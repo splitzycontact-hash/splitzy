@@ -15,6 +15,7 @@ import { Payment } from './pages/Payment'
 import { Confirmation } from './pages/Confirmation'
 import { Feedback } from './pages/Feedback'
 import { FeedbackSent } from './pages/FeedbackSent'
+import { TableEntry } from './pages/TableEntry'
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { state } = useSession()
@@ -97,6 +98,7 @@ function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          <Route path="/t/:slug/:tableNumber" element={<TableEntry />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>

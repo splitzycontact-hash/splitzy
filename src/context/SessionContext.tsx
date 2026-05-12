@@ -6,6 +6,8 @@ const initialState: SessionState = {
   restaurantName: MOCK_SESSION.restaurantName,
   tableNumber: MOCK_SESSION.tableNumber,
   tableCapacity: MOCK_SESSION.tableCapacity,
+  convexRestaurantId: null,
+  convexTableId: null,
   userName: '',
   userAvatarIndex: 0,
   convives: MOCK_SESSION.convives,
@@ -69,6 +71,8 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
       return { ...state, feedbackText: action.payload }
     case 'SEND_FEEDBACK':
       return { ...state, feedbackSent: true }
+    case 'SET_TABLE_CONTEXT':
+      return { ...state, ...action.payload }
     case 'RESET_SESSION':
       return { ...initialState }
     default:

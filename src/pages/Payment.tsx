@@ -8,12 +8,8 @@ import { Button } from '../components/ui/Button'
 import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
-import { useRestaurantId } from '../hooks/useRestaurant'
+import type { Id } from '../../convex/_generated/dataModel'
 import { MOCK_CARDS } from '../data/session'
-
-// Placeholder table ID constant — will be replaced by a real Convex ID once `npx convex dev` is run
-// For now, the mutation call is guarded so it only fires when restaurantId is available
-const MOCK_TABLE_NUMBER = 7
 
 export function Payment() {
   const { state, dispatch } = useSession()
@@ -21,7 +17,6 @@ export function Payment() {
   const { subtotal, tipAmount, splitzyFee, total } = useSessionCalcs()
   const [loading, setLoading] = useState(false)
 
-  const restaurantId = useRestaurantId()
   const createPayment = useMutation(api.payments.create)
 
   const selectedCard = MOCK_CARDS.find(c => c.id === state.selectedCardId) ?? MOCK_CARDS[0]
@@ -29,29 +24,20 @@ export function Payment() {
   const handlePay = async () => {
     setLoading(true)
     try {
-      // Fire-and-forget: record payment in Convex when restaurant is connected
-      if (restaurantId) {
-        // We use a sentinel approach: pass restaurantId as tableId as well
-        // since we don't have a real tableId in the client session yet.
-        // Once `npx convex dev` seeds the DB, this can be replaced with
-        // a real table lookup. For now the mutation is a best-effort call.
+      if (state.convexRestaurantId && state.convexTableId) {
         await createPayment({
-          restaurantId,
-          tableId: restaurantId as unknown as string & { __tableName: "tables" },
-          tableNumber: state.tableNumber ?? MOCK_TABLE_NUMBER,
+          restaurantId: state.convexRestaurantId as Id<'restaurants'>,
+          tableId: state.convexTableId as Id<'tables'>,
+          tableNumber: state.tableNumber,
           guests: state.equalSplitCount ?? 1,
           subtotalCents: subtotal,
           tipCents: tipAmount,
           commissionCents: splitzyFee,
           totalCents: total,
           paymentMethod: selectedCard.brand.toLowerCase(),
-        }).catch(() => {
-          // Silently fail if Convex is not connected
-        })
+        }).catch(() => {})
       }
-    } catch {
-      // Silently fail — app works without Convex
-    }
+    } catch {}
     dispatch({ type: 'CONFIRM_PAYMENT' })
     navigate('/confirmation')
   }

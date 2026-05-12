@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useMutation } from 'convex/react'
+import { useMutation, useQuery } from 'convex/react'
+import { QRCodeSVG } from 'qrcode.react'
+import { Download } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { Topbar } from '../layout/Topbar'
-import { useRestaurant } from '../context/RestaurantContext'
+import { useRestaurant, useRestaurantId } from '../context/RestaurantContext'
 
 type SectionKey = 'restaurant' | 'menu' | 'qr' | 'notifications' | 'pos' | 'billing'
 
@@ -31,6 +33,83 @@ const POS_INTEGRATIONS = [
   { name: 'API perso',  badge: 'Bientôt',    badgeStyle: 'bg-gray-100 text-gray-400',                          status: 'soon'       },
 ]
 
+function QRCodesSection({
+  tables, restaurantSlug,
+}: {
+  tables: { number: number; capacity: number }[]
+  restaurantSlug: string
+}) {
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+
+  function downloadSVG(tableNumber: number) {
+    const svgEl = document.getElementById(`qr-table-${tableNumber}`)
+    if (!svgEl) return
+    const svg = svgEl.outerHTML
+    const blob = new Blob([svg], { type: 'image/svg+xml' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `qr-table-${tableNumber}.svg`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  if (tables.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-border shadow-card p-12 text-center">
+        <div className="text-4xl mb-3">🪑</div>
+        <div className="text-base font-semibold text-dark">Aucune table configurée</div>
+        <div className="text-sm text-muted mt-1">Vos QR codes apparaîtront ici.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-white rounded-xl border border-border shadow-card p-5">
+        <h2 className="text-base font-bold text-dark mb-1">QR Codes de vos tables</h2>
+        <p className="text-sm text-muted mb-5">
+          Chaque QR code ouvre directement la page de paiement pour la table correspondante.
+        </p>
+        <div className="grid grid-cols-3 gap-4">
+          {tables.map(table => {
+            const url = `${baseUrl}/t/${restaurantSlug}/${table.number}`
+            return (
+              <div key={table.number} className="flex flex-col items-center gap-3 border border-border rounded-xl p-4">
+                <div className="text-sm font-bold text-dark">Table {table.number}</div>
+                <div className="bg-white p-2 rounded-lg border border-border">
+                  <QRCodeSVG
+                    id={`qr-table-${table.number}`}
+                    value={url}
+                    size={110}
+                    level="M"
+                    includeMargin={false}
+                  />
+                </div>
+                <div className="text-[10px] text-muted text-center break-all px-1">{url}</div>
+                <button
+                  onClick={() => downloadSVG(table.number)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-brand hover:text-brand-dark transition-colors"
+                >
+                  <Download size={12} />
+                  Télécharger
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="bg-brand-bg border border-brand/20 rounded-xl p-4 flex items-start gap-3">
+        <span className="text-xl shrink-0">💡</span>
+        <div className="text-sm text-dark">
+          <strong>Comment utiliser ?</strong> Imprimez chaque QR code et posez-le sur la table correspondante. Vos clients scannent, paient et laissent un avis — sans attendre le serveur.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
@@ -49,7 +128,9 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 export function Settings() {
   const restaurant = useRestaurant()
+  const restaurantId = useRestaurantId()
   const updateRestaurant = useMutation(api.restaurants.update)
+  const rawTables = useQuery(api.tables.list, restaurantId ? { restaurantId } : 'skip')
 
   const [section, setSection] = useState<SectionKey>('restaurant')
   const [saving, setSaving] = useState(false)
@@ -255,7 +336,15 @@ export function Settings() {
               </div>
             )}
 
-            {(section === 'menu' || section === 'qr' || section === 'billing') && (
+            {section === 'qr' && (
+              <QRCodesSection
+                tables={(rawTables ?? []) as { number: number; capacity: number }[]}
+                restaurantSlug={restaurant?.slug ?? ''}
+  
+              />
+            )}
+
+            {(section === 'menu' || section === 'billing') && (
               <div className="bg-white rounded-xl border border-border shadow-card p-12 text-center">
                 <div className="text-4xl mb-3">🚧</div>
                 <div className="text-base font-semibold text-dark">Section en cours de développement</div>
