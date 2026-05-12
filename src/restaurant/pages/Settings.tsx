@@ -77,7 +77,7 @@ function QRCodesSection({
             return (
               <div key={table.number} className="flex flex-col items-center gap-3 border border-border rounded-xl p-4">
                 <div className="text-sm font-bold text-dark">Table {table.number}</div>
-                <div className="bg-white p-2 rounded-lg border border-border">
+                <a href={url} target="_blank" rel="noreferrer" className="bg-white p-2 rounded-lg border border-border hover:border-brand transition-colors">
                   <QRCodeSVG
                     id={`qr-table-${table.number}`}
                     value={url}
@@ -85,14 +85,21 @@ function QRCodesSection({
                     level="M"
                     includeMargin={false}
                   />
-                </div>
-                <div className="text-[10px] text-muted text-center break-all px-1">{url}</div>
+                </a>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] text-brand underline text-center break-all px-1 hover:text-brand-dark"
+                >
+                  Tester le lien →
+                </a>
                 <button
                   onClick={() => downloadSVG(table.number)}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-brand hover:text-brand-dark transition-colors"
+                  className="flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-dark transition-colors"
                 >
                   <Download size={12} />
-                  Télécharger
+                  Télécharger SVG
                 </button>
               </div>
             )
