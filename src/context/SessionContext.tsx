@@ -8,6 +8,7 @@ const initialState: SessionState = {
   tableCapacity: MOCK_SESSION.tableCapacity,
   convexRestaurantId: null,
   convexTableId: null,
+  tableTotalCents: MOCK_SESSION.tableTotalCents,
   userName: '',
   userAvatarIndex: 0,
   convives: MOCK_SESSION.convives,

@@ -4,6 +4,7 @@ import { useSession } from '../context/SessionContext'
 import { Avatar, DottedAvatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
 import { pageVariants } from '../utils/animations'
+import { formatEur } from '../utils/formatCurrency'
 
 export function Landing() {
   const { state } = useSession()
@@ -133,10 +134,9 @@ export function Landing() {
           <span className="text-xs text-muted">Live</span>
         </div>
         <div className="flex items-baseline gap-1 mt-1">
-          <span className="text-3xl font-black text-dark">87,40</span>
-          <span className="text-lg font-bold text-muted">€</span>
+          <span className="text-3xl font-black text-dark">{formatEur(state.tableTotalCents)}</span>
         </div>
-        <p className="text-xs text-muted mt-1">Pour {state.tableCapacity} personnes · {state.convives.length} articles commandés</p>
+        <p className="text-xs text-muted mt-1">Pour {state.tableCapacity} personnes</p>
       </motion.div>
 
       {/* CTAs */}

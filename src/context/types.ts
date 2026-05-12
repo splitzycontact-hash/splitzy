@@ -29,6 +29,7 @@ export interface SessionState {
   tableCapacity: number
   convexRestaurantId: string | null
   convexTableId: string | null
+  tableTotalCents: number
   userName: string
   userAvatarIndex: number
   convives: Convive[]
@@ -60,5 +61,5 @@ export type SessionAction =
   | { type: 'TOGGLE_FEEDBACK_TAG'; payload: string }
   | { type: 'SET_FEEDBACK_TEXT'; payload: string }
   | { type: 'SEND_FEEDBACK' }
-  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null } }
+  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number } }
   | { type: 'RESET_SESSION' }

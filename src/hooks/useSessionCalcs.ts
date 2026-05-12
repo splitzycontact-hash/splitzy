@@ -1,6 +1,5 @@
 import { useSession } from '../context/SessionContext'
 import { MENU_ITEMS } from '../data/menu'
-import { TABLE_TOTAL_CENTS } from '../data/session'
 
 export function useSessionCalcs() {
   const { state } = useSession()
@@ -14,7 +13,7 @@ export function useSessionCalcs() {
       return acc + Math.round(item.price / sel.splitFactor)
     }, 0)
   } else if (state.splitMode === 'equal') {
-    subtotal = Math.round(TABLE_TOTAL_CENTS / state.equalSplitCount)
+    subtotal = Math.round(state.tableTotalCents / state.equalSplitCount)
   } else if (state.splitMode === 'custom') {
     subtotal = state.customAmount
   }

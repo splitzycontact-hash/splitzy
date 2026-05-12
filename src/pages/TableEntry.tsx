@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { useSession } from '../context/SessionContext'
+import { TABLE_TOTAL_CENTS } from '../data/session'
 
 export function TableEntry() {
   const { slug, tableNumber } = useParams<{ slug: string; tableNumber: string }>()
@@ -31,6 +32,7 @@ export function TableEntry() {
         tableCapacity: context.table?.capacity ?? 4,
         convexRestaurantId: context.restaurant._id,
         convexTableId: context.table?._id ?? null,
+        tableTotalCents: context.table?.amountCents ?? TABLE_TOTAL_CENTS,
       },
     })
     navigate('/', { replace: true })
