@@ -89,7 +89,7 @@ export function Items() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto pb-28">
+      <div className="flex-1 overflow-y-auto pb-4">
         {state.splitMode === 'item' && (
           <div className="px-3 pt-3 space-y-2">
             {CATEGORIES.map(cat => {
@@ -149,11 +149,8 @@ export function Items() {
         )}
       </div>
 
-      {/* Sticky footer */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-border px-5 py-3 safe-bottom"
-        style={{ maxWidth: 390, margin: '0 auto' }}
-      >
+      {/* Footer */}
+      <div className="flex-shrink-0 bg-white border-t border-border px-5 pt-3 pb-8 safe-bottom">
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-xs text-muted font-medium">Ma part</p>

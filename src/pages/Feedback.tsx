@@ -1,20 +1,39 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useMutation } from 'convex/react'
+import { api } from '../../convex/_generated/api'
 import { useSession } from '../context/SessionContext'
 import { DarkHero } from '../components/layout/DarkHero'
 import { StarRating } from '../components/features/StarRating'
 import { FeedbackTag } from '../components/features/FeedbackTag'
 import { Button } from '../components/ui/Button'
 import { pageVariants } from '../utils/animations'
+import { useRestaurantId } from '../hooks/useRestaurant'
 import { FEEDBACK_TAGS } from '../data/session'
 
 export function Feedback() {
   const { state, dispatch } = useSession()
   const navigate = useNavigate()
 
+  const restaurantId = useRestaurantId()
+  const createFeedback = useMutation(api.feedbacks.create)
+
   const canSend = state.feedbackStars > 0
 
-  const handleSend = () => {
+  const handleSend = async () => {
+    // Fire-and-forget: record feedback in Convex when restaurant is connected
+    if (restaurantId) {
+      createFeedback({
+        restaurantId,
+        tableId: restaurantId as unknown as string & { __tableName: "tables" },
+        tableNumber: state.tableNumber ?? 7,
+        stars: state.feedbackStars,
+        tags: state.feedbackTags,
+        text: state.feedbackText,
+      }).catch(() => {
+        // Silently fail if Convex is not connected
+      })
+    }
     dispatch({ type: 'SEND_FEEDBACK' })
     navigate('/feedback/sent')
   }

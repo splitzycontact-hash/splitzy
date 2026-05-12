@@ -44,13 +44,18 @@ export function Table() {
         className="flex-shrink-0 flex items-center justify-between px-5 py-4"
         style={{ background: '#18181B' }}
       >
-        <h1 className="text-white font-black text-lg">Table {state.tableNumber}</h1>
         <button
           type="button"
-          className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white"
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1 text-white/70 hover:text-white text-sm font-medium min-h-[44px]"
         >
-          ⋯
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Retour
         </button>
+        <h1 className="text-white font-black text-lg">Table {state.tableNumber}</h1>
+        <div className="w-16" />
       </div>
 
       {/* Convives row */}
@@ -63,7 +68,7 @@ export function Table() {
         <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
           À cette table
         </p>
-        <div className="flex items-center gap-3 overflow-x-auto hide-scrollbar">
+        <div className="flex items-center gap-3 overflow-x-auto hide-scrollbar py-1 px-0.5">
           {allConvives.map((c, idx) => (
             <div key={c.id} className="flex flex-col items-center gap-1 flex-shrink-0">
               <div
@@ -123,7 +128,7 @@ export function Table() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="px-5 mt-6 pb-8 safe-bottom flex flex-col gap-3"
+        className="px-5 mt-6 pb-4 safe-bottom flex flex-col gap-3"
       >
         <Button variant="brand" onClick={() => navigate('/items')}>
           Choisir mes articles

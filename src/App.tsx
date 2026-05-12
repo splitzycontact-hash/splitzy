@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { AnimatePresence } from 'framer-motion'
 import { SessionProvider, useSession } from './context/SessionContext'
 import { PhoneWrapper } from './components/layout/PhoneWrapper'
+import { RestaurantApp } from './restaurant/RestaurantApp'
 
 import { Landing } from './pages/Landing'
 import { Profile } from './pages/Profile'
@@ -106,9 +107,17 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <SessionProvider>
-        <AppRoutes />
-      </SessionProvider>
+      <Routes>
+        <Route path="/restaurant/*" element={<RestaurantApp />} />
+        <Route
+          path="/*"
+          element={
+            <SessionProvider>
+              <AppRoutes />
+            </SessionProvider>
+          }
+        />
+      </Routes>
     </BrowserRouter>
   )
 }

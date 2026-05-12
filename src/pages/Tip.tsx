@@ -45,19 +45,21 @@ export function Tip() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col items-center px-5 pt-6">
-        {/* Tip amount display */}
-        <motion.div
-          key={tipAmount}
-          initial={{ scale: 0.9, opacity: 0.6 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          className="text-center mb-2"
-        >
-          <p className="text-[56px] font-black text-dark leading-none">
-            {formatEur(tipAmount)}
-          </p>
-        </motion.div>
+      <div className="flex flex-col items-center px-5 pt-6">
+        {/* Tip amount display — masqué si 0 */}
+        {tipAmount > 0 && (
+          <motion.div
+            key={tipAmount}
+            initial={{ scale: 0.9, opacity: 0.6 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            className="text-center mb-2"
+          >
+            <p className="text-[56px] font-black text-dark leading-none">
+              {formatEur(tipAmount)}
+            </p>
+          </motion.div>
+        )}
 
         {/* Emotional copy */}
         <motion.p
@@ -127,8 +129,8 @@ export function Tip() {
       </div>
 
       {/* CTA */}
-      <div className="px-5 mt-6 pb-8 safe-bottom flex-shrink-0">
-        <Button variant="brand" onClick={() => navigate('/payment')}>
+      <div className="px-5 mt-3 pb-4 safe-bottom flex-shrink-0">
+        <Button variant="brand" onClick={() => navigate('/payment')} className="text-lg">
           Payer {formatEur(total)}
         </Button>
       </div>

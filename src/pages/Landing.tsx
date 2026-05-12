@@ -9,6 +9,14 @@ export function Landing() {
   const { state } = useSession()
   const navigate = useNavigate()
 
+  const handleScanQR = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.setAttribute('capture', 'environment')
+    input.click()
+  }
+
   return (
     <motion.div
       variants={pageVariants}
@@ -136,13 +144,13 @@ export function Landing() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5, duration: 0.3 }}
-        className="px-5 mt-6 pb-8 safe-bottom flex flex-col gap-3"
+        className="px-5 mt-6 pb-4 safe-bottom flex flex-col gap-3"
       >
         <Button variant="brand" onClick={() => navigate('/profile')}>
           Je rejoins la table →
         </Button>
-        <Button variant="ghost" onClick={() => {}}>
-          Scanner un autre QR
+        <Button variant="ghost" onClick={handleScanQR}>
+          Scanner un autre QR code
         </Button>
       </motion.div>
     </motion.div>

@@ -1,0 +1,189 @@
+import { mutation } from "./_generated/server"
+
+export const seedLeComptoir = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Check if already seeded
+    const existing = await ctx.db.query("restaurants").withIndex("by_slug", q => q.eq("slug", "le-comptoir-parisien")).unique()
+    if (existing) return { restaurantId: existing._id, message: "Already seeded" }
+
+    const restaurantId = await ctx.db.insert("restaurants", {
+      name: "Le Comptoir Parisien",
+      slug: "le-comptoir-parisien",
+      address: "12 rue de Rivoli, 75004 Paris",
+      phone: "01 42 33 44 55",
+      email: "gerant@lecomptoir.fr",
+      type: "restaurant",
+    })
+
+    // Create 14 tables
+    const tableStatuses = [
+      { n:1,  status:"dining"  as const, guests:2, durationMinutes:70,  amountCents:7800 },
+      { n:2,  status:"free"    as const },
+      { n:3,  status:"payment" as const, guests:3, durationMinutes:102, amountCents:10100, alert:true },
+      { n:4,  status:"dining"  as const, guests:2, durationMinutes:45,  amountCents:5200 },
+      { n:5,  status:"dining"  as const, guests:4, durationMinutes:32,  amountCents:3400 },
+      { n:6,  status:"free"    as const },
+      { n:7,  status:"paid"    as const, guests:2, durationMinutes:125, amountCents:6200 },
+      { n:8,  status:"dining"  as const, guests:3, durationMinutes:58,  amountCents:8800 },
+      { n:9,  status:"payment" as const, guests:4, durationMinutes:115, amountCents:7800, alert:true },
+      { n:10, status:"free"    as const },
+      { n:11, status:"dining"  as const, guests:2, durationMinutes:25,  amountCents:5600 },
+      { n:12, status:"payment" as const, guests:3, durationMinutes:130, amountCents:5500, alert:true },
+      { n:13, status:"paid"    as const, guests:5, durationMinutes:150, amountCents:14200 },
+      { n:14, status:"free"    as const },
+    ]
+
+    for (const t of tableStatuses) {
+      await ctx.db.insert("tables", {
+        restaurantId,
+        number: t.n,
+        capacity: 4,
+        status: t.status,
+        guests: t.guests,
+        durationMinutes: t.durationMinutes,
+        amountCents: t.amountCents,
+        alert: t.alert,
+      })
+    }
+
+    // Seed sample feedbacks
+    const tableRows = await ctx.db.query("tables").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).collect()
+    const tableMap = Object.fromEntries(tableRows.map(t => [t.number, t._id]))
+
+    const sampleFeedbacks = [
+      { tableNumber:12, stars:2, tags:["⏱ Service lent","🥘 Plat froid"], text:"Service vraiment trop lent, mon plat était tiède à l'arrivée.", timeLabel:"hier 21h47", isNew:true },
+      { tableNumber:4,  stars:3, tags:["💸 Erreur addition"], text:"Addition incorrecte, on a dû demander deux fois pour corriger.", timeLabel:"hier 20h12", isNew:true },
+      { tableNumber:7,  stars:5, tags:["😊 Super ambiance","✨ On reviendra !"], text:"Accueil chaleureux, entrecôte parfaite, on reviendra !", timeLabel:"hier 22h15", isNew:false },
+      { tableNumber:9,  stars:3, tags:["📢 Trop bruyant"], text:"Bon dîner, table un peu bruyante près de la cuisine.", timeLabel:"hier 19h44", isNew:false },
+    ]
+
+    for (const fb of sampleFeedbacks) {
+      const tid = tableMap[fb.tableNumber]
+      if (tid) {
+        await ctx.db.insert("feedbacks", {
+          restaurantId,
+          tableId: tid,
+          tableNumber: fb.tableNumber,
+          stars: fb.stars,
+          tags: fb.tags,
+          text: fb.text,
+          isNew: fb.isNew,
+          createdAt: Date.now(),
+          timeLabel: fb.timeLabel,
+        })
+      }
+    }
+
+    // Seed sample payments
+    const samplePayments = [
+      { tableNumber:7,  guests:2, subtotalCents:5700,  tipCents:570,  commissionCents:219, totalCents:6270,  paymentMethod:"card",     dateLabel:"11/05" },
+      { tableNumber:13, guests:5, subtotalCents:12920, tipCents:1280, commissionCents:497, totalCents:14200, paymentMethod:"applepay", dateLabel:"11/05" },
+      { tableNumber:2,  guests:2, subtotalCents:4380,  tipCents:440,  commissionCents:169, totalCents:4820,  paymentMethod:"card",     dateLabel:"10/05" },
+      { tableNumber:5,  guests:4, subtotalCents:8140,  tipCents:810,  commissionCents:313, totalCents:8950,  paymentMethod:"card",     dateLabel:"10/05" },
+      { tableNumber:11, guests:2, subtotalCents:3420,  tipCents:340,  commissionCents:132, totalCents:3760,  paymentMethod:"googlepay",dateLabel:"10/05" },
+      { tableNumber:6,  guests:3, subtotalCents:6590,  tipCents:650,  commissionCents:253, totalCents:7240,  paymentMethod:"card",     dateLabel:"09/05" },
+      { tableNumber:1,  guests:2, subtotalCents:4670,  tipCents:460,  commissionCents:180, totalCents:5130,  paymentMethod:"card",     dateLabel:"09/05" },
+      { tableNumber:8,  guests:4, subtotalCents:8980,  tipCents:890,  commissionCents:345, totalCents:9870,  paymentMethod:"applepay", dateLabel:"08/05" },
+    ]
+
+    for (const p of samplePayments) {
+      const tid = tableMap[p.tableNumber]
+      if (tid) {
+        await ctx.db.insert("payments", {
+          restaurantId,
+          tableId: tid,
+          tableNumber: p.tableNumber,
+          guests: p.guests,
+          subtotalCents: p.subtotalCents,
+          tipCents: p.tipCents,
+          commissionCents: p.commissionCents,
+          totalCents: p.totalCents,
+          paymentMethod: p.paymentMethod,
+          status: "Encaissé",
+          createdAt: Date.now(),
+          dateLabel: p.dateLabel,
+        })
+      }
+    }
+
+    return { restaurantId, message: "Seeded successfully" }
+  },
+})
+
+export const simulateClient = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const restaurant = await ctx.db
+      .query("restaurants")
+      .withIndex("by_slug", q => q.eq("slug", "le-comptoir-parisien"))
+      .unique()
+    if (!restaurant) throw new Error("Restaurant not found — run seedLeComptoir first")
+
+    // Pick table 2 (free)
+    const tables = await ctx.db
+      .query("tables")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurant._id))
+      .collect()
+    const table = tables.find(t => t.number === 2)
+    if (!table) throw new Error("Table 2 not found")
+
+    const now = Date.now()
+    const d = new Date(now)
+    const hhmm = `${String(d.getHours()).padStart(2,'0')}h${String(d.getMinutes()).padStart(2,'0')}`
+    const dateLabel = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
+
+    // 1. Client arrives — table goes dining
+    await ctx.db.patch(table._id, {
+      status: "dining",
+      guests: 2,
+      durationMinutes: 0,
+      amountCents: 7400,
+      alert: false,
+    })
+
+    // 2. Payment — Yann paie Entrecôte + Verre Bordeaux + Café
+    //    Sous-total: 24€ + 11€ + 3€ = 38€, pourboire 10% = 3,80€, commission 1,5% = 0,57€
+    const subtotal  = 3800
+    const tip       = 380
+    const commission = Math.round(subtotal * 0.015)
+    const total     = subtotal + tip
+
+    await ctx.db.insert("payments", {
+      restaurantId: restaurant._id,
+      tableId: table._id,
+      tableNumber: 2,
+      guests: 2,
+      subtotalCents: subtotal,
+      tipCents: tip,
+      commissionCents: commission,
+      totalCents: total,
+      paymentMethod: "card",
+      status: "Encaissé",
+      createdAt: now,
+      dateLabel,
+    })
+
+    // 3. Table passes to paid
+    await ctx.db.patch(table._id, { status: "paid", amountCents: total })
+
+    // 4. Feedback — 4 étoiles, bonne expérience
+    await ctx.db.insert("feedbacks", {
+      restaurantId: restaurant._id,
+      tableId: table._id,
+      tableNumber: 2,
+      stars: 4,
+      tags: ["😊 Super ambiance", "🍷 Carte des vins"],
+      text: "Très bon repas, entrecôte parfaitement cuite. Service attentionné. La carte des vins est excellente, on reviendra !",
+      isNew: true,
+      createdAt: now,
+      timeLabel: `aujourd'hui ${hhmm}`,
+    })
+
+    return {
+      message: `✅ Client simulé sur Table 2 — paiement ${(total/100).toFixed(2).replace('.',',')}€ enregistré, feedback 4★ envoyé`,
+      tableId: table._id,
+      totalCents: total,
+    }
+  },
+})

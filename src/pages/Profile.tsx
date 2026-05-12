@@ -23,18 +23,30 @@ export function Profile() {
       className="flex flex-col min-h-full bg-bg"
     >
       {/* Top bar */}
-      <div className="flex-shrink-0 px-5 pt-5 pb-3 bg-white border-b border-border">
-        {/* Step dots */}
-        <div className="flex items-center justify-center gap-2 mb-4">
-          {[0, 1, 2].map(i => (
-            <motion.div
-              key={i}
-              animate={{ width: i === 0 ? 28 : 8 }}
-              transition={springPop}
-              className="h-2 rounded-full"
-              style={{ background: i === 0 ? '#E8920A' : '#E5E7EB' }}
-            />
-          ))}
+      <div className="flex-shrink-0 px-5 pt-3 pb-3 bg-white border-b border-border">
+        <div className="flex items-center justify-between mb-3">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1 text-mid hover:text-dark text-sm font-medium min-h-[44px]"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Retour
+          </button>
+          <div className="flex items-center gap-2">
+            {[0, 1, 2].map(i => (
+              <motion.div
+                key={i}
+                animate={{ width: i === 0 ? 28 : 8 }}
+                transition={springPop}
+                className="h-2 rounded-full"
+                style={{ background: i === 0 ? '#E8920A' : '#E5E7EB' }}
+              />
+            ))}
+          </div>
+          <div className="w-16" />
         </div>
         <h1 className="text-xl font-black text-dark text-center">Choisis ton avatar</h1>
         <p className="text-sm text-muted text-center mt-1">Étape 1 sur 3</p>
@@ -121,7 +133,7 @@ export function Profile() {
       )}
 
       {/* CTA */}
-      <div className="px-5 mt-auto pt-6 pb-8 safe-bottom">
+      <div className="px-5 mt-auto pt-4 pb-14 safe-bottom">
         <Button
           variant="brand"
           disabled={!canContinue}

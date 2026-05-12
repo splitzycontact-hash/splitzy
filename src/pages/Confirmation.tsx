@@ -24,7 +24,7 @@ export function Confirmation() {
       exit="exit"
       className="flex flex-col min-h-full bg-bg"
     >
-      <DarkHero minHeight="220px" className="flex-shrink-0">
+<DarkHero minHeight="180px" className="flex-shrink-0">
         {/* Check circle */}
         <motion.div
           variants={checkAnimation}
@@ -56,7 +56,7 @@ export function Confirmation() {
       </DarkHero>
 
       {/* Bill card - overlaps the hero */}
-      <div className="flex-1 overflow-y-auto px-5 -mt-5 pb-6">
+      <div className="flex-1 overflow-y-auto px-5 mt-4 pb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

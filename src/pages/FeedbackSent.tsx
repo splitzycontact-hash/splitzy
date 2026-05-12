@@ -4,10 +4,14 @@ import { useSession } from '../context/SessionContext'
 import { DarkHero } from '../components/layout/DarkHero'
 import { Button } from '../components/ui/Button'
 import { pageVariants } from '../utils/animations'
-
 export function FeedbackSent() {
-  const { dispatch } = useSession()
+  const { state, dispatch } = useSession()
   const navigate = useNavigate()
+
+  const handleDownloadPDF = async () => {
+    const { generateInvoicePDF } = await import('../utils/generateInvoice')
+    generateInvoicePDF(state)
+  }
 
   const handleReset = () => {
     dispatch({ type: 'RESET_SESSION' })
@@ -61,6 +65,18 @@ export function FeedbackSent() {
             <span>Jamais publié · 100% privé</span>
           </div>
         </div>
+
+        {/* Download invoice */}
+        <button
+          type="button"
+          onClick={handleDownloadPDF}
+          className="w-full flex items-center justify-center gap-2 bg-white border border-border rounded-2xl py-4 min-h-[52px] text-sm font-semibold text-dark hover:bg-bg transition-colors active:bg-bg"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 1v9M8 10l-3-3M8 10l3-3M2 13h12" stroke="#374151" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Télécharger ma facture (PDF)
+        </button>
 
         {/* Spacer */}
         <div className="flex-1" />

@@ -26,6 +26,18 @@
   }
 }
 
+@media print {
+  body > *:not(.splitzy-print-portal) { display: none !important; }
+  .splitzy-print-portal {
+    position: static !important;
+    overflow: visible !important;
+    background: white !important;
+    height: auto !important;
+  }
+  .no-print { display: none !important; }
+  .print-break { break-before: page; }
+}
+
 @layer utilities {
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
