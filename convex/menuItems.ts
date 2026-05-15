@@ -82,11 +82,11 @@ export const syncFromSquare = action({
     })
     const dbToken = integration?.apiKey
     const accessToken = (process.env.SQUARE_ACCESS_TOKEN || dbToken)?.trim()
-    console.log("Catalog sync - Token:", accessToken?.slice(0, 15), "| URL: sandbox")
+    console.log("Catalog sync - Token:", accessToken?.slice(0, 15), "| URL: production")
     if (!accessToken) throw new Error("Square non connecté")
 
     const res = await fetch(
-      "https://connect.squareupsandbox.com/v2/catalog/list?types=ITEM,CATEGORY",
+      "https://connect.squareup.com/v2/catalog/list?types=ITEM,CATEGORY",
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
