@@ -13,12 +13,12 @@ export function RestaurantApp() {
   return (
     <Routes>
       <Route path="/sign-in" element={<RestaurantSignIn />} />
+      <Route path="/onboarding" element={<RestaurantOnboarding />} />
       <Route
         path="/*"
         element={
           <RestaurantAuthGuard>
             <Routes>
-              <Route path="/onboarding" element={<RestaurantOnboarding />} />
               <Route
                 path="/*"
                 element={

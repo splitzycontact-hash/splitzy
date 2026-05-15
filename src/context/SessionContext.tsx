@@ -3,9 +3,9 @@ import type { SessionState, SessionAction } from './types'
 import { MOCK_SESSION } from '../data/session'
 
 const initialState: SessionState = {
-  restaurantName: MOCK_SESSION.restaurantName,
-  tableNumber: MOCK_SESSION.tableNumber,
-  tableCapacity: MOCK_SESSION.tableCapacity,
+  restaurantName: '',
+  tableNumber: 0,
+  tableCapacity: 4,
   convexRestaurantId: null,
   convexTableId: null,
   tableTotalCents: MOCK_SESSION.tableTotalCents,

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useQuery } from 'convex/react'
+import { useState, useEffect, useRef } from 'react'
+import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { Topbar } from '../layout/Topbar'
@@ -48,6 +48,15 @@ export function Feedbacks() {
 
   const restaurantId = useRestaurantId()
   const rawFeedbacks = useQuery(api.feedbacks.list, restaurantId ? { restaurantId } : "skip")
+  const markAllRead = useMutation(api.feedbacks.markAllRead)
+
+  // Mark all feedbacks as read when the page is opened
+  const markedRef = useRef(false)
+  useEffect(() => {
+    if (!restaurantId || markedRef.current) return
+    markedRef.current = true
+    markAllRead({ restaurantId })
+  }, [restaurantId])
 
   type ConvexFeedback = { stars: number; tableNumber: number; timeLabel: string; isNew: boolean; text: string; tags: string[] }
 

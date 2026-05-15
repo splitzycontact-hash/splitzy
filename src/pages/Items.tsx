@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useQuery } from 'convex/react'
 import { useSession } from '../context/SessionContext'
 import { Pill } from '../components/ui/Pill'
 import { ItemRow } from '../components/features/ItemRow'
@@ -10,7 +11,9 @@ import { pageVariants, slideDown } from '../utils/animations'
 import { MENU_ITEMS } from '../data/menu'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
-import { TABLE_TOTAL_CENTS } from '../data/session'
+import { api } from '../../convex/_generated/api'
+import type { Id } from '../../convex/_generated/dataModel'
+import type { MenuItem } from '../context/types'
 type Category = 'entrees' | 'plats' | 'desserts' | 'boissons'
 
 const CATEGORIES: { id: Category; label: string; emoji: string }[] = [
@@ -25,6 +28,24 @@ export function Items() {
   const navigate = useNavigate()
   const { subtotal } = useSessionCalcs()
   const [openCategories, setOpenCategories] = useState<Set<Category>>(new Set(['entrees', 'plats']))
+
+  const convexItems = useQuery(
+    api.menuItems.listByRestaurant,
+    state.convexRestaurantId
+      ? { restaurantId: state.convexRestaurantId as Id<'restaurants'> }
+      : 'skip',
+  )
+
+  const menuItems: MenuItem[] = convexItems && convexItems.length > 0
+    ? convexItems.map(item => ({
+        id: item._id,
+        category: item.category as MenuItem['category'],
+        emoji: item.emoji,
+        name: item.name,
+        description: item.description ?? '',
+        price: item.priceCents,
+      }))
+    : MENU_ITEMS
 
   const toggleCategory = (cat: Category) => {
     setOpenCategories(prev => {
@@ -93,7 +114,7 @@ export function Items() {
         {state.splitMode === 'item' && (
           <div className="px-3 pt-3 space-y-2">
             {CATEGORIES.map(cat => {
-              const items = MENU_ITEMS.filter(m => m.category === cat.id)
+              const items = menuItems.filter(m => m.category === cat.id)
               const isOpen = openCategories.has(cat.id)
               return (
                 <div key={cat.id} className="bg-white rounded-2xl overflow-hidden">
@@ -174,13 +195,13 @@ export function Items() {
 
 function EqualSplitMode() {
   const { state, dispatch } = useSession()
-  const perPerson = Math.round(TABLE_TOTAL_CENTS / state.equalSplitCount)
+  const perPerson = Math.round(state.tableTotalCents / state.equalSplitCount)
 
   return (
     <div className="px-5 pt-6 flex flex-col items-center">
       <div className="bg-white rounded-2xl p-6 w-full text-center shadow-card">
         <p className="text-sm text-muted font-medium mb-1">Total de la table</p>
-        <p className="text-3xl font-black text-dark mb-6">{formatEur(TABLE_TOTAL_CENTS)}</p>
+        <p className="text-3xl font-black text-dark mb-6">{formatEur(state.tableTotalCents)}</p>
 
         <p className="text-xs text-muted font-semibold uppercase tracking-wider mb-3">
           Nombre de personnes
@@ -244,7 +265,7 @@ function CustomAmountMode() {
         />
         <span className="text-4xl font-black text-muted">€</span>
       </div>
-      <p className="text-xs text-muted mt-4">Total table : {formatEur(TABLE_TOTAL_CENTS)}</p>
+      <p className="text-xs text-muted mt-4">Total table : {formatEur(state.tableTotalCents)}</p>
     </div>
   )
 }

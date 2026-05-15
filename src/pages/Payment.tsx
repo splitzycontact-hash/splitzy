@@ -18,6 +18,7 @@ export function Payment() {
   const [loading, setLoading] = useState(false)
 
   const createPayment = useMutation(api.payments.create)
+  const updateTableStatus = useMutation(api.tables.updateStatus)
 
   const selectedCard = MOCK_CARDS.find(c => c.id === state.selectedCardId) ?? MOCK_CARDS[0]
 
@@ -35,6 +36,13 @@ export function Payment() {
           commissionCents: splitzyFee,
           totalCents: total,
           paymentMethod: selectedCard.brand.toLowerCase(),
+        }).catch(() => {})
+      }
+      if (state.convexTableId) {
+        await updateTableStatus({
+          tableId: state.convexTableId as Id<'tables'>,
+          status: 'paid',
+          amountCents: total,
         }).catch(() => {})
       }
     } catch {}

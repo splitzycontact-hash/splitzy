@@ -36,6 +36,10 @@ export const getOverviewStats = query({
     const totalCA = encaisse.reduce((s, p) => s + p.totalCents, 0)
     const totalTips = encaisse.reduce((s, p) => s + p.tipCents, 0)
     const avgTipPct = encaisse.length > 0 ? (totalTips / encaisse.reduce((s, p) => s + p.subtotalCents, 0) * 100).toFixed(1) : "0"
-    return { totalCA, totalTips, avgTipPct, txCount: encaisse.length }
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+    const todayPayments = encaisse.filter(p => p.createdAt >= startOfDay.getTime())
+    const todayCA = todayPayments.reduce((s, p) => s + p.totalCents, 0)
+    const todayTips = todayPayments.reduce((s, p) => s + p.tipCents, 0)
+    return { todayCA, todayTips, totalCA, totalTips, avgTipPct, txCount: encaisse.length }
   },
 })

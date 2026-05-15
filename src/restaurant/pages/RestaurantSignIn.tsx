@@ -10,8 +10,8 @@ export function RestaurantSignIn() {
         <div className="text-sm text-muted">Interface gérant</div>
       </div>
       <SignIn
-        forceRedirectUrl="/restaurant"
-        signUpForceRedirectUrl="/restaurant"
+        forceRedirectUrl="/restaurant/onboarding"
+        signUpForceRedirectUrl="/restaurant/onboarding"
         appearance={{
           variables: {
             colorPrimary: '#E8920A',

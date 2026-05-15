@@ -32,6 +32,16 @@ export const markRead = mutation({
   },
 })
 
+export const markAllRead = mutation({
+  args: { restaurantId: v.id("restaurants") },
+  handler: async (ctx, { restaurantId }) => {
+    const newItems = await ctx.db.query("feedbacks").withIndex("by_restaurant_new", q => q.eq("restaurantId", restaurantId).eq("isNew", true)).collect()
+    for (const item of newItems) {
+      await ctx.db.patch(item._id, { isNew: false })
+    }
+  },
+})
+
 export const getNewCount = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {

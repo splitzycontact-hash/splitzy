@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useMutation } from 'convex/react'
-import { useUser } from '@clerk/clerk-react'
+import { useNavigate, Navigate } from 'react-router-dom'
+import { useMutation, useQuery } from 'convex/react'
+import { useAuth, useUser, useClerk, SignUp } from '@clerk/clerk-react'
 import { api } from '../../../convex/_generated/api'
 import { ChevronRight, ChevronLeft, Check, QrCode } from 'lucide-react'
 
@@ -10,14 +10,64 @@ const clerkReady = (() => {
   return typeof k === 'string' && k.startsWith('pk_') && k.length > 20
 })()
 
-// Only rendered when ClerkProvider is mounted
 function OnboardingWithClerk() {
+  const { isLoaded, isSignedIn } = useAuth()
   const { user } = useUser()
+  const clerk = useClerk()
+  const restaurant = useQuery(
+    api.restaurants.getByClerkId,
+    isSignedIn && user ? { clerkUserId: user.id } : 'skip',
+  )
+
+  if (!isLoaded || (isSignedIn && restaurant === undefined)) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  // Already has a restaurant → go to dashboard
+  if (isSignedIn && restaurant) {
+    return <Navigate to="/restaurant" replace />
+  }
+
+  // Signed in but no restaurant → show form
+  if (isSignedIn) {
+    return (
+      <OnboardingForm
+        userId={user?.id ?? ''}
+        defaultEmail={user?.emailAddresses[0]?.emailAddress ?? ''}
+        onBack={() => clerk.signOut({ redirectUrl: '/restaurant/sign-in' })}
+      />
+    )
+  }
+
+  // Not signed in → show Clerk sign-up
   return (
-    <OnboardingForm
-      userId={user?.id ?? ''}
-      defaultEmail={user?.emailAddresses[0]?.emailAddress ?? ''}
-    />
+    <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-6 p-6">
+      <div className="text-center">
+        <div className="text-3xl font-black tracking-tight text-dark mb-1">
+          Split<span className="text-brand">zy</span>
+        </div>
+        <div className="text-sm text-muted">Créez votre compte restaurant</div>
+      </div>
+      <SignUp
+        forceRedirectUrl="/restaurant/onboarding"
+        appearance={{
+          variables: {
+            colorPrimary: '#E8920A',
+            colorTextOnPrimaryBackground: '#ffffff',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            borderRadius: '12px',
+          },
+          elements: {
+            card: 'shadow-card border border-border',
+            headerTitle: 'font-bold',
+          },
+        }}
+      />
+    </div>
   )
 }
 
@@ -26,7 +76,7 @@ export function RestaurantOnboarding() {
   return <OnboardingWithClerk />
 }
 
-function OnboardingForm({ userId, defaultEmail }: { userId: string; defaultEmail: string }) {
+function OnboardingForm({ userId, defaultEmail, onBack }: { userId: string; defaultEmail: string; onBack?: () => void }) {
   const navigate = useNavigate()
   const createRestaurant = useMutation(api.restaurants.create)
   const createTables = useMutation(api.tables.createBulk)
@@ -81,8 +131,19 @@ function OnboardingForm({ userId, defaultEmail }: { userId: string; defaultEmail
     <div className="min-h-screen bg-bg flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-8 py-5 bg-white border-b border-border">
-        <div className="text-2xl font-black tracking-tight text-dark">
-          Split<span className="text-brand">zy</span>
+        <div className="flex items-center gap-4">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 text-sm text-muted hover:text-dark transition-colors"
+            >
+              <ChevronLeft size={16} />
+              Retour
+            </button>
+          )}
+          <div className="text-2xl font-black tracking-tight text-dark">
+            Split<span className="text-brand">zy</span>
+          </div>
         </div>
         <div className="text-xs text-muted">
           Besoin d'aide ?{' '}
@@ -220,6 +281,7 @@ function Step1({ form, onChange }: { form: FormState; onChange: (p: Partial<Form
           <input
             type="text"
             placeholder="Le Comptoir Parisien"
+            autoComplete="off"
             value={form.name}
             onChange={e => onChange({ name: e.target.value })}
             className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-dark placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
@@ -229,6 +291,7 @@ function Step1({ form, onChange }: { form: FormState; onChange: (p: Partial<Form
           <input
             type="text"
             placeholder="12 rue de Rivoli, 75004 Paris"
+            autoComplete="off"
             value={form.address}
             onChange={e => onChange({ address: e.target.value })}
             className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-dark placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
@@ -239,6 +302,7 @@ function Step1({ form, onChange }: { form: FormState; onChange: (p: Partial<Form
             <input
               type="tel"
               placeholder="01 42 33 44 55"
+              autoComplete="off"
               value={form.phone}
               onChange={e => onChange({ phone: e.target.value })}
               className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-dark placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
@@ -248,6 +312,7 @@ function Step1({ form, onChange }: { form: FormState; onChange: (p: Partial<Form
             <input
               type="email"
               placeholder="gerant@restaurant.fr"
+              autoComplete="off"
               value={form.email}
               onChange={e => onChange({ email: e.target.value })}
               className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-dark placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { useQuery } from 'convex/react'
+import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
+import type { Id } from '../../../convex/_generated/dataModel'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { Topbar } from '../layout/Topbar'
 import { useRestaurantId } from '../../hooks/useRestaurant'
@@ -17,6 +18,7 @@ type TableData = {
   duration?: string
   amountCents?: number
   alert?: boolean
+  convexId: Id<'tables'> | null
 }
 
 type FilterKey = 'all' | TableStatus
@@ -66,8 +68,9 @@ export function Tables() {
 
   const restaurantId = useRestaurantId()
   const rawTables = useQuery(api.tables.list, restaurantId ? { restaurantId } : 'skip')
+  const resetToFree = useMutation(api.tables.resetToFree)
 
-  type ConvexTable = { number: number; status: TableStatus; guests?: number; durationMinutes?: number; amountCents?: number; alert?: boolean }
+  type ConvexTable = { _id: Id<'tables'>; number: number; status: TableStatus; guests?: number; durationMinutes?: number; amountCents?: number; alert?: boolean }
 
   const tables: TableData[] = rawTables
     ? (rawTables as ConvexTable[]).map(t => ({
@@ -77,6 +80,7 @@ export function Tables() {
         duration: durationLabel(t.durationMinutes),
         amountCents: t.amountCents,
         alert: t.alert,
+        convexId: t._id,
       }))
     : []
 
@@ -228,6 +232,17 @@ export function Tables() {
                 {selectedTable.status === 'payment' && (
                   <button className="flex-1 bg-brand text-white font-semibold text-sm rounded-xl py-2.5 hover:bg-brand-dark transition-colors">
                     Envoyer rappel 📲
+                  </button>
+                )}
+                {selectedTable.status !== 'free' && selectedTable.convexId && (
+                  <button
+                    onClick={() => {
+                      resetToFree({ tableId: selectedTable.convexId as Id<'tables'> }).catch(() => {})
+                      setSelectedTable(null)
+                    }}
+                    className="flex-1 bg-gray-100 text-gray-700 font-semibold text-sm rounded-xl py-2.5 hover:bg-gray-200 transition-colors border border-gray-200"
+                  >
+                    Libérer la table 🪑
                   </button>
                 )}
                 <button

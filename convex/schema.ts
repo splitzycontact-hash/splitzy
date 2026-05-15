@@ -10,6 +10,7 @@ export default defineSchema({
     email: v.string(),
     type: v.string(),
     clerkUserId: v.optional(v.string()),
+    suspended: v.optional(v.boolean()),
   }).index("by_slug", ["slug"])
     .index("by_clerk_user", ["clerkUserId"]),
 
@@ -51,4 +52,26 @@ export default defineSchema({
     timeLabel: v.string(),
   }).index("by_restaurant", ["restaurantId"])
     .index("by_restaurant_new", ["restaurantId", "isNew"]),
+
+  posIntegrations: defineTable({
+    restaurantId: v.id("restaurants"),
+    provider: v.string(),
+    apiKey: v.string(),
+    locationId: v.optional(v.string()),
+    extraKey: v.optional(v.string()),
+    status: v.union(v.literal("active"), v.literal("error"), v.literal("pending")),
+    lastSyncAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    syncedTableCount: v.optional(v.number()),
+  }).index("by_restaurant", ["restaurantId"])
+    .index("by_restaurant_provider", ["restaurantId", "provider"]),
+
+  menuItems: defineTable({
+    restaurantId: v.id("restaurants"),
+    name: v.string(),
+    category: v.string(),
+    priceCents: v.number(),
+    emoji: v.string(),
+    description: v.optional(v.string()),
+  }).index("by_restaurant", ["restaurantId"]),
 })

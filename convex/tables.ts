@@ -37,3 +37,21 @@ export const updateStatus = mutation({
     await ctx.db.patch(tableId, { status, guests, amountCents })
   },
 })
+
+export const resetToFree = mutation({
+  args: { tableId: v.id("tables") },
+  handler: async (ctx, { tableId }) => {
+    await ctx.db.patch(tableId, { status: 'free', guests: undefined, amountCents: undefined, alert: undefined })
+  },
+})
+
+export const importAmounts = mutation({
+  args: {
+    rows: v.array(v.object({ tableId: v.id("tables"), amountCents: v.number() })),
+  },
+  handler: async (ctx, { rows }) => {
+    for (const { tableId, amountCents } of rows) {
+      await ctx.db.patch(tableId, { amountCents, status: 'dining' })
+    }
+  },
+})

@@ -54,3 +54,27 @@ export const create = mutation({
     return ctx.db.insert("restaurants", args)
   },
 })
+
+export const setSuspended = mutation({
+  args: { id: v.id("restaurants"), suspended: v.boolean() },
+  handler: async (ctx, { id, suspended }) => {
+    await ctx.db.patch(id, { suspended })
+  },
+})
+
+export const deleteAll = mutation({
+  args: { id: v.id("restaurants") },
+  handler: async (ctx, { id }) => {
+    const deleteTable = async (table: string, index: string) => {
+      const rows = await (ctx.db.query(table as any) as any)
+        .withIndex(index, (q: any) => q.eq("restaurantId", id))
+        .collect()
+      for (const row of rows) await ctx.db.delete(row._id)
+    }
+    await deleteTable("feedbacks",  "by_restaurant")
+    await deleteTable("payments",   "by_restaurant")
+    await deleteTable("menuItems",  "by_restaurant")
+    await deleteTable("tables",     "by_restaurant")
+    await ctx.db.delete(id)
+  },
+})

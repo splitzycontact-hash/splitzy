@@ -29,8 +29,8 @@ export function Overview() {
   const isLoading = stats === undefined || rawTables === undefined
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
-  const caTotal   = stats?.totalCA   ?? 0
-  const tipsTotal = stats?.totalTips ?? 0
+  const caTotal   = stats?.todayCA   ?? 0
+  const tipsTotal = stats?.todayTips ?? 0
   const avgTipPct = stats?.avgTipPct ?? '0'
 
   const feedbacks = (rawFeedbacks ?? []) as ConvexFeedback[]

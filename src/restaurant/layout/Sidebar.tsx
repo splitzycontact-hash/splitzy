@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, Grid2x2, Sun, Receipt, Settings, LogOut } from 'lucide-react'
 import { UserButton, useUser, useClerk } from '@clerk/clerk-react'
-import { useRestaurant } from '../context/RestaurantContext'
+import { useQuery } from 'convex/react'
+import { api } from '../../../convex/_generated/api'
+import { useRestaurant, useRestaurantId } from '../context/RestaurantContext'
 
 const clerkReady = (() => {
   const k = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined
@@ -10,8 +12,8 @@ const clerkReady = (() => {
 
 const NAV_ITEMS = [
   { label: "Vue d'ensemble", icon: LayoutDashboard, to: '/restaurant',           exact: true },
-  { label: 'Tables live',    icon: Grid2x2,         to: '/restaurant/tables',    badge: undefined },
-  { label: 'Feedbacks matin',icon: Sun,             to: '/restaurant/feedbacks', badge: '5' },
+  { label: 'Tables live',    icon: Grid2x2,         to: '/restaurant/tables' },
+  { label: 'Feedbacks matin',icon: Sun,             to: '/restaurant/feedbacks', feedbackBadge: true },
   { label: 'Factures',       icon: Receipt,         to: '/restaurant/factures' },
   { label: 'Paramètres',     icon: Settings,        to: '/restaurant/settings' },
 ]
@@ -44,6 +46,12 @@ function UserSection() {
 
 export function Sidebar() {
   const restaurant = useRestaurant()
+  const restaurantId = useRestaurantId()
+  const newFeedbackCount = useQuery(
+    api.feedbacks.getNewCount,
+    restaurantId ? { restaurantId } : 'skip',
+  ) ?? 0
+
   return (
     <aside className="w-60 h-screen flex flex-col bg-white border-r border-border shrink-0">
       <div className="px-5 pt-6 pb-4">
@@ -54,28 +62,31 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-3 py-2 space-y-0.5">
-        {NAV_ITEMS.map(({ label, icon: Icon, to, exact, badge }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={exact}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative ${
-                isActive
-                  ? 'bg-brand-bg text-brand border-l-[3px] border-brand pl-[9px]'
-                  : 'text-mid hover:bg-bg border-l-[3px] border-transparent pl-[9px]'
-              }`
-            }
-          >
-            <Icon size={17} className="shrink-0" />
-            <span className="flex-1">{label}</span>
-            {badge && (
-              <span className="text-xs bg-brand text-white rounded-full px-1.5 py-0.5 leading-none font-semibold">
-                {badge}
-              </span>
-            )}
-          </NavLink>
-        ))}
+        {NAV_ITEMS.map(({ label, icon: Icon, to, exact, feedbackBadge }) => {
+          const badge = feedbackBadge && newFeedbackCount > 0 ? String(newFeedbackCount) : undefined
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={exact}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative ${
+                  isActive
+                    ? 'bg-brand-bg text-brand border-l-[3px] border-brand pl-[9px]'
+                    : 'text-mid hover:bg-bg border-l-[3px] border-transparent pl-[9px]'
+                }`
+              }
+            >
+              <Icon size={17} className="shrink-0" />
+              <span className="flex-1">{label}</span>
+              {badge && (
+                <span className="text-xs bg-brand text-white rounded-full px-1.5 py-0.5 leading-none font-semibold">
+                  {badge}
+                </span>
+              )}
+            </NavLink>
+          )
+        })}
       </nav>
 
       <div className="px-4 pb-5 space-y-3">

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
+import { useAuth } from '@clerk/clerk-react'
 import { SessionProvider, useSession } from './context/SessionContext'
 import { PhoneWrapper } from './components/layout/PhoneWrapper'
 import { RestaurantApp } from './restaurant/RestaurantApp'
@@ -17,6 +18,11 @@ import { Feedback } from './pages/Feedback'
 import { FeedbackSent } from './pages/FeedbackSent'
 import { TableEntry } from './pages/TableEntry'
 
+const clerkReady = (() => {
+  const k = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined
+  return typeof k === 'string' && k.startsWith('pk_') && k.length > 20
+})()
+
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { state } = useSession()
   if (!state.userName.trim()) {
@@ -25,85 +31,60 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-function AppRoutes() {
+function ConsumerAppContent() {
   const location = useLocation()
-
   return (
     <PhoneWrapper>
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
+          <Route path="/t/:slug/:tableNumber" element={<TableEntry />} />
           <Route path="/" element={<Landing />} />
           <Route path="/profile" element={<Profile />} />
-          <Route
-            path="/table"
-            element={
-              <ProtectedRoute>
-                <Table />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/items"
-            element={
-              <ProtectedRoute>
-                <Items />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/recap"
-            element={
-              <ProtectedRoute>
-                <Recap />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/tip"
-            element={
-              <ProtectedRoute>
-                <Tip />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payment"
-            element={
-              <ProtectedRoute>
-                <Payment />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/confirmation"
-            element={
-              <ProtectedRoute>
-                <Confirmation />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/feedback"
-            element={
-              <ProtectedRoute>
-                <Feedback />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/feedback/sent"
-            element={
-              <ProtectedRoute>
-                <FeedbackSent />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/t/:slug/:tableNumber" element={<TableEntry />} />
+          <Route path="/table"         element={<ProtectedRoute><Table /></ProtectedRoute>} />
+          <Route path="/items"         element={<ProtectedRoute><Items /></ProtectedRoute>} />
+          <Route path="/recap"         element={<ProtectedRoute><Recap /></ProtectedRoute>} />
+          <Route path="/tip"           element={<ProtectedRoute><Tip /></ProtectedRoute>} />
+          <Route path="/payment"       element={<ProtectedRoute><Payment /></ProtectedRoute>} />
+          <Route path="/confirmation"  element={<ProtectedRoute><Confirmation /></ProtectedRoute>} />
+          <Route path="/feedback"      element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
+          <Route path="/feedback/sent" element={<ProtectedRoute><FeedbackSent /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
     </PhoneWrapper>
   )
+}
+
+function ConsumerAppGuard() {
+  const { isSignedIn, isLoaded } = useAuth()
+  const { state } = useSession()
+  const location = useLocation()
+
+  // QR code table routes are always public — never block customers
+  if (location.pathname.startsWith('/t/')) {
+    return <ConsumerAppContent />
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  // Authenticated Clerk user with no active table context → restaurant owner, send to dashboard
+  // If restaurantName is set, they arrived via a QR code scan → let them through
+  if (isSignedIn && !state.restaurantName) {
+    return <Navigate to="/restaurant/onboarding" replace />
+  }
+
+  return <ConsumerAppContent />
+}
+
+function AppRoutes() {
+  if (!clerkReady) return <ConsumerAppContent />
+  return <ConsumerAppGuard />
 }
 
 export default function App() {
