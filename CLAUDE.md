@@ -49,11 +49,27 @@ All three apps share **one Convex deployment** (one schema, one set of functions
 |---|---|---|
 | Convex backend | `scintillating-viper-372` (`.env.local`) | `mellow-chinchilla-481` (Convex deploy) |
 | Vercel frontend | `http://localhost:5173` | `https://splitzy-client.vercel.app` |
-| Clerk auth | `pk_test_bm92ZWwtY291Z2FyLTg4…` (test) | same key used on Vercel |
+| Clerk auth | `pk_test_bm92ZWwtY291Z2FyLTg4…` (dev instance) | `pk_test_…` + origin `splitzy-client.vercel.app` autorisée |
 | Square POS | `connect.squareup.com` (production) | same |
 | Stripe Connect | Stripe Connect Express | platform: Splitzy, 1.5% commission |
 
 The Vercel production deployment points to **Convex prod** (`mellow-chinchilla-481`). Local dev points to **Convex dev** (`scintillating-viper-372`). Changes to Convex functions must be deployed to both if you want them in prod.
+
+### Clerk — contraintes de domaine (important)
+
+Clerk a deux types d'instances :
+- **Dev instance** (`pk_test_...`) — supporte n'importe quel domaine si ajouté dans **Allowed origins**. Utilisée en local ET sur Vercel pour l'instant.
+- **Prod instance** (`pk_live_...`) — nécessite un domaine custom vérifié. Les domaines `.vercel.app` ne sont **pas** supportés en prod Clerk.
+
+**État actuel** : on utilise la clé `pk_test_...` sur Vercel avec `https://splitzy-client.vercel.app` ajouté dans Clerk dashboard → Configure → Restrictions → **Allowed origins**.
+
+**Quand on aura un domaine custom** (ex: `app.splitzy.fr`) :
+1. Créer une instance Clerk prod → récupérer `pk_live_...`
+2. Ajouter le domaine dans Clerk dashboard → Domains (vérification DNS)
+3. Remplacer `VITE_CLERK_PUBLISHABLE_KEY` dans Vercel par `pk_live_...`
+4. Redéployer
+
+Une instance Clerk prod est déjà créée (`pk_live_Y2x1cmsuc3BsaXR6eXRleHQuY29tJ2Rldi1wcm9k`) — en attente d'un domaine custom pour être activée.
 
 ### Convex env vars (set on dev deployment)
 
