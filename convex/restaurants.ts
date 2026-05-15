@@ -4,7 +4,7 @@ import { v } from "convex/values"
 export const getTableContext = query({
   args: { slug: v.string(), tableNumber: v.number() },
   handler: async (ctx, { slug, tableNumber }) => {
-    const restaurant = await ctx.db.query("restaurants").withIndex("by_slug", q => q.eq("slug", slug)).unique()
+    const restaurant = await ctx.db.query("restaurants").withIndex("by_slug", q => q.eq("slug", slug)).first()
     if (!restaurant) return null
     const tables = await ctx.db.query("tables").withIndex("by_restaurant", q => q.eq("restaurantId", restaurant._id)).collect()
     const table = tables.find(t => t.number === tableNumber) ?? null
@@ -51,6 +51,8 @@ export const create = mutation({
     clerkUserId: v.string(),
   },
   handler: async (ctx, args) => {
+    const existing = await ctx.db.query("restaurants").withIndex("by_slug", q => q.eq("slug", args.slug)).first()
+    if (existing) return existing._id
     return ctx.db.insert("restaurants", args)
   },
 })
