@@ -143,8 +143,8 @@ export const syncFromSquare = action({
         const category = mapCategory(categoryNameById[catId] ?? "")
         const emoji = EMOJI[category]
         const variations: any[] = d.variations ?? []
-        const priceMoney = variations[0]?.item_variation_data?.price_money
-        const priceCents: number = priceMoney?.amount ?? 0
+        const priceCents: number = variations[0]?.item_variation_data?.price_money?.amount ?? 0
+        console.log("Item:", name, "| Price cents:", priceCents, "| raw variation:", JSON.stringify(variations[0]?.item_variation_data ?? null))
         items.push({ name, category, priceCents, emoji, description })
       })
 
