@@ -33,10 +33,15 @@ CONVEX_DEPLOYMENT=dev:scintillating-viper-372 npx convex logs --history
 
 ## Architecture
 
-Splitzy is a **restaurant bill-splitting app** with two surfaces:
+Splitzy is a **restaurant bill-splitting app** currently with two surfaces in a single repo, being migrated to a 3-app monorepo (Turborepo + pnpm):
 
-1. **Client app** (`/`, `/profile`, `/table`, …) — mobile-first, accessed via QR code
-2. **Restaurant dashboard** (`/restaurant/*`) — desktop, for restaurant owners
+| App | Status | Surface |
+|---|---|---|
+| `apps/client` | exists — `src/` (non-restaurant routes) | Mobile PWA, QR code entry |
+| `apps/dashboard` | exists — `src/restaurant/` | Desktop dashboard for restaurant owners |
+| `apps/admin` | **to build** | Dark theme internal tool for Splitzy team |
+
+All three apps share **one Convex deployment** (one schema, one set of functions). The Convex backend is the single source of truth — no HTTP calls between apps, only Convex queries/mutations.
 
 ### Infrastructure
 
@@ -46,19 +51,23 @@ Splitzy is a **restaurant bill-splitting app** with two surfaces:
 | Vercel frontend | `http://localhost:5173` | `https://splitzy-client.vercel.app` |
 | Clerk auth | `pk_test_bm92ZWwtY291Z2FyLTg4…` (test) | same key used on Vercel |
 | Square POS | `connect.squareup.com` (production) | same |
+| Stripe Connect | Stripe Connect Express | platform: Splitzy, 1.5% commission |
 
 The Vercel production deployment points to **Convex prod** (`mellow-chinchilla-481`). Local dev points to **Convex dev** (`scintillating-viper-372`). Changes to Convex functions must be deployed to both if you want them in prod.
 
 ### Convex env vars (set on dev deployment)
 
 ```
-SQUARE_ACCESS_TOKEN   # Square production token (EAAAl_b44btPH…)
-SQUARE_LOCATION_ID    # LS3JS5QB97NV8
+SQUARE_ACCESS_TOKEN        # Square production token (EAAAl_b44btPH…)
+SQUARE_LOCATION_ID         # LS3JS5QB97NV8
+STRIPE_SECRET_KEY          # sk_… (never in VITE_* — server only)
+STRIPE_WEBHOOK_SECRET      # whsec_… for signature verification
+MAILGUN_API_KEY            # for transactional emails
 ```
 
-These must also be set on the prod deployment if Square sync is needed there.
+These must also be set on the prod deployment.
 
-### Routing overview
+### Routing overview (current single-repo)
 
 ```
 /restaurant/*         → RestaurantApp (Clerk-protected dashboard)
@@ -77,11 +86,28 @@ All client routes after `/profile` are protected by `ProtectedRoute` (redirects 
 - If Clerk is loaded + user is signed in + `state.restaurantName` is empty → redirect to `/restaurant/onboarding` (restaurant owner flow).
 - `flushSync` wraps `dispatch(SET_TABLE_CONTEXT)` in `TableEntry` before `navigate('/')` to prevent a race where the guard sees `restaurantName = ''` at the new path.
 
-### Convex backend (`convex/`)
+### Auth — Clerk roles
+
+Admin and dashboard users are authenticated via Clerk. Their Convex `users` document (keyed by `clerkUserId`) carries a `role` field:
+
+```
+super_admin     Full access — can impersonate, suspend, delete
+admin_support   Full access except team management
+viewer          Read-only admin access
+gerant          Dashboard access scoped to their restaurant(s)
+```
+
+Every sensitive Convex mutation checks `ctx.auth.getUserIdentity()` → looks up `users.role` → throws `ConvexError` if insufficient. Never bypass this check.
+
+---
+
+## Convex backend (`convex/`)
+
+### Existing files
 
 | File | Key exports |
 |---|---|
-| `schema.ts` | Full DB schema (see below) |
+| `schema.ts` | Full DB schema |
 | `restaurants.ts` | `getTableContext`, `getByClerkId`, `getBySlug`, `create`, `update`, `setSuspended`, `deleteAll` |
 | `tables.ts` | `list`, `createBulk`, `updateStatus`, `resetToFree`, `importAmounts` |
 | `menuItems.ts` | `listByRestaurant`, `addItem`, `updateItem`, `deleteItem`, `replaceAll`, `syncFromSquare` |
@@ -89,20 +115,83 @@ All client routes after `/profile` are protected by `ProtectedRoute` (redirects 
 | `feedbacks.ts` | `list`, `create`, `markRead` |
 | `posIntegrations.ts` | `getByProvider`, `upsert`, `syncLive` |
 
-### DB schema
+### Files to add (admin + interconnexion phases)
+
+| File | Purpose |
+|---|---|
+| `http.ts` | HTTP actions — Stripe webhook (`/stripe-webhook`), Mailgun inbound (`/mailgun-inbound`) |
+| `crons.ts` | Scheduled jobs — `deliverMorningFeedbacks` (8h Paris), `checkDependencies` (every 30s) |
+| `auth.config.ts` | Clerk → Convex JWT config |
+| `users.ts` | `getByClerkId`, `upsert`, `list`, `updateRole` |
+| `restaurantMembers.ts` | membership queries |
+| `sessions.ts` | `openSession`, `listOpenByRestaurant`, `close` |
+| `diners.ts` | `join`, `listBySession` |
+| `dinerItems.ts` | `lock`, `markPaid` |
+| `transactions.ts` | `create`, `markSucceeded`, `markFailed`, `listRecent`, `listByRestaurant` |
+| `stripeWebhooks.ts` | `dispatch`, `getByEventId`, `listRecent`, `retryDeadLetter` |
+| `tickets.ts` | `list`, `create`, `assign`, `resolve` |
+| `bugs.ts` | `list`, `create`, `resolve`, `createHighSeverity` |
+| `auditLogs.ts` | `insert` only — no patch/delete (immutable) |
+| `featureFlags.ts` | `evaluate`, `list`, `update` |
+| `admin.ts` | `impersonate`, `verifyImpersonationToken`, `suspendRestaurant` |
+| `dependencyStatus.ts` | `list`, `upsert` |
+| `gdprRequests.ts` | `create`, `resolve` |
+| `subscriptions.ts` | `list`, `listPastDue`, `incrementDunning` |
+| `broadcasts.ts` | `create`, `send` |
+
+---
+
+## DB schema (`convex/schema.ts`)
+
+Full schema — all tables, all indexes. `_id` and `_creationTime` are auto-generated by Convex (never declare them).
 
 ```
-restaurants   slug (indexed), clerkUserId (indexed), name, address, phone, email, type, suspended?
-tables        restaurantId (indexed), number, capacity, status, guests?, durationMinutes?, amountCents?, alert?
-payments      restaurantId (indexed), tableId, tableNumber, guests, subtotalCents, tipCents, commissionCents, totalCents, paymentMethod, status, createdAt, dateLabel
-feedbacks     restaurantId (indexed), tableId, tableNumber, stars, tags[], text, isNew, createdAt, timeLabel
-posIntegrations restaurantId (indexed+provider), provider, apiKey, locationId?, status, lastSyncAt?, lastError?
-menuItems     restaurantId (indexed), name, category, priceCents, emoji, description?
+restaurants      slug*, clerkUserId*, status*, plan, healthScore?, stripeAccountId?, kycStatus?, suspended?, posProvider?
+users            clerkUserId*, role*, email, firstName?, lastName?, totpEnabled?
+restaurantMembers restaurantId*, userId*, role
+tables           restaurantId*, qrToken*, number, capacity, status, guests?, amountCents?, alert?
+menuCategories   restaurantId*, name, displayOrder?
+menuItems        restaurantId*, categoryId?, name, priceCents, emoji?, category?, isAvailable?, externalId?
+sessions         restaurantId*, tableId*, status, by_restaurant_status*, closedAt?, totalCents?
+diners           sessionId*, firstName, avatar?, joinedAt
+dinerItems       dinerId*, menuItemId*, qty, priceCents, status
+payments         restaurantId*, tableId, tableNumber, guests, subtotalCents, tipCents, commissionCents, totalCents, paymentMethod, status, createdAt*, dateLabel
+transactions     restaurantId*, sessionId*, stripePaymentIntentId?, status, amountCents, tipCents?, commissionCents?, succeededAt*, failureCode?, paymentMethod?
+refunds          transactionId*, stripeRefundId?, amountCents, status, initiatedBy?
+disputes         transactionId*, stripeDisputeId?, amountCents, status, reason?, evidenceDueBy?
+feedbacks        restaurantId*, tableId, stars, tags[], text, isNew*, deliveredAt*, createdAt, timeLabel
+subscriptions    restaurantId*, status*, plan, stripeSubscriptionId?, dunningAttempts?
+invoices         restaurantId*, number, amountCents, vatCents, status, issuedAt, paidAt?
+payouts          restaurantId*, stripePayoutId?, amountCents, status
+tickets          restaurantId?, status*, priority, assignedTo?, createdBy?, resolvedAt?
+ticketMessages   ticketId*, authorId?, body, isInternal?
+bugs             status+severity*, restaurantId?, assignedTo?, severity, isPinned?
+auditLogs        actorId*, resourceType+resourceId*, action, isImpersonation?, diff?
+featureFlags     key*, status, rolloutType, rolloutValue?
+broadcasts       type, audience, sentAt?, scheduledFor?, createdBy?
+restaurantNotes  restaurantId*, authorId, body
+gdprRequests     status*, email, type, dueBy
+dependencyStatus service*, status, latencyMs?
+stripeWebhookEvents eventId*, status, failureCount?
+platformConfig   key*, value, updatedBy?, updatedAt
+savedViews       userId*, scope, name, filters
+pinnedRestaurants userId*, userId+restaurantId*
+posIntegrations  restaurantId*, restaurantId+provider*, provider, apiKey, status, lastSyncAt?
 ```
 
-`tables.status` values: `"free" | "dining" | "payment" | "paid"`
+`*` = indexed. `tables.status` values: `"free" | "dining" | "payment" | "paid"`.
 
-### Client flow — state management
+---
+
+## Realtime — Convex reactive queries
+
+**There are no channels to manage.** `useQuery` hooks re-render automatically when underlying data changes. A `payments.create` mutation triggers all active `useQuery(api.payments.list, ...)` calls across all connected clients instantly.
+
+Dashboard tables live, admin feed, client diner list — all reactive with zero subscription code.
+
+---
+
+## Client flow — state management
 
 Single global context: `src/context/SessionContext.tsx` — `useReducer` with `SessionState`/`SessionAction` (defined in `src/context/types.ts`).
 
@@ -113,7 +202,7 @@ Single global context: `src/context/SessionContext.tsx` — `useReducer` with `S
 - `splitMode: 'item' | 'equal' | 'custom'`
 - `selectedItems: SelectedItem[]` — each has `menuItemId` + `splitFactor` (1–4)
 - `tipPercent: number` — 0–30
-- `convives: Convive[]` — other people at the table (populated by real scan context, not mock)
+- `convives: Convive[]` — other people at the table
 
 **Derived values** (never stored in state, computed in `src/hooks/useSessionCalcs.ts`):
 - `subtotal` — depends on splitMode
@@ -121,22 +210,28 @@ Single global context: `src/context/SessionContext.tsx` — `useReducer` with `S
 - `splitzyFee = subtotal × 1.5%` (display only, not added to total)
 - `total = subtotal + tipAmount`
 
-### Mock / seed data
+---
+
+## Mock / seed data
 
 - `src/data/menu.ts` — 14 static menu items for the client demo (not synced from Convex). Items with `takenBy` are greyed out.
 - `src/data/session.ts` — **cleaned**: `TABLE_TOTAL_CENTS = 0`, `MOCK_SESSION.convives = []`, `restaurantName = ''`. `MOCK_CARDS` (Visa/Mastercard) still present for the payment carousel demo.
 - Real menu data lives in Convex `menuItems` table, synced from Square via `syncFromSquare`.
 
-### Square POS integration
+---
+
+## Square POS integration
 
 `convex/menuItems.ts → syncFromSquare` action:
 - Calls `connect.squareup.com/v2/catalog/list?types=ITEM,CATEGORY` (production, not sandbox)
 - Token priority: `process.env.SQUARE_ACCESS_TOKEN` (Convex env var) → DB (`posIntegrations.apiKey`)
 - Maps `item_data.variations[0].item_variation_data.price_money.amount` → `priceCents`
-- Items with `pricing_type: "VARIABLE_PRICING"` get `priceCents: 0` — they must be set to Fixed Pricing in Square dashboard
+- Items with `pricing_type: "VARIABLE_PRICING"` get `priceCents: 0` — must be set to Fixed Pricing in Square dashboard
 - Categories mapped to: `entrees | plats | desserts | boissons`
 
-### Restaurant dashboard (`src/restaurant/`)
+---
+
+## Restaurant dashboard (`src/restaurant/`)
 
 Auth: `RestaurantGuard` fetches restaurant by `clerkUserId` (production) or by `VITE_RESTAURANT_SLUG` env var (dev without Clerk).
 
@@ -153,33 +248,45 @@ Located in `Tables.tsx`. Each table card has a dashed amber `[TEST] Simuler comm
 3. Shows a breakdown + total in a modal with a ↺ re-roll button
 4. On confirm: calls `tables.updateStatus(tableId, status='dining', guests=totalQty, amountCents=total)`
 
-This simulates what a real POS would send and is the primary way to test the client QR flow end-to-end.
+---
 
-### Design tokens (Tailwind)
+## Design tokens (Tailwind)
 
 ```
-brand / brand-dark / brand-light / brand-bg / brand-glow  — orange palette (#E8920A)
+brand / brand-dark / brand-light / brand-bg / brand-glow  — orange palette (#E8920A = --splitzy-orange)
 dark-hero (#18181B)   — dark section backgrounds
 muted (#9CA3AF)       — secondary text
 shadow-glow           — orange ring for selected states
 ```
 
-### Monetary formatting
+Never hardcode `#E8920A` — always use `var(--splitzy-orange)` or the `brand` Tailwind alias.
+
+---
+
+## Monetary formatting
 
 **Always** use `formatEur(cents: number)` from `src/utils/formatCurrency.ts`.
-Produces `57€` (no decimal) or `62,70€` (comma, no space before `€`). Never `.toFixed()` directly.
+Produces `57€` (no decimal) or `62,70€` (comma, no space before `€`). Never `.toFixed()` directly. Never store amounts as floats — always integer cents.
 
-### Animations
+---
+
+## Animations
 
 `src/utils/animations.ts`: `pageVariants` (page slide + `AnimatePresence`), `slideDown`, `springPop`, `checkAnimation`, `starStagger` + `starItem`.
 
-### PhoneWrapper
+---
+
+## PhoneWrapper
 
 On desktop (>768px) the client app renders inside an iPhone 15 Pro frame (390px, radius 44px). On real mobile it's transparent. **All client UI modifications must target real mobile** — do not use the desktop PhoneWrapper as reference.
 
-### Avatar system
+---
+
+## Avatar system
 
 `src/components/ui/Avatar.tsx` — 6 emoji avatars: `['🦊','🐻','🐸','🐙','🦄','🐯']` (indexed 0–5). Each has a paired background color.
+
+---
 
 ## Known issues fixed (context for future sessions)
 
