@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X } from 'lucide-react'
+import { X, RefreshCw } from 'lucide-react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -21,6 +21,8 @@ type TableData = {
   convexId: Id<'tables'> | null
 }
 
+type SimItem = { name: string; qty: number; unitCents: number }
+
 type FilterKey = 'all' | TableStatus
 
 const STATUS_STYLE: Record<TableStatus, { card: string; pill: string; label: string }> = {
@@ -36,6 +38,17 @@ function durationLabel(minutes?: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   return m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
+}
+
+function generateOrder(menu: { name: string; priceCents: number }[]): SimItem[] {
+  if (menu.length === 0) return []
+  const shuffled = [...menu].sort(() => Math.random() - 0.5)
+  const count = Math.min(shuffled.length, 2 + Math.floor(Math.random() * 3))
+  return shuffled.slice(0, count).map(item => ({
+    name: item.name,
+    qty: Math.random() > 0.5 ? 2 : 1,
+    unitCents: item.priceCents,
+  }))
 }
 
 function TableCard({ table, onClick, onSimulate }: { table: TableData; onClick: () => void; onSimulate: () => void }) {
@@ -73,31 +86,41 @@ export function Tables() {
   const [filter, setFilter] = useState<FilterKey>('all')
   const [selectedTable, setSelectedTable] = useState<TableData | null>(null)
   const [simulatingTable, setSimulatingTable] = useState<TableData | null>(null)
-  const [simAmount, setSimAmount] = useState('')
+  const [simItems, setSimItems] = useState<SimItem[]>([])
   const [simLoading, setSimLoading] = useState(false)
-  const amountInputRef = useRef<HTMLInputElement>(null)
 
   const restaurantId = useRestaurantId()
   const rawTables = useQuery(api.tables.list, restaurantId ? { restaurantId } : 'skip')
-  const resetToFree = useMutation(api.tables.resetToFree)
+  const rawMenu   = useQuery(api.menuItems.listByRestaurant, restaurantId ? { restaurantId } : 'skip')
+  const resetToFree  = useMutation(api.tables.resetToFree)
   const updateStatus = useMutation(api.tables.updateStatus)
 
+  const menu = (rawMenu ?? []) as { name: string; priceCents: number }[]
+
+  function openSimModal(table: TableData) {
+    setSimulatingTable(table)
+    setSimItems(generateOrder(menu))
+  }
+
+  function regenerate() {
+    setSimItems(generateOrder(menu))
+  }
+
   async function confirmSimulation() {
-    if (!simulatingTable?.convexId) return
-    const cents = Math.round(parseFloat(simAmount.replace(',', '.')) * 100)
-    if (isNaN(cents) || cents <= 0) { amountInputRef.current?.focus(); return }
+    if (!simulatingTable?.convexId || simItems.length === 0) return
+    const totalCents = simItems.reduce((s, i) => s + i.qty * i.unitCents, 0)
     setSimLoading(true)
     try {
       await updateStatus({
         tableId: simulatingTable.convexId as Id<'tables'>,
         status: 'dining',
-        guests: simulatingTable.guests ?? 2,
-        amountCents: cents,
+        guests: simItems.reduce((s, i) => s + i.qty, 0),
+        amountCents: totalCents,
       })
     } finally {
       setSimLoading(false)
       setSimulatingTable(null)
-      setSimAmount('')
+      setSimItems([])
     }
   }
 
@@ -129,8 +152,9 @@ export function Tables() {
   ]
 
   const visible = filter === 'all' ? tables : tables.filter(t => t.status === filter)
-
   const isLoading = rawTables === undefined
+
+  const simTotal = simItems.reduce((s, i) => s + i.qty * i.unitCents, 0)
 
   return (
     <RestaurantLayout>
@@ -181,14 +205,14 @@ export function Tables() {
                 key={table.id}
                 table={table}
                 onClick={() => setSelectedTable(table)}
-                onSimulate={() => { setSimulatingTable(table); setSimAmount(''); setTimeout(() => amountInputRef.current?.focus(), 50) }}
+                onSimulate={() => openSimModal(table)}
               />
             ))}
           </div>
         )}
       </main>
 
-      {/* Modal */}
+      {/* Table detail modal */}
       <AnimatePresence>
         {selectedTable && (
           <motion.div
@@ -205,7 +229,6 @@ export function Tables() {
               exit={{ scale: 0.95, opacity: 0, y: 12 }}
               transition={{ type: 'spring', stiffness: 300, damping: 28 }}
             >
-              {/* Header */}
               <div className="flex items-center justify-between px-6 py-4" style={{ background: '#2a2724' }}>
                 <div className="text-lg font-bold text-white">Table {selectedTable.id}</div>
                 <div className="flex items-center gap-3">
@@ -222,8 +245,6 @@ export function Tables() {
                   </button>
                 </div>
               </div>
-
-              {/* Content */}
               <div className="px-6 py-6">
                 {selectedTable.status === 'free' ? (
                   <div className="flex flex-col items-center py-6 gap-2 text-center">
@@ -251,15 +272,11 @@ export function Tables() {
                         <span className="text-lg font-bold text-dark">{formatEur(selectedTable.amountCents)}</span>
                       </div>
                     ) : (
-                      <div className="text-center py-4 text-sm text-muted">
-                        Montant non encore défini
-                      </div>
+                      <div className="text-center py-4 text-sm text-muted">Montant non encore défini</div>
                     )}
                   </div>
                 )}
               </div>
-
-              {/* Actions */}
               <div className="flex items-center gap-3 px-6 pb-5">
                 {selectedTable.status === 'payment' && (
                   <button className="flex-1 bg-brand text-white font-semibold text-sm rounded-xl py-2.5 hover:bg-brand-dark transition-colors">
@@ -297,54 +314,72 @@ export function Tables() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={e => { if (e.target === e.currentTarget) { setSimulatingTable(null); setSimAmount('') } }}
+            onClick={e => { if (e.target === e.currentTarget) { setSimulatingTable(null); setSimItems([]) } }}
           >
             <motion.div
-              className="bg-white rounded-2xl shadow-card-dark w-[360px] overflow-hidden"
+              className="bg-white rounded-2xl shadow-card-dark w-[380px] overflow-hidden"
               initial={{ scale: 0.95, opacity: 0, y: 12 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 12 }}
               transition={{ type: 'spring', stiffness: 300, damping: 28 }}
             >
+              {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border">
                 <div className="flex items-center gap-2">
                   <span className="rounded px-1.5 py-0.5 bg-amber-400 text-white text-[10px] font-bold tracking-wide">TEST</span>
                   <span className="text-sm font-bold text-dark">Simuler commande — Table {simulatingTable.id}</span>
                 </div>
-                <button onClick={() => { setSimulatingTable(null); setSimAmount('') }} className="text-muted hover:text-dark transition-colors">
+                <button onClick={() => { setSimulatingTable(null); setSimItems([]) }} className="text-muted hover:text-dark transition-colors">
                   <X size={16} />
                 </button>
               </div>
-              <div className="px-5 py-5 space-y-4">
-                <p className="text-xs text-muted">Simule ce qu'un vrai POS enverrait : met la table en "En repas" avec le montant saisi.</p>
-                <div>
-                  <label className="block text-xs font-semibold text-mid mb-1.5">Montant (€)</label>
-                  <div className="relative">
-                    <input
-                      ref={amountInputRef}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="ex: 87.40"
-                      value={simAmount}
-                      onChange={e => setSimAmount(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && confirmSimulation()}
-                      className="w-full rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-dark placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand pr-8"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted text-sm">€</span>
+
+              {/* Order breakdown */}
+              <div className="px-5 py-4">
+                {simItems.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-muted">
+                    Aucun article dans le menu — synchro Square d'abord.
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-2">
+                    {simItems.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm">
+                        <span className="text-dark font-medium">
+                          {item.name}
+                          <span className="text-muted font-normal"> ×{item.qty}</span>
+                        </span>
+                        <span className="font-semibold text-dark tabular-nums">
+                          {formatEur(item.qty * item.unitCents)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between pt-3 mt-1 border-t border-border">
+                      <span className="text-sm font-bold text-dark">Total</span>
+                      <span className="text-base font-bold text-brand tabular-nums">{formatEur(simTotal)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Actions */}
               <div className="flex gap-2 px-5 pb-5">
                 <button
-                  onClick={() => { setSimulatingTable(null); setSimAmount('') }}
+                  onClick={() => { setSimulatingTable(null); setSimItems([]) }}
                   className="flex-1 rounded-xl border border-border bg-bg text-mid text-sm font-semibold py-2.5 hover:bg-border transition-colors"
                 >
                   Annuler
                 </button>
                 <button
+                  onClick={regenerate}
+                  disabled={menu.length === 0}
+                  className="rounded-xl border border-border bg-bg text-mid px-3 py-2.5 hover:bg-border transition-colors disabled:opacity-40"
+                  title="Regénérer"
+                >
+                  <RefreshCw size={15} />
+                </button>
+                <button
                   onClick={confirmSimulation}
-                  disabled={simLoading || !simAmount}
+                  disabled={simLoading || simItems.length === 0}
                   className="flex-1 rounded-xl bg-brand text-white text-sm font-semibold py-2.5 hover:bg-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {simLoading ? 'Envoi…' : 'Confirmer'}
