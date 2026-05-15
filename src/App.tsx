@@ -60,8 +60,10 @@ function ConsumerAppGuard() {
   const { state } = useSession()
   const location = useLocation()
 
-  // QR code table routes are always public — never block customers
-  if (location.pathname.startsWith('/t/')) {
+  // QR code table routes are always public — never block customers.
+  // window.location.pathname is checked first: useLocation() can lag during
+  // Clerk re-initialization on hard refresh, causing a spurious auth redirect.
+  if (window.location.pathname.startsWith('/t/') || location.pathname.startsWith('/t/')) {
     return <ConsumerAppContent />
   }
 

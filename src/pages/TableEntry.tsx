@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
@@ -21,16 +22,20 @@ export function TableEntry() {
     if (!context) return // handled below with error UI
     if (context.restaurant.suspended) return // handled below with suspended UI
 
-    dispatch({
-      type: 'SET_TABLE_CONTEXT',
-      payload: {
-        restaurantName: context.restaurant.name,
-        tableNumber: context.table?.number ?? Number(tableNumber),
-        tableCapacity: context.table?.capacity ?? 4,
-        convexRestaurantId: context.restaurant._id,
-        convexTableId: context.table?._id ?? null,
-        tableTotalCents: context.table?.amountCents ?? TABLE_TOTAL_CENTS,
-      },
+    // flushSync commits the dispatch before navigate fires, preventing
+    // ConsumerAppGuard from seeing restaurantName = '' at the new '/' path
+    flushSync(() => {
+      dispatch({
+        type: 'SET_TABLE_CONTEXT',
+        payload: {
+          restaurantName: context.restaurant.name,
+          tableNumber: context.table?.number ?? Number(tableNumber),
+          tableCapacity: context.table?.capacity ?? 4,
+          convexRestaurantId: context.restaurant._id,
+          convexTableId: context.table?._id ?? null,
+          tableTotalCents: context.table?.amountCents ?? TABLE_TOTAL_CENTS,
+        },
+      })
     })
     if (context.table?._id) {
       updateStatus({ tableId: context.table._id, status: 'dining', guests: context.table.capacity }).catch(() => {})

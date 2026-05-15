@@ -1,15 +1,11 @@
-export const TABLE_TOTAL_CENTS = 8740
+export const TABLE_TOTAL_CENTS = 0
 
 export const MOCK_SESSION = {
-  restaurantName: 'Le Comptoir Parisien',
-  tableNumber: 7,
+  restaurantName: '',
+  tableNumber: 0,
   tableCapacity: 4,
   tableTotalCents: TABLE_TOTAL_CENTS,
-  convives: [
-    { id: 'alice', name: 'Alice', avatarIndex: 1, color: '#3B82F6' },
-    { id: 'marc', name: 'Marc', avatarIndex: 2, color: '#8B5CF6' },
-    { id: 'lea', name: 'Léa', avatarIndex: 3, color: '#EF4444' },
-  ],
+  convives: [] as { id: string; name: string; avatarIndex: number; color: string }[],
 }
 
 export const FEEDBACK_TAGS = [
