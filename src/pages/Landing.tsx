@@ -4,36 +4,13 @@ import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
 
-const AVATAR_COLORS = ['#E8920A', '#10B981', '#3B82F6', '#8B5CF6', '#F43F5E', '#14B8A6']
-
-function LiveDot({ color = '#10B981' }: { color?: string }) {
-  return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-      <span style={{
-        width: 7, height: 7, borderRadius: '50%', background: color,
-        display: 'inline-block',
-        animation: 'livePulse 1.6s ease-in-out infinite',
-      }} />
-      <style>{`@keyframes livePulse {
-        0% { box-shadow: 0 0 0 0 ${color}66; }
-        70% { box-shadow: 0 0 0 8px transparent; }
-        100% { box-shadow: 0 0 0 0 transparent; }
-      }`}</style>
-    </span>
-  )
-}
-
 export function Landing() {
   const { state } = useSession()
   const navigate = useNavigate()
 
-  const handleScanQR = () => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/*'
-    input.setAttribute('capture', 'environment')
-    input.click()
-  }
+  const tableLabel = state.tableNumber
+    ? `Table ${state.tableNumber}${state.restaurantName ? ` · ${state.restaurantName}` : ''}`
+    : 'Splitzy'
 
   return (
     <motion.div
@@ -41,148 +18,160 @@ export function Landing() {
       initial="initial"
       animate="animate"
       exit="exit"
-      style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#FAFAFA' }}
+      style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#F4F4F5' }}
     >
       {/* Dark hero */}
       <div style={{
-        position: 'relative', overflow: 'hidden',
-        background: '#0A0A0A',
-        padding: '60px 24px 36px',
-        color: '#fff',
+        background: '#18181B',
+        padding: '52px 24px 32px',
+        textAlign: 'center',
+        position: 'relative',
+        overflow: 'hidden',
         flexShrink: 0,
       }}>
-        {/* Diagonal stripes */}
+        {/* Decorative card deco */}
         <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.5,
-          background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.022) 0 1px, transparent 1px 14px)',
-        }} />
-        {/* Radial glow */}
-        <div style={{
-          position: 'absolute', top: -60, right: -60, width: 280, height: 280,
-          background: 'radial-gradient(circle, rgba(232,146,10,0.22) 0%, transparent 60%)',
-          pointerEvents: 'none',
-        }} />
-        <div style={{ position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#A1A1AA', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            <LiveDot />
-            <span>Service en cours · Table {state.tableNumber || '—'}</span>
+          position: 'absolute', right: 18, top: '50%', transform: 'translateY(-50%)',
+          display: 'flex', gap: 7, opacity: 0.16, pointerEvents: 'none',
+        }}>
+          <div style={{ width: 30, height: 48, borderRadius: 6, padding: '8px 5px', display: 'flex', flexDirection: 'column', gap: 5, background: '#ffffff' }}>
+            <div style={{ height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.18)' }} />
+            <div style={{ height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.18)', width: '60%' }} />
+            <div style={{ height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.18)' }} />
+            <div style={{ height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.18)', width: '80%' }} />
           </div>
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 11, color: '#E8920A', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              Bienvenue chez
-            </div>
-            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.05, marginTop: 6 }}>
+          <div style={{ width: 30, height: 48, borderRadius: 6, padding: '8px 5px', display: 'flex', flexDirection: 'column', gap: 5, background: '#E8920A' }}>
+            <div style={{ height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.22)' }} />
+            <div style={{ height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.22)', width: '60%' }} />
+            <div style={{ height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.22)' }} />
+            <div style={{ height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.22)', width: '80%' }} />
+          </div>
+        </div>
+
+        {/* Pill */}
+        <div style={{ marginBottom: 20 }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 7,
+            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)',
+            borderRadius: 24, padding: '8px 18px',
+            color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 600,
+            backdropFilter: 'blur(8px)',
+          }}>
+            <span style={{
+              width: 7, height: 7, background: '#E8920A', borderRadius: '50%',
+              boxShadow: '0 0 6px rgba(232,146,10,0.8)',
+              animation: 'landingPillBlink 2s infinite',
+            }} />
+            {tableLabel}
+          </span>
+          <style>{`@keyframes landingPillBlink { 0%,100%{opacity:1} 50%{opacity:.35} }`}</style>
+        </div>
+
+        {/* Logo */}
+        <div style={{ fontSize: 36, fontWeight: 900, color: '#fff', letterSpacing: '-0.5px', marginBottom: 6 }}>
+          Split<span style={{ color: '#E8920A' }}>zy</span>
+        </div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.02em' }}>
+          Payez. Partez. Sans friction.
+        </div>
+      </div>
+
+      {/* White sheet */}
+      <div style={{
+        background: '#fff',
+        borderRadius: '32px 32px 0 0',
+        marginTop: -24,
+        padding: '28px 24px 0',
+        boxShadow: '0 -6px 40px rgba(0,0,0,0.12)',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {/* Sheet handle */}
+        <div style={{ width: 32, height: 4, background: '#E0E0E4', borderRadius: 4, margin: '0 auto 24px' }} />
+
+        {/* Restaurant card */}
+        <div style={{
+          background: 'linear-gradient(to right, #fffbf2 0%, #fff 60%)',
+          borderRadius: 20, padding: 16,
+          display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20,
+          border: '1px solid rgba(232,146,10,0.2)',
+          borderLeft: '4px solid #E8920A',
+          boxShadow: '0 2px 16px rgba(232,146,10,0.1)',
+        }}>
+          <div style={{
+            width: 50, height: 50, flexShrink: 0,
+            background: 'linear-gradient(135deg, #E8920A, #B45309)',
+            borderRadius: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, boxShadow: '0 4px 14px rgba(232,146,10,0.32)',
+          }}>
+            🍽
+          </div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>
               {state.restaurantName || 'Le restaurant'}
             </div>
-            <div style={{ fontSize: 13, color: '#A1A1AA', marginTop: 6 }}>
-              {state.tableCapacity > 0 ? `${state.tableCapacity} convives` : 'Table réservée'}
-              {state.convives.length > 0 && ` · ${state.convives.length} déjà connectés`}
+            <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
+              {state.tableNumber ? `Table ${state.tableNumber}` : 'Table'}
+              {state.tableCapacity > 0 ? ` · ${state.tableCapacity} couverts` : ''}
+              {' · Session ouverte'}
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Convives row */}
-      {state.convives.length > 0 && (
-        <div style={{ padding: '24px 20px 0' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
-            Déjà à table
-          </div>
-          <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start' }}>
-            {state.convives.map(c => (
-              <div key={c.id} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                <div style={{
-                  width: 42, height: 42, borderRadius: '50%',
-                  background: c.color || AVATAR_COLORS[c.avatarIndex] || '#A1A1AA',
-                  color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, fontSize: 17,
-                }}>
-                  {(c.name[0] ?? '?').toUpperCase()}
-                </div>
-                <div style={{ fontSize: 10.5, color: '#52525B', fontWeight: 500 }}>{c.name}</div>
+            {state.tableTotalCents > 0 && (
+              <div style={{ fontSize: 12, color: '#E8920A', fontWeight: 700, marginTop: 2 }}>
+                Addition : {formatEur(state.tableTotalCents)}
               </div>
-            ))}
-            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            )}
+          </div>
+        </div>
+
+        {/* 3 steps */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 24, alignItems: 'stretch' }}>
+          {[
+            { n: '1', label: 'Ton prénom' },
+            { n: '2', label: 'Tes plats' },
+            { n: '3', label: 'Paie en 10s' },
+          ].map(s => (
+            <div key={s.n} style={{
+              flex: 1, background: '#fff', border: '1px solid #E5E7EB',
+              borderRadius: 16, padding: '14px 6px', textAlign: 'center',
+            }}>
               <div style={{
-                width: 42, height: 42, borderRadius: '50%',
-                border: '1.5px dashed #E4E4E7',
+                width: 30, height: 30, borderRadius: '50%', margin: '0 auto 8px',
+                background: 'linear-gradient(135deg, #E8920A, #B45309)',
+                color: '#fff', fontSize: 12, fontWeight: 800,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#A1A1AA', fontWeight: 700, fontSize: 18,
-              }}>+</div>
-              <div style={{ fontSize: 10.5, color: '#A1A1AA', fontWeight: 500 }}>Toi</div>
+                boxShadow: '0 3px 10px rgba(232,146,10,0.4)',
+              }}>
+                {s.n}
+              </div>
+              <div style={{ fontSize: 10, color: '#374151', fontWeight: 700, lineHeight: 1.35 }}>
+                {s.label}
+              </div>
             </div>
-            <div style={{ flex: 1, fontSize: 11.5, color: '#A1A1AA', alignSelf: 'center', lineHeight: 1.35 }}>
-              et toi<br />bientôt !
-            </div>
+          ))}
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* CTAs */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 'max(32px, calc(20px + env(safe-area-inset-bottom)))' }}>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.985 }}
+            onClick={() => navigate('/profile')}
+            style={{
+              width: '100%', height: 56, borderRadius: 18, border: 0,
+              background: '#E8920A', color: '#fff',
+              fontSize: 16, fontWeight: 800, letterSpacing: '0.01em', cursor: 'pointer',
+              boxShadow: '0 4px 18px rgba(232,146,10,0.32), 0 1px 4px rgba(0,0,0,0.1)',
+            }}
+          >
+            C'est parti →
+          </motion.button>
+          <div style={{ textAlign: 'center', fontSize: 11, color: '#9CA3AF', paddingBottom: 4 }}>
+            ✓ Aucune app · <span style={{ color: '#E8920A', fontWeight: 600 }}>Paiement sécurisé Stripe</span>
           </div>
         </div>
-      )}
-
-      {/* Addition card */}
-      <div style={{
-        margin: state.convives.length > 0 ? '24px 20px 0' : '24px 20px 0',
-        padding: 18,
-        background: '#fff', borderRadius: 18, border: '1px solid #E4E4E7',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ fontSize: 11.5, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Addition en cours
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 8 }}>
-              <span style={{ fontSize: 38, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
-                {state.tableTotalCents > 0 ? formatEur(state.tableTotalCents) : '—'}
-              </span>
-              {state.tableCapacity > 0 && (
-                <span style={{ fontSize: 12, color: '#52525B' }}>pour {state.tableCapacity} personnes</span>
-              )}
-            </div>
-          </div>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '4px 8px', borderRadius: 999,
-            background: 'rgba(16,185,129,0.08)', color: '#10B981',
-            fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
-          }}>
-            <LiveDot />
-            LIVE
-          </div>
-        </div>
-      </div>
-
-      <div style={{ flex: 1 }} />
-
-      {/* CTAs */}
-      <div style={{ padding: '20px 20px 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.985 }}
-          onClick={() => navigate('/profile')}
-          style={{
-            width: '100%', height: 56, borderRadius: 16, border: 0,
-            background: '#E8920A', color: '#fff',
-            fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            boxShadow: '0 10px 28px -8px rgba(232,146,10,0.55), inset 0 0 0 1px rgba(255,255,255,0.12)',
-          }}
-        >
-          Je rejoins la table
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M6.75 3.75L11.25 9L6.75 14.25" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </motion.button>
-        <button
-          type="button"
-          onClick={handleScanQR}
-          style={{
-            width: '100%', height: 48, borderRadius: 14, border: '1px solid #E4E4E7',
-            background: '#fff', color: '#52525B',
-            fontSize: 14, fontWeight: 600, cursor: 'pointer',
-          }}
-        >
-          Scanner un autre QR code
-        </button>
       </div>
     </motion.div>
   )

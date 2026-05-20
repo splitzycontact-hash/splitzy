@@ -15,11 +15,13 @@
     -moz-osx-font-smoothing: grayscale;
     background: #F4F4F5;
     color: #111827;
+    height: 100%;
+    overscroll-behavior: none;
   }
 
   #root {
     width: 100%;
-    min-height: 100svh;
+    min-height: 100dvh;
     display: flex;
     justify-content: center;
     background: #F4F4F5;

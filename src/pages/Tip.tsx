@@ -5,13 +5,12 @@ import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
 
-function getTipMessage(pct: number): string {
-  if (pct === 0) return 'Aucun pourboire'
-  if (pct <= 5) return 'Un petit geste'
-  if (pct <= 12) return "C'est généreux"
-  if (pct <= 20) return 'Très généreux'
-  return 'Super généreux 🌟'
-}
+const TIP_OPTIONS = [
+  { value: 0, label: 'Aucun' },
+  { value: 10, label: '10 %' },
+  { value: 15, label: '15 %' },
+  { value: 20, label: '20 %' },
+]
 
 export function Tip() {
   const { state, dispatch } = useSession()
@@ -24,134 +23,124 @@ export function Tip() {
       initial="initial"
       animate="animate"
       exit="exit"
-      style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#FAFAFA' }}
+      style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#F4F4F5' }}
     >
-      {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px 6px' }}>
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          style={{
-            width: 34, height: 34, borderRadius: 11, border: '1px solid #E4E4E7',
-            background: '#fff', color: '#0A0A0A', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}
-        >
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-            <path d="M9.5 3L5 7.5L9.5 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 700, color: '#0A0A0A', letterSpacing: '-0.01em' }}>
-          Pourboire
-        </div>
-        <div style={{ width: 34 }} />
-      </div>
-
-      {/* Big amount */}
-      <div style={{ padding: '24px 24px 18px', textAlign: 'center' }}>
-        <div style={{ fontSize: 11.5, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Tu ajoutes
-        </div>
-        <motion.div
-          key={state.tipPercent}
-          initial={{ scale: 0.9, opacity: 0.6 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          style={{
-            fontSize: 54, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.04em', marginTop: 4,
-            fontVariantNumeric: 'tabular-nums', display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 2,
-          }}
-        >
-          <span>{formatEur(tipAmount).replace('€', '')}</span>
-          <span style={{ color: '#E8920A' }}>€</span>
-        </motion.div>
-        <div style={{ fontSize: 13.5, color: '#52525B', marginTop: 4 }}>
-          {state.tipPercent}% · {getTipMessage(state.tipPercent)}
-        </div>
-      </div>
-
-      {/* Slider */}
-      <div style={{ padding: '0 24px' }}>
-        <input
-          type="range"
-          min={0}
-          max={30}
-          step={1}
-          value={state.tipPercent}
-          onChange={e => dispatch({ type: 'SET_TIP_PERCENT', payload: parseInt(e.target.value, 10) })}
-          style={{ width: '100%', accentColor: '#E8920A', height: 32, cursor: 'pointer' }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#52525B', fontWeight: 600 }}>
-          <span>0 %</span>
-          <span style={{ color: '#E8920A' }}>{state.tipPercent} %</span>
-          <span>30 %</span>
-        </div>
-      </div>
-
-      {/* Quick chips */}
-      <div style={{ padding: '18px 20px 0', display: 'flex', gap: 8 }}>
-        {[0, 10, 15, 20].map(v => {
-          const active = state.tipPercent === v
-          return (
-            <button
-              key={v}
-              type="button"
-              onClick={() => dispatch({ type: 'SET_TIP_PERCENT', payload: v })}
-              style={{
-                flex: 1, height: 40, borderRadius: 12,
-                border: `1.5px solid ${active ? '#E8920A' : '#E4E4E7'}`,
-                background: active ? '#E8920A' : '#fff',
-                color: active ? '#fff' : '#0A0A0A',
-                fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {v === 0 ? 'Aucun' : `${v} %`}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Breakdown card */}
-      <div style={{ padding: '20px 20px 0' }}>
-        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #E4E4E7', padding: '4px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', gap: 10 }}>
-            <span style={{ fontSize: 13.5, color: '#52525B' }}>Ma part</span>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#0A0A0A', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-              {formatEur(subtotal)}
-            </span>
+      {/* Dark header */}
+      <div style={{
+        background: '#18181B', padding: '18px 20px 14px', color: '#fff', flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, position: 'relative' }}>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(255,255,255,0.08)', border: 'none', padding: '7px 12px',
+              borderRadius: 10, color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 700,
+              cursor: 'pointer', minHeight: 44, minWidth: 44,
+              transition: 'background 0.2s, color 0.2s',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M9 2.5L4.5 7L9 11.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            Retour
+          </button>
+          <div style={{
+            position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+            fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap', pointerEvents: 'none',
+          }}>
+            Pourboire
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px dashed #E4E4E7', gap: 10 }}>
-            <span style={{ fontSize: 13.5, color: '#52525B' }}>+ Pourboire</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: tipAmount > 0 ? '#E8920A' : '#A1A1AA', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-              {tipAmount > 0 ? `+${formatEur(tipAmount)}` : '—'}
-            </span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderTop: '1px solid #E4E4E7', gap: 10 }}>
-            <span style={{ fontSize: 15, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.01em' }}>À payer</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.025em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-              {formatEur(total)}
-            </span>
+          {/* Progress bar */}
+          <div style={{ width: 48, height: 3, background: 'rgba(255,255,255,0.12)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ width: '66%', height: '100%', background: '#E8920A', borderRadius: 2, boxShadow: '0 0 8px rgba(232,146,10,0.5)' }} />
           </div>
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 16 }} />
+      {/* Body */}
+      <div style={{ padding: '0 20px 28px', flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ fontSize: 14, fontWeight: 800, margin: '18px 0 12px', color: '#111827' }}>
+          Laisser un pourboire
+        </div>
+
+        {/* 4 tip buttons */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10 }}>
+          {TIP_OPTIONS.map(opt => {
+            const active = state.tipPercent === opt.value
+            const tipEur = opt.value > 0 && subtotal > 0
+              ? formatEur(Math.round(subtotal * opt.value / 100))
+              : null
+            return (
+              <motion.button
+                key={opt.value}
+                type="button"
+                whileTap={{ scale: 0.96 }}
+                onClick={() => dispatch({ type: 'SET_TIP_PERCENT', payload: opt.value })}
+                style={{
+                  padding: '16px 6px', background: active ? '#fff' : '#F4F4F5',
+                  border: `2px solid ${active ? '#E8920A' : '#E5E7EB'}`,
+                  borderRadius: 16, textAlign: 'center' as const, cursor: 'pointer',
+                  transition: 'all 0.22s cubic-bezier(0.34,1.56,0.64,1)',
+                  boxShadow: active ? '0 4px 16px rgba(232,146,10,0.22), 0 0 0 3px rgba(232,146,10,0.1)' : 'none',
+                  transform: active ? 'translateY(-2px)' : 'none',
+                }}
+              >
+                <div style={{ fontSize: 16, fontWeight: 800, color: active ? '#B45309' : '#111827' }}>
+                  {opt.label}
+                </div>
+                {tipEur && (
+                  <div style={{ fontSize: 11, color: active ? '#E8920A' : '#9CA3AF', marginTop: 3, fontWeight: active ? 700 : 500 }}>
+                    {tipEur}
+                  </div>
+                )}
+              </motion.button>
+            )
+          })}
+        </div>
+
+        {/* Recap card */}
+        <div style={{
+          background: '#FAFAFA', borderRadius: 18, padding: '14px 16px',
+          margin: '16px 0', border: '1px solid #E5E7EB', boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', color: '#374151' }}>
+            <span>Ma part</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{subtotal > 0 ? formatEur(subtotal) : '—'}</span>
+          </div>
+          {state.tipPercent > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', color: '#B45309', fontWeight: 600 }}>
+              <span>+ Pourboire ({state.tipPercent} %)</span>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>+{formatEur(tipAmount)}</span>
+            </div>
+          )}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+            borderTop: '2px solid #111827', marginTop: 8, paddingTop: 10, fontSize: 15, fontWeight: 900,
+          }}>
+            <span>Total</span>
+            <span style={{ fontSize: 22, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+              {total > 0 ? formatEur(total) : '—'}
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* CTA */}
-      <div style={{ padding: '14px 20px 28px' }}>
+      <div style={{ padding: '14px 20px', paddingBottom: 'max(28px, calc(16px + env(safe-area-inset-bottom)))', flexShrink: 0 }}>
         <motion.button
           type="button"
           whileTap={{ scale: 0.985 }}
           onClick={() => navigate('/payment')}
           style={{
-            width: '100%', height: 56, borderRadius: 16, border: 0, background: '#E8920A', color: '#fff',
-            fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em', cursor: 'pointer',
+            width: '100%', height: 56, borderRadius: 18, border: 0, background: '#E8920A', color: '#fff',
+            fontSize: 16, fontWeight: 800, letterSpacing: '0.01em', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            boxShadow: '0 10px 28px -8px rgba(232,146,10,0.55), inset 0 0 0 1px rgba(255,255,255,0.12)',
+            boxShadow: '0 4px 18px rgba(232,146,10,0.32), 0 1px 4px rgba(0,0,0,0.1)',
           }}
         >
-          Payer {formatEur(total)}
+          {total > 0 ? `Payer ${formatEur(total)}` : 'Continuer'}
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
             <path d="M6.75 3.75L11.25 9L6.75 14.25" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>

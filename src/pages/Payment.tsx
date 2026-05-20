@@ -78,9 +78,9 @@ export function Payment() {
             type="button"
             onClick={() => navigate(-1)}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px',
-              background: 'rgba(255,255,255,0.06)', border: 0, borderRadius: 10, color: '#fff',
-              fontSize: 13, fontWeight: 500, cursor: 'pointer', marginBottom: 14,
+              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 14px',
+              background: 'rgba(255,255,255,0.08)', border: 0, borderRadius: 10, color: '#fff',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer', marginBottom: 14, minHeight: 44,
             }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -244,7 +244,7 @@ export function Payment() {
           Paiement sécurisé · Stripe · 3D Secure
         </div>
       </div>
-      <div style={{ padding: '8px 20px 24px' }}>
+      <div style={{ padding: '8px 20px', paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))' }}>
         <motion.button
           type="button"
           whileTap={{ scale: 0.985 }}

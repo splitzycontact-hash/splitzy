@@ -84,7 +84,7 @@ export function Items() {
           type="button"
           onClick={() => navigate(-1)}
           style={{
-            width: 34, height: 34, borderRadius: 11, border: '1px solid #E4E4E7',
+            width: 44, height: 44, borderRadius: 12, border: '1px solid #E4E4E7',
             background: '#fff', color: '#0A0A0A', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}
@@ -136,7 +136,7 @@ export function Items() {
 
       {/* Mode content */}
       {state.splitMode === 'item' && (
-        <div style={{ padding: '14px 20px 0', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '14px 20px 0', flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
           {categorized.map(({ cat, items }) => {
             const open = openCat === cat
             return (
@@ -173,7 +173,7 @@ export function Items() {
                         }}>
                           <button
                             type="button"
-                            onClick={() => dispatch({ type: 'TOGGLE_ITEM', payload: it.id })}
+                            onClick={() => dispatch({ type: 'TOGGLE_ITEM', payload: { itemId: it.id, priceCents: it.price } })}
                             style={{
                               width: '100%', padding: '12px 16px', border: 0, background: 'transparent',
                               display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
@@ -216,12 +216,12 @@ export function Items() {
                                       type="button"
                                       onClick={() => dispatch({ type: 'SET_ITEM_SPLIT', payload: { itemId: it.id, factor: s } })}
                                       style={{
-                                        height: 28, minWidth: 36, padding: '0 8px',
-                                        borderRadius: 8,
-                                        border: `1px solid ${isActive ? '#E8920A' : '#E4E4E7'}`,
+                                        height: 44, minWidth: 44, padding: '0 10px',
+                                        borderRadius: 10,
+                                        border: `1.5px solid ${isActive ? '#E8920A' : '#E4E4E7'}`,
                                         background: isActive ? '#FFF4E5' : '#fff',
                                         color: isActive ? '#E8920A' : '#52525B',
-                                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                                        fontSize: 13, fontWeight: 700, cursor: 'pointer',
                                       }}
                                     >
                                       ÷{s}
@@ -309,7 +309,8 @@ export function Items() {
       <div style={{
         position: 'sticky', bottom: 0,
         background: 'linear-gradient(to top, #FAFAFA 70%, rgba(250,250,250,0))',
-        padding: '14px 20px 24px',
+        padding: '14px 20px',
+        paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))',
         flexShrink: 0,
       }}>
         <div style={{
@@ -335,7 +336,7 @@ export function Items() {
           type="button"
           whileTap={{ scale: 0.985 }}
           disabled={subtotal <= 0}
-          onClick={() => navigate('/recap')}
+          onClick={() => navigate('/tip')}
           style={{
             width: '100%', height: 54, borderRadius: 16, border: 0, marginTop: 0,
             background: subtotal > 0 ? '#E8920A' : '#E4E4E7',

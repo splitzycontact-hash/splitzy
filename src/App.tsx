@@ -8,9 +8,7 @@ import { RestaurantApp } from './restaurant/RestaurantApp'
 
 import { Landing } from './pages/Landing'
 import { Profile } from './pages/Profile'
-import { Table } from './pages/Table'
 import { Items } from './pages/Items'
-import { Recap } from './pages/Recap'
 import { Tip } from './pages/Tip'
 import { Payment } from './pages/Payment'
 import { Confirmation } from './pages/Confirmation'
@@ -48,9 +46,7 @@ function ConsumerAppContent() {
           <Route path="/t/:slug/:tableNumber" element={<TableEntry />} />
           <Route path="/welcome" element={<Landing />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/table"         element={<ProtectedRoute><Table /></ProtectedRoute>} />
           <Route path="/items"         element={<ProtectedRoute><Items /></ProtectedRoute>} />
-          <Route path="/recap"         element={<ProtectedRoute><Recap /></ProtectedRoute>} />
           <Route path="/tip"           element={<ProtectedRoute><Tip /></ProtectedRoute>} />
           <Route path="/payment"       element={<ProtectedRoute><Payment /></ProtectedRoute>} />
           <Route path="/confirmation"  element={<ProtectedRoute><Confirmation /></ProtectedRoute>} />
@@ -64,11 +60,10 @@ function ConsumerAppContent() {
 }
 
 function ConsumerAppGuard() {
-  const { isSignedIn, isLoaded } = useAuth()
-  const { state } = useSession()
+  const { isLoaded } = useAuth()
   const location = useLocation()
 
-  // QR code table routes are always public — never block customers.
+  // QR code table routes are always public.
   // window.location.pathname is checked first: useLocation() can lag during
   // Clerk re-initialization on hard refresh, causing a spurious auth redirect.
   if (window.location.pathname.startsWith('/t/') || location.pathname.startsWith('/t/')) {
@@ -83,12 +78,8 @@ function ConsumerAppGuard() {
     )
   }
 
-  // Authenticated Clerk user with no active table context → restaurant owner, send to dashboard
-  // If restaurantName is set, they arrived via a QR code scan → let them through
-  if (isSignedIn && !state.restaurantName) {
-    return <Navigate to="/restaurant/onboarding" replace />
-  }
-
+  // Consumer routes are public — no Clerk auth required.
+  // Restaurant owners access their dashboard via /restaurant/* which has its own guard.
   return <ConsumerAppContent />
 }
 

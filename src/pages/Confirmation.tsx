@@ -233,7 +233,7 @@ export function Confirmation() {
 
       <div style={{ flex: 1 }} />
 
-      <div style={{ padding: '14px 20px 24px', textAlign: 'center' }}>
+      <div style={{ padding: '14px 20px', paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))', textAlign: 'center' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <span style={{
             width: 16, height: 16, borderRadius: 4, background: '#0A0A0A',

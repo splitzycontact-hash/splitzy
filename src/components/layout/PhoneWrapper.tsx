@@ -44,7 +44,7 @@ export function PhoneWrapper({ children }: PhoneWrapperProps) {
       </div>
 
       {/* Mobile: full screen */}
-      <div className="md:hidden flex flex-col w-full min-h-svh" style={{ background: '#F4F4F5' }}>
+      <div className="md:hidden flex flex-col w-full" style={{ background: '#F4F4F5', minHeight: '100dvh' }}>
         {children}
       </div>
     </>
