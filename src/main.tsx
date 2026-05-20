@@ -24,6 +24,7 @@ createRoot(document.getElementById('root')!).render(
           publishableKey={CLERK_KEY!}
           signInForceRedirectUrl="/restaurant/onboarding"
           signUpForceRedirectUrl="/restaurant/onboarding"
+          allowedRedirectOrigins={['https://splitzy.fr', 'https://www.splitzy.fr']}
         >
           {inner}
         </ClerkProvider>
