@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { SplitzyLogo } from './Navbar'
 import { IconLinkedin, IconTwitter, IconInstagram } from './Icons'
 
@@ -5,28 +6,27 @@ const FOOTER_COLS = [
   {
     title: 'Produit',
     links: [
-      { label: 'Fonctionnalités', href: '#fonctionnalites' },
-      { label: 'Tarifs',          href: '/pricing' },
-      { label: 'Démo',            href: '/demo' },
-      { label: 'Changelog',       href: '/changelog' },
+      { label: 'Fonctionnalités', to: '/#fonctionnalites' },
+      { label: 'Tarifs',          to: '/pricing' },
+      { label: 'Démo',            to: '/demo' },
+      { label: 'Changelog',       to: '/changelog' },
     ],
   },
   {
     title: 'Entreprise',
     links: [
-      { label: 'À propos',  href: '/about' },
-      { label: 'Blog',      href: '/blog' },
-      { label: 'Presse',    href: '/press' },
-      { label: 'Carrières', href: '/careers' },
+      { label: 'À propos',  to: '/about' },
+      { label: 'Blog',      to: '/blog' },
+      { label: 'Presse',    to: '/press' },
+      { label: 'Carrières', to: '/careers' },
     ],
   },
   {
     title: 'Support',
     links: [
-      { label: 'Contact',       href: '/contact' },
-      { label: "Centre d'aide", href: '/help' },
-      { label: 'Sécurité',      href: '/security' },
-      { label: 'Statut',        href: 'https://status.splitzy.fr' },
+      { label: 'Contact',       to: '/contact' },
+      { label: "Centre d'aide", to: '/help' },
+      { label: 'Sécurité',      to: '/security' },
     ],
   },
 ]
@@ -64,7 +64,7 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Link cols */}
+          {/* Link cols — <Link to> pour navigation client-side sans rechargement */}
           {FOOTER_COLS.map((col) => (
             <div key={col.title} className="md:col-span-2">
               <h4 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-white/40 mb-4">
@@ -72,13 +72,13 @@ export function Footer() {
               </h4>
               <ul className="space-y-2.5">
                 {col.links.map((l) => (
-                  <li key={l.href}>
-                    <a
-                      href={l.href}
+                  <li key={l.to}>
+                    <Link
+                      to={l.to}
                       className="text-[14px] text-white/75 hover:text-orange-400 transition-colors"
                     >
                       {l.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -109,12 +109,18 @@ export function Footer() {
             © {new Date().getFullYear()} Splitzy SAS · Tous droits réservés.
           </p>
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-white/55">
-            <li><a href="/legal"   className="hover:text-white transition-colors">CGU</a></li>
-            <li><a href="/privacy" className="hover:text-white transition-colors">Confidentialité</a></li>
-            <li><a href="/legal"   className="hover:text-white transition-colors">Mentions légales</a></li>
+            <li><Link to="/legal"   className="hover:text-white transition-colors">CGU</Link></li>
+            <li><Link to="/privacy" className="hover:text-white transition-colors">Confidentialité</Link></li>
+            <li><Link to="/legal"   className="hover:text-white transition-colors">Mentions légales</Link></li>
             <li className="inline-flex items-center gap-1.5 text-white/40">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse-dot" />
-              Tous les systèmes opérationnels
+              <a
+                href="https://status.splitzy.fr"
+                target="_blank" rel="noreferrer"
+                className="hover:text-white transition-colors"
+              >
+                Tous les systèmes opérationnels
+              </a>
             </li>
           </ul>
         </div>
