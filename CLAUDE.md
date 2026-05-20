@@ -88,12 +88,15 @@ These must also be set on the prod deployment.
 ```
 /restaurant/*         → RestaurantApp (Clerk-protected dashboard)
 /t/:slug/:tableNumber → TableEntry (public — customer QR entry point)
-/                     → Landing
-/profile              → Profile (set name + avatar)
-/table → /items → /recap → /tip → /payment → /confirmation → /feedback → /feedback/sent
+/                     → Landing (marketing homepage)
+/welcome              → Landing (consumer — après scan QR)
+/profile              → Profile (avatar + prénom)
+/items → /tip → /payment → /confirmation → /feedback → /feedback/sent
 ```
 
-All client routes after `/profile` are protected by `ProtectedRoute` (redirects to `/` if `userName` is empty). Session resets on `/feedback/sent`.
+Les routes `/table` et `/recap` ont été supprimées (sauvegarde v3). Le flow est désormais : `TableEntry → /welcome → /profile → /items → /tip → /payment → /confirmation → /feedback → /feedback/sent`.
+
+All client routes after `/profile` are protected by `ProtectedRoute` (redirects to `/welcome` if `userName` is empty). Session resets on `/feedback/sent`.
 
 ### Auth guard logic (`src/App.tsx`)
 
@@ -302,7 +305,57 @@ On desktop (>768px) the client app renders inside an iPhone 15 Pro frame (390px,
 
 `src/components/ui/Avatar.tsx` — 6 emoji avatars: `['🦊','🐻','🐸','🐙','🦄','🐯']` (indexed 0–5). Each has a paired background color.
 
+Dans `Profile.tsx` (flow consumer), seuls les 4 premiers avatars sont exposés en grille 2×2 :
+```
+{ id: 0, emoji: '🦊', bg: '#E8920A', label: 'Léo' }
+{ id: 1, emoji: '🐻', bg: '#3B82F6', label: 'Mia' }
+{ id: 2, emoji: '🐸', bg: '#8B5CF6', label: 'Alex' }
+{ id: 3, emoji: '🐙', bg: '#10B981', label: 'Sam' }
+```
+L'index `userAvatarIndex` (0–3) est stocké dans `SessionState` et utilisé dans `Table.tsx` (convives) et autres.
+
 ---
+
+## Design system consumer (mobile)
+
+Source de vérité : `../Splitzy Interface Restaurateur/uploads/splitzy_mockup (1).html`
+
+### CSS contraintes mobiles obligatoires
+- `min-height: 100dvh` sur `#root` (pas `svh` ni `vh` — le `dvh` exclut l'UI du navigateur iOS)
+- `height: 100%; overscroll-behavior: none` sur `html, body`
+- Tous les inputs ont `font-size: 16px` minimum (en dessous → iOS zoom automatique)
+- Touch targets : `min-height: 44px`, `min-width: 44px` sur tous les boutons interactifs
+- Zones scrollables : `WebkitOverflowScrolling: 'touch'` + `overscrollBehavior: 'contain'`
+- CTAs en bas de page : `paddingBottom: 'max(Xpx, calc(Ypx + env(safe-area-inset-bottom)))'`
+- `viewport-fit=cover` déjà en place dans `index.html`
+
+### Palette (ne jamais hardcoder en dehors des pages consumer)
+```
+--brand:    #E8920A   (orange principal)
+--brand-dk: #B45309   (orange hover / texte actif)
+--brand-lt: #FEF3C7   (fond sélectionné)
+--brand-bg: #fffbf2
+--dark:     #111827
+--mid:      #374151
+--muted:    #9CA3AF
+--border:   #E5E7EB
+--bg:       #F4F4F5
+```
+
+NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentionnel (pas de Tailwind dans le flow client).
+
+### Pages consumer — design attendu (sauvegarde v3)
+
+| Page | Hero | Contenu sheet |
+|---|---|---|
+| `Landing` | Fond `#18181B`, pill animée « Table X · Restaurant », logo Splitzy | Restaurant card avec icône 🍽, 3 steps, bouton « C'est parti → » |
+| `Profile` | Fond `#18181B`, step dots, carte preview identité (avatar + prénom live) | 2×2 avatar grid (🦊🐻🐸🐙), input prénom 17px, chips suggestion, CTA→/items |
+| `Items` | Header dark `#18181B` + progress bar | Toggle 2 modes (par article / parts égales), scroll `-webkit-overflow-scrolling: touch` |
+| `Tip` | Header dark + progress bar | 4 boutons (Aucun/10%/15%/20%) en grid, recap card, CTA→/payment |
+| `Payment` | Fond dark, montant en grand | Carousel cartes, Apple Pay / Google Pay, CTA payer |
+| `Confirmation` | Fond dark, checkmark animé | Receipt card, progress bar → /feedback (8s) |
+| `Feedback` | Fond dark, étoile icon | Privacy badge, StarRating, tags, textarea **font-size 16px**, CTA |
+| `FeedbackSent` | Centré, check vert | Note privé, download PDF, bouton reset session |
 
 ## Known issues fixed (context for future sessions)
 
@@ -310,3 +363,5 @@ On desktop (>768px) the client app renders inside an iPhone 15 Pro frame (390px,
 - **Refresh redirect on /t/ routes**: Fixed with `window.location.pathname` check in `ConsumerAppGuard` + `flushSync` in `TableEntry` before `navigate('/')`.
 - **Square prices 0€**: Sandbox items use `VARIABLE_PRICING`. Production URL + token required. Fixed.
 - **Dashboard/client out of sync**: Were pointing to different restaurant documents. Fixed by merging duplicate restaurants so both use the same `_id`.
+- **Infinite spinner sur /t/ routes** : `TableEntry` a un timeout de 10 s → écran "Problème de connexion" avec bouton Réessayer.
+- **VITE_CONVEX_URL prod** : Vercel prod pointe explicitement sur `https://mellow-chinchilla-481.eu-west-1.convex.cloud` (défini via `vercel env add`).
