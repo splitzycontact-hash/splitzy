@@ -15,6 +15,15 @@ npm run lint       # ESLint
 npm run preview    # preview production build
 ```
 
+Vercel (deploy production — Vercel CLI installé globalement) :
+
+```bash
+export PATH="$HOME/.local/node/bin:$PATH"
+vercel --prod      # build + deploy sur www.splitzy.fr depuis le répertoire courant
+```
+
+> **Important** : Vercel déploie automatiquement depuis la branche `main`. Les branches `sauvegarde-*` ne déclenchent que des previews. Pour déployer en prod : merger dans `main` + `vercel --prod`.
+
 Convex (always run from `splitzy-client/` directory):
 
 ```bash
@@ -344,7 +353,7 @@ Source de vérité : `../Splitzy Interface Restaurateur/uploads/splitzy_mockup (
 
 NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentionnel (pas de Tailwind dans le flow client).
 
-### Pages consumer — design attendu (sauvegarde v4)
+### Pages consumer — design attendu (sauvegarde v5)
 
 | Page | Hero | Contenu sheet |
 |---|---|---|
@@ -363,6 +372,11 @@ NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentio
 - **Refresh redirect on /t/ routes**: Fixed with `window.location.pathname` check in `ConsumerAppGuard` + `flushSync` in `TableEntry` before `navigate('/')`.
 - **Square prices 0€**: Sandbox items use `VARIABLE_PRICING`. Production URL + token required. Fixed.
 - **Dashboard/client out of sync**: Were pointing to different restaurant documents. Fixed by merging duplicate restaurants so both use the same `_id`.
-- **Infinite spinner sur /t/ routes** : `TableEntry` a un timeout de 10 s → écran "Problème de connexion" avec bouton Réessayer.
+- **Infinite spinner sur /t/ routes** : `TableEntry` a un timeout de 20 s → écran "Problème de connexion" avec bouton Réessayer (sans `window.location.reload()` — utilise `retryKey` state).
 - **VITE_CONVEX_URL prod** : Vercel prod pointe explicitement sur `https://mellow-chinchilla-481.eu-west-1.convex.cloud` (défini via `vercel env add`).
 - **QR Codes flash "Aucune table configurée"** (sauvegarde v4) : `rawTables ?? []` passait `[]` à `QRCodesSection` pendant le chargement Convex → état vide affiché par erreur. Corrigé avec un spinner si `rawTables === undefined`, cohérent avec le pattern de `MenuSection`. Règle générale : ne jamais passer `undefined ?? []` à un composant qui affiche un état vide — toujours garder le `undefined` pour afficher un spinner.
+- **Clerk chargeait sur /t/ routes** (sauvegarde v5) : `ClerkProvider` était dans `main.tsx` → inclus dans le bundle initial chargé par tous les utilisateurs. Corrigé en créant `src/restaurant/RestaurantRoot.tsx` (lazy-importé depuis `App.tsx`) qui contient l'unique `import { ClerkProvider }`. Le bundle `index-*.js` ne contient plus aucune référence Clerk.
+- **TableEntry naviguait avant que les données soient prêtes** (sauvegarde v5) : navigation vers `/welcome` déclenchée avant que Convex ait répondu. Ajout de 4 guards dans l'effet de navigation : `context === undefined`, `!context`, `context.restaurant.slug !== slug` (cache périmé), `!context.table` (table inexistante dans Convex), `navigated.current` (double-fire StrictMode).
+- **Footer liens internes en `<a href>`** (sauvegarde v5) : causaient un rechargement complet de la page. Tous remplacés par `<Link to>` (react-router-dom).
+- **LazyMotion** (sauvegarde v5) : framer-motion `motion.*` → `m.*` dans tous les composants animés + `<LazyMotion features={domAnimation}>` dans `App.tsx`. Réduit le bundle initial (~150 kB évités sur le chemin critique).
+- **Vercel ne déployait pas depuis sauvegarde-v4** (sauvegarde v5) : Vercel déploie depuis `main` uniquement. Les pushes sur `sauvegarde-*` ne créent que des previews. Corrigé en mergant `sauvegarde-v4 → main` + `vercel --prod`.
