@@ -48,7 +48,7 @@ All three apps share **one Convex deployment** (one schema, one set of functions
 | Service | Dev | Prod |
 |---|---|---|
 | Convex backend | `scintillating-viper-372` (`.env.local`) | `mellow-chinchilla-481` (Convex deploy) |
-| Vercel frontend | `http://localhost:5173` | `https://splitzy-client.vercel.app` |
+| Vercel frontend | `http://localhost:5173` | `https://www.splitzy.fr` |
 | Clerk auth | `pk_test_bm92ZWwtY291Z2FyLTg4…` (dev instance) | `pk_test_…` + origin `splitzy-client.vercel.app` autorisée |
 | Square POS | `connect.squareup.com` (production) | same |
 | Stripe Connect | Stripe Connect Express | platform: Splitzy, 1.5% commission |
@@ -344,7 +344,7 @@ Source de vérité : `../Splitzy Interface Restaurateur/uploads/splitzy_mockup (
 
 NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentionnel (pas de Tailwind dans le flow client).
 
-### Pages consumer — design attendu (sauvegarde v3)
+### Pages consumer — design attendu (sauvegarde v4)
 
 | Page | Hero | Contenu sheet |
 |---|---|---|
@@ -365,3 +365,4 @@ NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentio
 - **Dashboard/client out of sync**: Were pointing to different restaurant documents. Fixed by merging duplicate restaurants so both use the same `_id`.
 - **Infinite spinner sur /t/ routes** : `TableEntry` a un timeout de 10 s → écran "Problème de connexion" avec bouton Réessayer.
 - **VITE_CONVEX_URL prod** : Vercel prod pointe explicitement sur `https://mellow-chinchilla-481.eu-west-1.convex.cloud` (défini via `vercel env add`).
+- **QR Codes flash "Aucune table configurée"** (sauvegarde v4) : `rawTables ?? []` passait `[]` à `QRCodesSection` pendant le chargement Convex → état vide affiché par erreur. Corrigé avec un spinner si `rawTables === undefined`, cohérent avec le pattern de `MenuSection`. Règle générale : ne jamais passer `undefined ?? []` à un composant qui affiche un état vide — toujours garder le `undefined` pour afficher un spinner.
