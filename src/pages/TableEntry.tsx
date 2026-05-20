@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from 'convex/react'
@@ -12,46 +12,75 @@ export function TableEntry() {
   const { dispatch } = useSession()
   const updateStatus = useMutation(api.tables.updateStatus)
   const [timedOut, setTimedOut] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
+
+  // Ref utilisé comme verrou : empêche le double-fire de l'effet en StrictMode
+  // et sur les re-renders entre le dispatch et la navigation.
+  const navigated = useRef(false)
 
   const context = useQuery(api.restaurants.getTableContext, {
     slug: slug ?? '',
     tableNumber: Number(tableNumber ?? 0),
   })
 
-  // Show error if Convex doesn't respond within 10 s
+  // Countdown 20s. retryKey redémarre le timer sans reload complet.
+  // Toutes les UI d'attente/erreur restent sur /t/:slug/:tableNumber.
   useEffect(() => {
     if (context !== undefined) return
-    const id = setTimeout(() => setTimedOut(true), 10_000)
+    setTimedOut(false)
+    const id = setTimeout(() => setTimedOut(true), 20_000)
     return () => clearTimeout(id)
-  }, [context])
+  }, [context, retryKey])
 
+  // Navigation vers /welcome — point unique de sortie de ce composant.
+  // Conditions nécessaires avant de naviguer :
+  //   1. context est défini (Convex a répondu)
+  //   2. context n'est pas null (restaurant existe)
+  //   3. restaurant.slug correspond à l'URL (pas de donnée cachée périmée)
+  //   4. table existe dans Convex (sinon le flow de paiement n'a pas de convexTableId)
+  //   5. restaurant non suspendu
   useEffect(() => {
-    if (context === undefined) return // still loading
-    if (!context) return // handled below with error UI
-    if (context.restaurant.suspended) return // handled below with suspended UI
+    if (context === undefined) return
+    if (!context) return
+    if (context.restaurant.slug !== slug) return
+    if (!context.table) return
+    if (context.restaurant.suspended) return
+    if (navigated.current) return
 
-    // flushSync commits the dispatch before navigate fires, preventing
-    // ConsumerAppGuard from seeing restaurantName = '' at the new '/' path
+    navigated.current = true
+
+    // flushSync garantit que le SessionContext est à jour avant que
+    // react-router démonte ce composant et monte Landing.
     flushSync(() => {
       dispatch({
         type: 'SET_TABLE_CONTEXT',
         payload: {
           restaurantName: context.restaurant.name,
-          tableNumber: context.table?.number ?? Number(tableNumber),
-          tableCapacity: context.table?.capacity ?? 4,
+          tableNumber: context.table!.number,
+          tableCapacity: context.table!.capacity ?? 4,
           convexRestaurantId: context.restaurant._id,
-          convexTableId: context.table?._id ?? null,
-          tableTotalCents: context.table?.amountCents ?? TABLE_TOTAL_CENTS,
+          convexTableId: context.table!._id,
+          tableTotalCents: context.table!.amountCents ?? TABLE_TOTAL_CENTS,
         },
       })
     })
-    if (context.table?._id) {
-      updateStatus({ tableId: context.table._id, status: 'dining', guests: context.table.capacity }).catch(() => {})
-    }
+
+    updateStatus({
+      tableId: context.table!._id,
+      status: 'dining',
+      guests: context.table!.capacity,
+    }).catch(() => {})
+
     navigate('/welcome', { replace: true })
   }, [context])
 
-  // Connection timeout
+  function handleRetry() {
+    setTimedOut(false)
+    setRetryKey(k => k + 1)
+  }
+
+  // ─── Erreur après 20s ────────────────────────────────────────────────────
+  // L'URL reste /t/:slug/:tableNumber — un refresh relance le chargement.
   if (context === undefined && timedOut) {
     return (
       <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4 px-6 text-center">
@@ -65,7 +94,7 @@ export function TableEntry() {
         </div>
         <button
           type="button"
-          onClick={() => window.location.reload()}
+          onClick={handleRetry}
           style={{
             padding: '12px 28px', borderRadius: 12, border: 0,
             background: '#E8920A', color: '#fff',
@@ -78,7 +107,7 @@ export function TableEntry() {
     )
   }
 
-  // Loading
+  // ─── Spinner — affiché pendant les 20s sur /t/:slug/:tableNumber ─────────
   if (context === undefined) {
     return (
       <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-3">
@@ -91,7 +120,7 @@ export function TableEntry() {
     )
   }
 
-  // Restaurant not found
+  // ─── Restaurant introuvable ───────────────────────────────────────────────
   if (!context) {
     return (
       <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4 px-6 text-center">
@@ -108,7 +137,7 @@ export function TableEntry() {
     )
   }
 
-  // Suspended
+  // ─── Restaurant suspendu ──────────────────────────────────────────────────
   if (context.restaurant.suspended) {
     return (
       <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4 px-6 text-center">
@@ -125,7 +154,24 @@ export function TableEntry() {
     )
   }
 
-  // Redirecting (context loaded, navigate in progress)
+  // ─── Table non configurée ─────────────────────────────────────────────────
+  if (!context.table) {
+    return (
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="text-2xl font-black tracking-tight" style={{ color: '#18181B' }}>
+          Split<span style={{ color: '#E8920A' }}>zy</span>
+        </div>
+        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center text-2xl">🪑</div>
+        <div>
+          <div className="text-base font-bold text-dark">Table introuvable</div>
+          <div className="text-sm text-muted mt-1">Cette table n'est pas encore configurée.</div>
+          <div className="text-xs text-muted mt-1">Demandez au serveur de scanner le QR code.</div>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── Navigation en cours (données prêtes, transition vers /welcome) ───────
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-3">
       <div className="text-2xl font-black tracking-tight" style={{ color: '#18181B' }}>

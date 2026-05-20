@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 interface ProgressBarProps {
   value: number // 0-100
@@ -9,7 +9,7 @@ interface ProgressBarProps {
 export function ProgressBar({ value, className = '', color = '#E8920A' }: ProgressBarProps) {
   return (
     <div className={`w-full h-1 bg-white/20 rounded-full overflow-hidden ${className}`}>
-      <motion.div
+      <m.div
         className="h-full rounded-full"
         style={{ backgroundColor: color }}
         initial={{ width: 0 }}

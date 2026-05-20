@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { fadeInUp } from './shared'
 import {
   IconArrowRight, IconPlay, IconCheck, IconSparkles, IconQr,
@@ -153,7 +153,7 @@ export function Hero() {
 
       <div className="relative max-w-6xl mx-auto px-4 md:px-6">
         {/* Badge */}
-        <motion.div
+        <m.div
           className="flex justify-center"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0, transition: { duration: 0.4, delay: 0.05 } }}
@@ -169,31 +169,31 @@ export function Hero() {
             <span>Dashboard gérant disponible</span>
             <IconArrowRight size={13} className="text-white/40" />
           </a>
-        </motion.div>
+        </m.div>
 
         {/* H1 */}
-        <motion.div initial="hidden" animate="visible" custom={0.1} variants={fadeInUp}>
+        <m.div initial="hidden" animate="visible" custom={0.1} variants={fadeInUp}>
           <h1 className="mt-6 md:mt-8 text-center text-[36px] md:text-[56px] leading-[1.05] font-bold text-white max-w-3xl mx-auto text-balance">
             <span className="block">Fini les additions qui traînent.</span>
             <span className="block text-orange-500">Vos clients paient en 30 secondes.</span>
           </h1>
-        </motion.div>
+        </m.div>
 
         {/* Sous-titre */}
-        <motion.p
+        <m.p
           className="mt-5 md:mt-6 text-center text-[16px] md:text-[18px] leading-[1.6] text-white/60 max-w-xl mx-auto"
           initial="hidden" animate="visible" custom={0.2} variants={fadeInUp}
         >
           Splitzy permet à vos convives de partager l'addition et payer leur part depuis leur téléphone. Sans app, sans friction.
-        </motion.p>
+        </m.p>
 
         {/* CTAs */}
-        <motion.div
+        <m.div
           className="mt-7 md:mt-8"
           initial="hidden" animate="visible" custom={0.3} variants={fadeInUp}
         >
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
-            <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+            <m.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
               <a
                 href="/restaurant/onboarding"
                 className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 bg-orange-600 text-white font-medium text-[15px] px-6 py-3.5 rounded-xl shadow-lg shadow-orange-600/40 hover:bg-orange-700 hover:shadow-xl hover:shadow-orange-600/50 transition-colors"
@@ -201,8 +201,8 @@ export function Hero() {
                 Commencer gratuitement
                 <IconArrowRight size={16} />
               </a>
-            </motion.div>
-            <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+            </m.div>
+            <m.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
               <a
                 href="/demo"
                 className="inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-white/[0.04] border border-white/15 text-white font-medium text-[15px] px-6 py-3.5 rounded-xl hover:bg-white/[0.08] hover:border-white/25 transition-colors backdrop-blur-sm"
@@ -210,12 +210,12 @@ export function Hero() {
                 <IconPlay size={13} />
                 Voir la démo
               </a>
-            </motion.div>
+            </m.div>
           </div>
-        </motion.div>
+        </m.div>
 
         {/* Social proof */}
-        <motion.ul
+        <m.ul
           className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] text-white/40"
           initial="hidden" animate="visible" custom={0.4} variants={fadeInUp}
         >
@@ -225,17 +225,17 @@ export function Hero() {
               {t}
             </li>
           ))}
-        </motion.ul>
+        </m.ul>
 
         {/* Mockup */}
-        <motion.div
+        <m.div
           className="mt-12 md:mt-16 flex justify-center"
           initial={{ opacity: 0, scale: 0.95, y: 24 }}
           animate={{ opacity: 1, scale: 1, y: 0, transition: { duration: 0.7, delay: 0.4, ease: [0.25, 0.46, 0.45, 0.94] } }}
         >
           <div className="relative">
             {/* Notification card — desktop only */}
-            <motion.div
+            <m.div
               className="hidden md:block absolute -right-24 top-16 z-10"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0, transition: { duration: 0.5, delay: 1 } }}
@@ -249,10 +249,10 @@ export function Hero() {
                   <p className="text-[11px] text-white/50 tabular-nums">142,80 € · 4 convives</p>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
 
             {/* QR card — desktop only */}
-            <motion.div
+            <m.div
               className="hidden md:block absolute -left-28 bottom-24 z-10"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0, transition: { duration: 0.5, delay: 1.2 } }}
@@ -269,13 +269,13 @@ export function Hero() {
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
 
             <div className="md:rotate-[1deg]">
               <PhoneMockup />
             </div>
           </div>
-        </motion.div>
+        </m.div>
       </div>
 
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-ink-900" />

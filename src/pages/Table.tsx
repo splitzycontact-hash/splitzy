@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useQuery } from 'convex/react'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
@@ -42,7 +42,7 @@ export function Table() {
     : []
 
   return (
-    <motion.div
+    <m.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -174,7 +174,7 @@ export function Table() {
 
       {/* CTAs */}
       <div style={{ padding: '16px 20px 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.985 }}
           onClick={() => navigate('/items')}
@@ -190,7 +190,7 @@ export function Table() {
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
             <path d="M6.75 3.75L11.25 9L6.75 14.25" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-        </motion.button>
+        </m.button>
         <button
           type="button"
           style={{
@@ -203,6 +203,6 @@ export function Table() {
           Voir le menu complet
         </button>
       </div>
-    </motion.div>
+    </m.div>
   )
 }

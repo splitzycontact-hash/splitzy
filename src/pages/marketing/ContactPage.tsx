@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 import { IconArrowRight } from './Icons'
@@ -100,7 +100,7 @@ function SubjectSelect({ value, onChange }: { value: SubjectId; onChange: (v: Su
       </button>
       <AnimatePresence>
         {open && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
@@ -119,7 +119,7 @@ function SubjectSelect({ value, onChange }: { value: SubjectId; onChange: (v: Su
                 <span className="text-[11px] text-ink-400">{s.eta}</span>
               </button>
             ))}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>
@@ -139,7 +139,7 @@ function inputCls(err: boolean) {
 
 function Spinner() {
   return (
-    <motion.span
+    <m.span
       animate={{ rotate: 360 }}
       transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
       className="inline-block w-4 h-4 rounded-full border-2 border-white/30 border-t-white"
@@ -259,7 +259,7 @@ function ContactForm({ onSent }: { onSent: (email: string) => void }) {
           </span>
         </label>
 
-        <motion.button
+        <m.button
           type="submit"
           whileTap={{ scale: 0.985 }}
           disabled={state !== 'idle'}
@@ -268,7 +268,7 @@ function ContactForm({ onSent }: { onSent: (email: string) => void }) {
           {state === 'idle'    && <><span>Envoyer le message</span><IconArrowRight size={16} /></>}
           {state === 'sending' && <><Spinner /><span>Envoi en cours…</span></>}
           {state === 'sent'    && <><IcCheck className="w-[16px] h-[16px]" /><span>Message envoyé</span></>}
-        </motion.button>
+        </m.button>
 
         <p className="text-[11.5px] text-ink-400 text-center">
           Réponse sous <strong className="text-ink-900 font-semibold">24 h ouvrées</strong>. Aucune carte requise, aucun démarchage.
@@ -334,7 +334,7 @@ function ContactSidebar() {
         <p className="text-[13.5px] text-ink-500 leading-relaxed">
           Un paiement bloqué, un client à votre table en ce moment ? Notre équipe répond en chat sous <strong className="text-ink-900 font-semibold">4 minutes</strong>.
         </p>
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.98 }}
           onMouseEnter={() => setChatHover(true)}
@@ -343,7 +343,7 @@ function ContactSidebar() {
         >
           Ouvrir le chat
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)]" />
-        </motion.button>
+        </m.button>
       </div>
 
       {/* SLA pills */}
@@ -401,7 +401,7 @@ function FaqTeaser() {
                 </button>
                 <AnimatePresence>
                   {isOpen && (
-                    <motion.div
+                    <m.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
@@ -409,7 +409,7 @@ function FaqTeaser() {
                       className="overflow-hidden"
                     >
                       <p className="px-5 md:px-[22px] pb-5 text-[14px] text-ink-500 leading-relaxed">{f.a}</p>
-                    </motion.div>
+                    </m.div>
                   )}
                 </AnimatePresence>
               </div>
@@ -428,7 +428,7 @@ function SuccessToast({ email, onDismiss }: { email: string; onDismiss: () => vo
     return () => clearTimeout(t)
   }, [onDismiss])
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, x: 24, scale: 0.95 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 24, scale: 0.95 }}
@@ -442,7 +442,7 @@ function SuccessToast({ email, onDismiss }: { email: string; onDismiss: () => vo
         <p className="text-white text-[14px] font-medium">Message envoyé !</p>
         <p className="text-white/60 text-[12px] mt-0.5">Réponse sous 24 h à {email}</p>
       </div>
-    </motion.div>
+    </m.div>
   )
 }
 

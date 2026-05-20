@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { NAME_SUGGESTIONS } from '../data/session'
@@ -20,7 +20,7 @@ export function Profile() {
   const displayName = state.userName.trim()
 
   return (
-    <motion.div
+    <m.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -142,7 +142,7 @@ export function Profile() {
           {AVATARS.map(a => {
             const active = state.userAvatarIndex === a.id
             return (
-              <motion.button
+              <m.button
                 key={a.id}
                 type="button"
                 whileTap={{ scale: 0.96 }}
@@ -178,7 +178,7 @@ export function Profile() {
                 <div style={{ fontSize: 12, fontWeight: 700, color: active ? '#B45309' : '#9CA3AF' }}>
                   {a.label}
                 </div>
-              </motion.button>
+              </m.button>
             )
           })}
         </div>
@@ -231,7 +231,7 @@ export function Profile() {
 
         {/* CTA */}
         <div style={{ paddingBottom: 'max(32px, calc(20px + env(safe-area-inset-bottom)))', flexShrink: 0 }}>
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.985 }}
             onClick={() => navigate('/items')}
@@ -250,9 +250,9 @@ export function Profile() {
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M6.75 3.75L11.25 9L6.75 14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          </motion.button>
+          </m.button>
         </div>
       </div>
-    </motion.div>
+    </m.div>
   )
 }

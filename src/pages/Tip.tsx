@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
@@ -18,7 +18,7 @@ export function Tip() {
   const { subtotal, tipAmount, total } = useSessionCalcs()
 
   return (
-    <motion.div
+    <m.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -73,7 +73,7 @@ export function Tip() {
               ? formatEur(Math.round(subtotal * opt.value / 100))
               : null
             return (
-              <motion.button
+              <m.button
                 key={opt.value}
                 type="button"
                 whileTap={{ scale: 0.96 }}
@@ -95,7 +95,7 @@ export function Tip() {
                     {tipEur}
                   </div>
                 )}
-              </motion.button>
+              </m.button>
             )
           })}
         </div>
@@ -129,7 +129,7 @@ export function Tip() {
 
       {/* CTA */}
       <div style={{ padding: '14px 20px', paddingBottom: 'max(28px, calc(16px + env(safe-area-inset-bottom)))', flexShrink: 0 }}>
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.985 }}
           onClick={() => navigate('/payment')}
@@ -144,8 +144,8 @@ export function Tip() {
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
             <path d="M6.75 3.75L11.25 9L6.75 14.25" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-        </motion.button>
+        </m.button>
       </div>
-    </motion.div>
+    </m.div>
   )
 }

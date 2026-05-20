@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { IconArrowRight, IconMenu, IconClose } from './Icons'
 
 const NAV_LINKS = [
@@ -105,7 +105,7 @@ export function Navbar() {
 
       <AnimatePresence>
         {open && (
-          <motion.div
+          <m.div
             id="mobile-drawer"
             role="dialog"
             aria-modal="true"
@@ -127,7 +127,7 @@ export function Navbar() {
               </button>
             </div>
 
-            <motion.nav
+            <m.nav
               className="flex-1 overflow-y-auto px-6 pt-8 pb-6 flex flex-col"
               initial="hidden"
               animate="visible"
@@ -137,7 +137,7 @@ export function Navbar() {
               }}
             >
               {NAV_LINKS.map((l) => (
-                <motion.a
+                <m.a
                   key={l.href}
                   href={l.href}
                   onClick={closeDrawer}
@@ -148,7 +148,7 @@ export function Navbar() {
                   }}
                 >
                   {l.label}
-                </motion.a>
+                </m.a>
               ))}
 
               <div className="mt-auto pt-8 flex flex-col gap-3">
@@ -168,8 +168,8 @@ export function Navbar() {
                   Se connecter
                 </a>
               </div>
-            </motion.nav>
-          </motion.div>
+            </m.nav>
+          </m.div>
         )}
       </AnimatePresence>
     </>

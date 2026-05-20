@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 
@@ -18,7 +18,7 @@ export function FeedbackSent() {
   }
 
   return (
-    <motion.div
+    <m.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -29,7 +29,7 @@ export function FeedbackSent() {
       }}
     >
       {/* Check circle */}
-      <motion.div
+      <m.div
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 280, damping: 18 }}
@@ -42,18 +42,18 @@ export function FeedbackSent() {
         <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
           <path d="M6 17L13.5 24L28 9" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-      </motion.div>
+      </m.div>
 
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
         style={{ fontSize: 22, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.025em' }}
       >
         Merci pour ton retour !
-      </motion.div>
+      </m.div>
 
-      <motion.div
+      <m.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -63,10 +63,10 @@ export function FeedbackSent() {
           ? <>{state.restaurantName} lira ton avis demain matin.<br />Il reste totalement privé.</>
           : <>Le gérant lira ton avis demain matin.<br />Il reste totalement privé.</>
         }
-      </motion.div>
+      </m.div>
 
       {/* Privacy note */}
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
@@ -82,7 +82,7 @@ export function FeedbackSent() {
         <span style={{ fontSize: 12, color: '#E8920A', fontWeight: 600 }}>
           Jamais publié · 100 % privé
         </span>
-      </motion.div>
+      </m.div>
 
       <div style={{ flex: 1, minHeight: 32 }} />
 
@@ -104,7 +104,7 @@ export function FeedbackSent() {
           Télécharger ma facture (PDF)
         </button>
 
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.985 }}
           onClick={handleReset}
@@ -116,7 +116,7 @@ export function FeedbackSent() {
           }}
         >
           Bonne soirée ! →
-        </motion.button>
+        </m.button>
 
         <button
           type="button"
@@ -129,6 +129,6 @@ export function FeedbackSent() {
           ← Modifier mon avis
         </button>
       </div>
-    </motion.div>
+    </m.div>
   )
 }

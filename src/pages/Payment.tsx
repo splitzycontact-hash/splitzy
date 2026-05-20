@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { useSession } from '../context/SessionContext'
@@ -52,7 +52,7 @@ export function Payment() {
   }
 
   return (
-    <motion.div
+    <m.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -179,7 +179,7 @@ export function Payment() {
           Paiement rapide
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={() => handlePay('apple_pay')}
@@ -201,8 +201,8 @@ export function Payment() {
                 Pay
               </>
             )}
-          </motion.button>
-          <motion.button
+          </m.button>
+          <m.button
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={() => handlePay('google_pay')}
@@ -229,7 +229,7 @@ export function Payment() {
                 Pay
               </>
             )}
-          </motion.button>
+          </m.button>
         </div>
       </div>
 
@@ -245,7 +245,7 @@ export function Payment() {
         </div>
       </div>
       <div style={{ padding: '8px 20px', paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))' }}>
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.985 }}
           onClick={() => handlePay(selectedCard.brand.toLowerCase())}
@@ -264,15 +264,15 @@ export function Payment() {
           ) : (
             `Payer avec ${selectedCard.brand} ···· ${selectedCard.last4}`
           )}
-        </motion.button>
+        </m.button>
       </div>
-    </motion.div>
+    </m.div>
   )
 }
 
 function Spinner({ color = '#fff' }: { color?: string }) {
   return (
-    <motion.div
+    <m.div
       animate={{ rotate: 360 }}
       transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
       style={{

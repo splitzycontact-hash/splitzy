@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { fadeInUp, useFadeInView } from './shared'
 import { IconQuote, IconStar } from './Icons'
 
@@ -40,7 +40,7 @@ type Testimonial = typeof TESTIMONIALS[number]
 
 function TestimonialCard({ t }: { t: Testimonial }) {
   return (
-    <motion.figure
+    <m.figure
       variants={fadeInUp}
       whileHover={{ y: -3, transition: { duration: 0.2 } }}
       className="relative bg-white border border-ink-100 rounded-2xl p-7 md:p-8 h-full flex flex-col hover:border-orange-200 hover:shadow-xl hover:shadow-orange-600/5 transition-all duration-300"
@@ -70,7 +70,7 @@ function TestimonialCard({ t }: { t: Testimonial }) {
           </p>
         </div>
       </figcaption>
-    </motion.figure>
+    </m.figure>
   )
 }
 
@@ -85,29 +85,29 @@ export function Testimonials() {
       aria-labelledby="testimonials-heading"
     >
       <div ref={ref} className="max-w-6xl mx-auto px-4 md:px-6">
-        <motion.div
+        <m.div
           className="text-center"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
           variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
         >
-          <motion.span
+          <m.span
             variants={fadeInUp}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold uppercase tracking-[0.08em]"
           >
             Ils en parlent mieux que nous
-          </motion.span>
-          <motion.h2
+          </m.span>
+          <m.h2
             id="testimonials-heading"
             variants={fadeInUp}
             className="mt-5 text-[28px] md:text-[40px] font-bold text-ink-900 leading-[1.15] text-balance max-w-2xl mx-auto"
           >
             Nos restaurants adorent Splitzy.
-          </motion.h2>
-        </motion.div>
+          </m.h2>
+        </m.div>
 
         {/* Desktop grid */}
-        <motion.div
+        <m.div
           className="hidden md:grid mt-14 grid-cols-3 gap-6 lg:gap-8"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
@@ -116,12 +116,12 @@ export function Testimonials() {
           {TESTIMONIALS.map((t) => (
             <TestimonialCard key={t.name} t={t} />
           ))}
-        </motion.div>
+        </m.div>
 
         {/* Mobile carousel */}
         <div className="md:hidden mt-10">
           <div className="overflow-hidden">
-            <motion.div
+            <m.div
               className="flex"
               animate={{ x: `-${index * 100}%` }}
               transition={{ type: 'spring', stiffness: 240, damping: 30 }}
@@ -131,7 +131,7 @@ export function Testimonials() {
                   <TestimonialCard t={t} />
                 </div>
               ))}
-            </motion.div>
+            </m.div>
           </div>
           <div className="mt-6 flex items-center justify-center gap-2">
             {TESTIMONIALS.map((_, i) => (

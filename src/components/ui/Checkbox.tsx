@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 interface CheckboxProps {
   checked: boolean
@@ -8,7 +8,7 @@ interface CheckboxProps {
 
 export function Checkbox({ checked, onChange, disabled = false }: CheckboxProps) {
   return (
-    <motion.button
+    <m.button
       type="button"
       role="checkbox"
       aria-checked={checked}
@@ -33,6 +33,6 @@ export function Checkbox({ checked, onChange, disabled = false }: CheckboxProps)
           />
         </svg>
       )}
-    </motion.button>
+    </m.button>
   )
 }

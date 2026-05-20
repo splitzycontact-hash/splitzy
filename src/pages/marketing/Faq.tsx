@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { fadeInUp, useFadeInView } from './shared'
 import { IconPlus, IconMinus } from './Icons'
 
@@ -73,7 +73,7 @@ function FaqItem({ item, isOpen, onToggle, id }: {
       </h3>
       <AnimatePresence initial={false}>
         {isOpen && (
-          <motion.div
+          <m.div
             id={`faq-panel-${id}`}
             role="region"
             aria-labelledby={`faq-trigger-${id}`}
@@ -85,7 +85,7 @@ function FaqItem({ item, isOpen, onToggle, id }: {
             <p className="pb-5 md:pb-6 pr-12 text-[15px] leading-[1.65] text-white/60">
               {item.a}
             </p>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>
@@ -109,26 +109,26 @@ export function Faq() {
       />
 
       <div ref={ref} className="relative max-w-3xl mx-auto px-4 md:px-6">
-        <motion.div
+        <m.div
           className="text-center"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
           variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
         >
-          <motion.span
+          <m.span
             variants={fadeInUp}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.06] border border-white/10 text-white/70 text-[11px] font-semibold uppercase tracking-[0.08em]"
           >
             Questions fréquentes
-          </motion.span>
-          <motion.h2
+          </m.span>
+          <m.h2
             id="faq-heading"
             variants={fadeInUp}
             className="mt-5 text-[28px] md:text-[40px] font-bold text-white leading-[1.15] text-balance"
           >
             On a déjà répondu.
-          </motion.h2>
-          <motion.p
+          </m.h2>
+          <m.p
             variants={fadeInUp}
             className="mt-4 text-[16px] md:text-[17px] text-white/55 max-w-xl mx-auto leading-[1.6]"
           >
@@ -140,10 +140,10 @@ export function Faq() {
               on répond sous 24h
             </a>
             .
-          </motion.p>
-        </motion.div>
+          </m.p>
+        </m.div>
 
-        <motion.div
+        <m.div
           className="mt-10 md:mt-12 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-sm px-5 md:px-7"
           initial={{ opacity: 0, y: 24 }}
           animate={inView ? { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.2 } } : {}}
@@ -157,7 +157,7 @@ export function Faq() {
               onToggle={() => setOpenIdx(openIdx === i ? -1 : i)}
             />
           ))}
-        </motion.div>
+        </m.div>
       </div>
     </section>
   )

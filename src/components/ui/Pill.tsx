@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 interface PillProps {
   label: string
@@ -9,7 +9,7 @@ interface PillProps {
 
 export function Pill({ label, active = false, onClick, className = '' }: PillProps) {
   return (
-    <motion.button
+    <m.button
       type="button"
       whileTap={{ scale: 0.95 }}
       onClick={onClick}
@@ -24,6 +24,6 @@ export function Pill({ label, active = false, onClick, className = '' }: PillPro
       `}
     >
       {label}
-    </motion.button>
+    </m.button>
   )
 }

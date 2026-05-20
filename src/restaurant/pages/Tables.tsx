@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { X, RefreshCw } from 'lucide-react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -215,14 +215,14 @@ export function Tables() {
       {/* Table detail modal */}
       <AnimatePresence>
         {selectedTable && (
-          <motion.div
+          <m.div
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={(e) => { if (e.target === e.currentTarget) setSelectedTable(null) }}
           >
-            <motion.div
+            <m.div
               className="bg-white rounded-2xl overflow-hidden shadow-card-dark w-[420px]"
               initial={{ scale: 0.95, opacity: 0, y: 12 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -301,22 +301,22 @@ export function Tables() {
                   Fermer
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       {/* Simulate order modal */}
       <AnimatePresence>
         {simulatingTable && (
-          <motion.div
+          <m.div
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={e => { if (e.target === e.currentTarget) { setSimulatingTable(null); setSimItems([]) } }}
           >
-            <motion.div
+            <m.div
               className="bg-white rounded-2xl shadow-card-dark w-[380px] overflow-hidden"
               initial={{ scale: 0.95, opacity: 0, y: 12 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -385,8 +385,8 @@ export function Tables() {
                   {simLoading ? 'Envoi…' : 'Confirmer'}
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
     </RestaurantLayout>

@@ -1,33 +1,53 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { AnimatePresence } from 'framer-motion'
-import { useAuth } from '@clerk/clerk-react'
+import { AnimatePresence, LazyMotion, domAnimation } from 'framer-motion'
 import { SessionProvider, useSession } from './context/SessionContext'
 import { PhoneWrapper } from './components/layout/PhoneWrapper'
-import { RestaurantApp } from './restaurant/RestaurantApp'
 
-import { Landing } from './pages/Landing'
-import { Profile } from './pages/Profile'
-import { Items } from './pages/Items'
-import { Tip } from './pages/Tip'
-import { Payment } from './pages/Payment'
-import { Confirmation } from './pages/Confirmation'
-import { Feedback } from './pages/Feedback'
-import { FeedbackSent } from './pages/FeedbackSent'
-import { TableEntry } from './pages/TableEntry'
+// Consumer flow — chargé à la demande
+const TableEntry   = lazy(() => import('./pages/TableEntry').then(({ TableEntry })     => ({ default: TableEntry })))
+const Landing      = lazy(() => import('./pages/Landing').then(({ Landing })           => ({ default: Landing })))
+const Profile      = lazy(() => import('./pages/Profile').then(({ Profile })           => ({ default: Profile })))
+const Items        = lazy(() => import('./pages/Items').then(({ Items })               => ({ default: Items })))
+const Tip          = lazy(() => import('./pages/Tip').then(({ Tip })                   => ({ default: Tip })))
+const Payment      = lazy(() => import('./pages/Payment').then(({ Payment })           => ({ default: Payment })))
+const Confirmation = lazy(() => import('./pages/Confirmation').then(({ Confirmation }) => ({ default: Confirmation })))
+const Feedback     = lazy(() => import('./pages/Feedback').then(({ Feedback })         => ({ default: Feedback })))
+const FeedbackSent = lazy(() => import('./pages/FeedbackSent').then(({ FeedbackSent }) => ({ default: FeedbackSent })))
 
-import { Homepage } from './pages/marketing/Homepage'
-import { AboutPage } from './pages/marketing/AboutPage'
-import { BlogPage } from './pages/marketing/BlogPage'
-import { ContactPage } from './pages/marketing/ContactPage'
-import { PricingPage } from './pages/marketing/PricingPage'
-import { CarriersPage } from './pages/marketing/CarriersPage'
-import { PaymentPage } from './pages/marketing/PaymentPage'
+// Dashboard restaurant + Clerk — tout chargé à la demande (Clerk absent du bundle initial)
+const RestaurantRoot = lazy(() => import('./restaurant/RestaurantRoot'))
 
-const clerkReady = (() => {
-  const k = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined
-  return typeof k === 'string' && k.startsWith('pk_') && k.length > 20
-})()
+// Pages marketing — chargées à la demande
+const Homepage    = lazy(() => import('./pages/marketing/Homepage').then(({ Homepage })       => ({ default: Homepage })))
+const AboutPage   = lazy(() => import('./pages/marketing/AboutPage').then(({ AboutPage })     => ({ default: AboutPage })))
+const BlogPage    = lazy(() => import('./pages/marketing/BlogPage').then(({ BlogPage })       => ({ default: BlogPage })))
+const ContactPage = lazy(() => import('./pages/marketing/ContactPage').then(({ ContactPage }) => ({ default: ContactPage })))
+const PricingPage = lazy(() => import('./pages/marketing/PricingPage').then(({ PricingPage }) => ({ default: PricingPage })))
+const CarriersPage = lazy(() => import('./pages/marketing/CarriersPage').then(({ CarriersPage }) => ({ default: CarriersPage })))
+const MarketingPaymentPage = lazy(() => import('./pages/marketing/PaymentPage').then(({ PaymentPage }) => ({ default: PaymentPage })))
+
+function PageLoader() {
+  return (
+    <div style={{
+      height: '100dvh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#FFFFFF',
+    }}>
+      <div style={{
+        width: 32,
+        height: 32,
+        border: '3px solid #FFF4E5',
+        borderTop: '3px solid #E8920A',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+      }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  )
+}
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { state } = useSession()
@@ -59,62 +79,37 @@ function ConsumerAppContent() {
   )
 }
 
-function ConsumerAppGuard() {
-  const { isLoaded } = useAuth()
-  const location = useLocation()
-
-  // QR code table routes are always public.
-  // window.location.pathname is checked first: useLocation() can lag during
-  // Clerk re-initialization on hard refresh, causing a spurious auth redirect.
-  if (window.location.pathname.startsWith('/t/') || location.pathname.startsWith('/t/')) {
-    return <ConsumerAppContent />
-  }
-
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  // Consumer routes are public — no Clerk auth required.
-  // Restaurant owners access their dashboard via /restaurant/* which has its own guard.
-  return <ConsumerAppContent />
-}
-
-function AppRoutes() {
-  if (!clerkReady) return <ConsumerAppContent />
-  return <ConsumerAppGuard />
-}
-
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Marketing pages */}
-        <Route path="/" element={<Homepage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/blog" element={<BlogPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/careers" element={<CarriersPage />} />
-        <Route path="/how-it-works" element={<PaymentPage />} />
-        <Route path="/demo" element={<PaymentPage />} />
+    <LazyMotion features={domAnimation}>
+      <BrowserRouter>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* Pages marketing */}
+            <Route path="/" element={<Homepage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/blog" element={<BlogPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/careers" element={<CarriersPage />} />
+            <Route path="/how-it-works" element={<MarketingPaymentPage />} />
+            <Route path="/demo" element={<MarketingPaymentPage />} />
 
-        {/* Restaurant owner dashboard */}
-        <Route path="/restaurant/*" element={<RestaurantApp />} />
+            {/* Dashboard restaurant — Clerk chargé ici uniquement, absent du bundle initial */}
+            <Route path="/restaurant/*" element={<RestaurantRoot />} />
 
-        {/* Consumer QR client — /welcome + /t/:slug/:tableNumber + flow */}
-        <Route
-          path="/*"
-          element={
-            <SessionProvider>
-              <AppRoutes />
-            </SessionProvider>
-          }
-        />
-      </Routes>
-    </BrowserRouter>
+            {/* Flow client QR — pas de Clerk */}
+            <Route
+              path="/*"
+              element={
+                <SessionProvider>
+                  <ConsumerAppContent />
+                </SessionProvider>
+              }
+            />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </LazyMotion>
   )
 }

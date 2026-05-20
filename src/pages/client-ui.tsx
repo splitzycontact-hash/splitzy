@@ -1,6 +1,6 @@
 // Shared design tokens, helpers and UI primitives for the client payment flow.
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 // ── Design tokens ──────────────────────────────────────────────────
 export const C = {
@@ -236,7 +236,7 @@ export function StarRating({ value, onChange, size = 44 }: { value: number; onCh
       {[1, 2, 3, 4, 5].map((n) => {
         const active = n <= (hover || value)
         return (
-          <motion.button
+          <m.button
             key={n}
             type="button"
             onClick={() => onChange(n)}
@@ -253,7 +253,7 @@ export function StarRating({ value, onChange, size = 44 }: { value: number; onCh
             aria-label={`${n} étoile${n > 1 ? 's' : ''}`}
           >
             <Icon.Star style={{ width: size, height: size, filter: active ? 'drop-shadow(0 2px 8px rgba(232,146,10,0.35))' : 'none' }} />
-          </motion.button>
+          </m.button>
         )
       })}
     </div>
@@ -262,7 +262,7 @@ export function StarRating({ value, onChange, size = 44 }: { value: number; onCh
 
 export function Spin({ color = '#fff' }: { color?: string }) {
   return (
-    <motion.div
+    <m.div
       animate={{ rotate: 360 }}
       transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
       style={{
@@ -280,7 +280,7 @@ export function OrangeBtn({ onClick, disabled, children, height = 56 }: {
   height?: number
 }) {
   return (
-    <motion.button
+    <m.button
       type="button"
       whileTap={{ scale: 0.985 }}
       onClick={onClick}
@@ -297,7 +297,7 @@ export function OrangeBtn({ onClick, disabled, children, height = 56 }: {
       }}
     >
       {children}
-    </motion.button>
+    </m.button>
   )
 }
 

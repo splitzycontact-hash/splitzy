@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 export function FeedbackNudge() {
   const [progress, setProgress] = useState(0)
@@ -24,7 +24,7 @@ export function FeedbackNudge() {
   }, [navigate])
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.6, duration: 0.3 }}
@@ -38,12 +38,12 @@ export function FeedbackNudge() {
         <span className="text-2xl">⭐</span>
       </div>
       <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
-        <motion.div
+        <m.div
           className="h-full bg-brand rounded-full"
           style={{ width: `${progress}%` }}
         />
       </div>
       <p className="text-xs text-muted mt-2 text-center">Redirection dans quelques secondes…</p>
-    </motion.div>
+    </m.div>
   )
 }

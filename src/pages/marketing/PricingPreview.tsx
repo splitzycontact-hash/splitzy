@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { fadeInUp, useFadeInView } from './shared'
 import { IconCheck, IconArrowRight, IconSparkles } from './Icons'
 
@@ -42,7 +42,7 @@ type Plan = typeof PLANS[number]
 
 function PlanCard({ plan }: { plan: Plan }) {
   return (
-    <motion.div
+    <m.div
       variants={fadeInUp}
       whileHover={{ y: -3, transition: { duration: 0.2 } }}
       className={
@@ -97,7 +97,7 @@ function PlanCard({ plan }: { plan: Plan }) {
         {plan.cta}
         <IconArrowRight size={15} />
       </a>
-    </motion.div>
+    </m.div>
   )
 }
 
@@ -111,34 +111,34 @@ export function PricingPreview() {
       aria-labelledby="pricing-heading"
     >
       <div ref={ref} className="max-w-6xl mx-auto px-4 md:px-6">
-        <motion.div
+        <m.div
           className="text-center"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
           variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
         >
-          <motion.span
+          <m.span
             variants={fadeInUp}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold uppercase tracking-[0.08em]"
           >
             Tarifs
-          </motion.span>
-          <motion.h2
+          </m.span>
+          <m.h2
             id="pricing-heading"
             variants={fadeInUp}
             className="mt-5 text-[28px] md:text-[40px] font-bold text-ink-900 leading-[1.15] text-balance"
           >
             Un tarif simple et transparent.
-          </motion.h2>
-          <motion.p
+          </m.h2>
+          <m.p
             variants={fadeInUp}
             className="mt-4 text-[16px] md:text-[18px] text-ink-500 max-w-xl mx-auto leading-[1.6]"
           >
             Commencez gratuitement, évoluez quand vous êtes prêts.
-          </motion.p>
-        </motion.div>
+          </m.p>
+        </m.div>
 
-        <motion.div
+        <m.div
           className="mt-12 md:mt-14 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-3xl mx-auto"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
@@ -147,7 +147,7 @@ export function PricingPreview() {
           {PLANS.map((p) => (
             <PlanCard key={p.id} plan={p} />
           ))}
-        </motion.div>
+        </m.div>
 
         <p className="mt-10 text-center text-[14px] text-ink-500">
           Besoin de plus ?{' '}

@@ -1,10 +1,10 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { fadeInUp, useFadeInView } from './shared'
 import { IconWallet, IconQr, IconChartBar, IconCloud, IconBell, IconBolt, IconShield } from './Icons'
 
 function FeatureCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <motion.div
+    <m.div
       variants={fadeInUp}
       whileHover={{ y: -3, transition: { duration: 0.2 } }}
       className={
@@ -14,7 +14,7 @@ function FeatureCard({ children, className = '' }: { children: React.ReactNode; 
       }
     >
       {children}
-    </motion.div>
+    </m.div>
   )
 }
 
@@ -160,34 +160,34 @@ export function Features() {
       aria-labelledby="features-heading"
     >
       <div ref={ref} className="max-w-6xl mx-auto px-4 md:px-6">
-        <motion.div
+        <m.div
           className="text-center"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
           variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
         >
-          <motion.span
+          <m.span
             variants={fadeInUp}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold uppercase tracking-[0.08em]"
           >
             Fonctionnalités
-          </motion.span>
-          <motion.h2
+          </m.span>
+          <m.h2
             id="features-heading"
             variants={fadeInUp}
             className="mt-5 text-[28px] md:text-[40px] font-bold text-ink-900 leading-[1.15] text-balance max-w-2xl mx-auto"
           >
             Tout ce dont votre restaurant a besoin.
-          </motion.h2>
-          <motion.p
+          </m.h2>
+          <m.p
             variants={fadeInUp}
             className="mt-4 text-[16px] md:text-[18px] text-ink-500 max-w-xl mx-auto leading-[1.6]"
           >
             Pensé pour les gérants débordés, pas pour les ingénieurs.
-          </motion.p>
-        </motion.div>
+          </m.p>
+        </m.div>
 
-        <motion.div
+        <m.div
           className="mt-12 md:mt-16 grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
@@ -199,28 +199,28 @@ export function Features() {
             desc="Chaque convive sélectionne ses plats. Splitzy calcule automatiquement les montants individuels, TVA incluse."
             Visual={SmartSplitVisual}
           />
-          <motion.div
+          <m.div
             className="flex flex-col gap-5 md:gap-6"
             variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
           >
             <SmallCard Icon={IconQr} title="QR codes par table" desc="Générez autant de QR codes que de tables. Réutilisables, modifiables à tout moment." />
             <SmallCard Icon={IconChartBar} title="Dashboard en temps réel" desc="Suivez chaque transaction live. Export comptable en un clic." />
-          </motion.div>
+          </m.div>
 
-          <motion.div
+          <m.div
             className="flex flex-col gap-5 md:gap-6"
             variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
           >
             <SmallCard Icon={IconCloud} title="Sans application à télécharger" desc="100 % web. Vos clients scannent et c'est tout." />
             <SmallCard Icon={IconBell} title="Notifications instantanées" desc="Soyez alerté dès qu'une table a fini de régler." />
-          </motion.div>
+          </m.div>
           <LargeCard
             Icon={IconBolt}
             title="Paiements sans friction"
             desc="Apple Pay, Google Pay, carte bancaire. Vos clients paient en 15 secondes depuis leur téléphone."
             Visual={PaymentVisual}
           />
-        </motion.div>
+        </m.div>
       </div>
     </section>
   )

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { useSession } from '../context/SessionContext'
@@ -49,7 +49,7 @@ export function Feedback() {
     : 'Une super soirée !'
 
   return (
-    <motion.div
+    <m.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -210,7 +210,7 @@ export function Feedback() {
 
       {/* CTAs */}
       <div style={{ padding: '14px 20px', paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))', flexShrink: 0 }}>
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.985 }}
           onClick={handleSend}
@@ -225,7 +225,7 @@ export function Feedback() {
           }}
         >
           Envoyer mon avis
-        </motion.button>
+        </m.button>
         <button
           type="button"
           onClick={() => navigate('/feedback/sent')}
@@ -237,6 +237,6 @@ export function Feedback() {
           Passer
         </button>
       </div>
-    </motion.div>
+    </m.div>
   )
 }

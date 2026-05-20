@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { fadeInUp, useFadeInView } from './shared'
 
 const RESTAURANT_LOGOS = [
@@ -38,7 +38,7 @@ export function Logos() {
       aria-labelledby="logos-heading"
     >
       <div className="max-w-6xl mx-auto px-4 md:px-6">
-        <motion.p
+        <m.p
           ref={ref}
           id="logos-heading"
           className="text-center text-[12px] md:text-[13px] font-medium uppercase tracking-[0.14em] text-white/40"
@@ -48,10 +48,10 @@ export function Logos() {
           custom={0}
         >
           Ils font confiance à Splitzy
-        </motion.p>
+        </m.p>
 
         {/* Desktop: 6 logos grid */}
-        <motion.div
+        <m.div
           className="hidden md:grid mt-10 grid-cols-3 lg:grid-cols-6 gap-y-8 gap-x-8 lg:gap-x-10 items-center justify-items-center max-w-5xl mx-auto"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
@@ -61,19 +61,19 @@ export function Logos() {
           }}
         >
           {RESTAURANT_LOGOS.slice(0, 6).map((logo) => (
-            <motion.div
+            <m.div
               key={logo.name}
               variants={fadeInUp}
               className="opacity-40 hover:opacity-90 transition-opacity duration-300"
             >
               <LogoWordmark logo={logo} />
-            </motion.div>
+            </m.div>
           ))}
-        </motion.div>
+        </m.div>
 
         {/* Mobile: infinite marquee */}
         <div className="md:hidden mt-8 marquee-mask overflow-hidden">
-          <motion.div
+          <m.div
             className="flex items-center gap-x-10 whitespace-nowrap"
             animate={{ x: ['0%', '-50%'] }}
             transition={{ duration: 28, ease: 'linear', repeat: Infinity }}
@@ -83,7 +83,7 @@ export function Logos() {
                 <LogoWordmark logo={logo} />
               </div>
             ))}
-          </motion.div>
+          </m.div>
         </div>
       </div>
     </section>

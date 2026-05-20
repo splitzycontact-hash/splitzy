@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { MENU_ITEMS } from '../data/menu'
@@ -30,7 +30,7 @@ export function Confirmation() {
   const totalStr = formatEur(total).replace('€', '')
 
   return (
-    <motion.div
+    <m.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -52,7 +52,7 @@ export function Confirmation() {
           pointerEvents: 'none',
         }} />
         <div style={{ position: 'relative', textAlign: 'center' }}>
-          <motion.div
+          <m.div
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 240, damping: 16, delay: 0.05 }}
@@ -66,16 +66,16 @@ export function Confirmation() {
             <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
               <path d="M6 17L13.5 24L28 9" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          </motion.div>
-          <motion.div
+          </m.div>
+          <m.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 }}
             style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.025em' }}
           >
             Paiement reçu !
-          </motion.div>
-          <motion.div
+          </m.div>
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.35 }}
@@ -83,13 +83,13 @@ export function Confirmation() {
           >
             Merci pour cette soirée chez<br />
             <strong style={{ color: '#fff', fontWeight: 600 }}>{state.restaurantName}</strong>
-          </motion.div>
+          </m.div>
         </div>
       </div>
 
       {/* Receipt */}
       <div style={{ padding: '16px 20px 0' }}>
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
@@ -151,7 +151,7 @@ export function Confirmation() {
               {totalStr}€
             </span>
           </div>
-        </motion.div>
+        </m.div>
 
         {/* Receipt actions */}
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
@@ -247,6 +247,6 @@ export function Confirmation() {
           </span>
         </span>
       </div>
-    </motion.div>
+    </m.div>
   )
 }

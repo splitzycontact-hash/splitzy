@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 interface FeedbackTagProps {
   label: string
@@ -8,7 +8,7 @@ interface FeedbackTagProps {
 
 export function FeedbackTag({ label, selected, onToggle }: FeedbackTagProps) {
   return (
-    <motion.button
+    <m.button
       type="button"
       whileTap={{ scale: 0.95 }}
       onClick={onToggle}
@@ -22,6 +22,6 @@ export function FeedbackTag({ label, selected, onToggle }: FeedbackTagProps) {
       `}
     >
       {label}
-    </motion.button>
+    </m.button>
   )
 }

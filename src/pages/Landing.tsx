@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
@@ -13,7 +13,7 @@ export function Landing() {
     : 'Splitzy'
 
   return (
-    <motion.div
+    <m.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -155,7 +155,7 @@ export function Landing() {
 
         {/* CTAs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 'max(32px, calc(20px + env(safe-area-inset-bottom)))' }}>
-          <motion.button
+          <m.button
             type="button"
             whileTap={{ scale: 0.985 }}
             onClick={() => navigate('/profile')}
@@ -167,12 +167,12 @@ export function Landing() {
             }}
           >
             C'est parti →
-          </motion.button>
+          </m.button>
           <div style={{ textAlign: 'center', fontSize: 11, color: '#9CA3AF', paddingBottom: 4 }}>
             ✓ Aucune app · <span style={{ color: '#E8920A', fontWeight: 600 }}>Paiement sécurisé Stripe</span>
           </div>
         </div>
       </div>
-    </motion.div>
+    </m.div>
   )
 }

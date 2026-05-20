@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 import { IconArrowRight, IconCheck } from './Icons'
@@ -138,9 +138,9 @@ function ScreenProfile({ onNext }: { onNext: () => void }) {
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-        <motion.div animate={{ scale: name ? 1 : 0.94 }} transition={{ type: 'spring', stiffness: 320, damping: 22 }} style={{ width: 64, height: 64, borderRadius: '50%', background: color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 26, boxShadow: `0 8px 20px -6px ${color}77` }}>
+        <m.div animate={{ scale: name ? 1 : 0.94 }} transition={{ type: 'spring', stiffness: 320, damping: 22 }} style={{ width: 64, height: 64, borderRadius: '50%', background: color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 26, boxShadow: `0 8px 20px -6px ${color}77` }}>
           {initial || <span style={{ fontSize: 14, opacity: 0.5 }}>?</span>}
-        </motion.div>
+        </m.div>
       </div>
       <div style={{ padding: '0 16px' }}>
         <div style={{ fontSize: 9.5, fontWeight: 600, color: '#71717A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Couleur</div>
@@ -371,7 +371,7 @@ function ScreenPayment({ onNext }: { onNext: () => void }) {
 
       <div style={{ padding: '10px 16px 16px' }}>
         <button type="button" onClick={pay} disabled={loading} style={{ width: '100%', height: 44, borderRadius: 13, border: 0, background: '#E8920A', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 8px 20px -6px rgba(232,146,10,0.5)' }}>
-          {loading ? <><motion.span animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }} style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> Traitement…</> : <>Payer {total}</>}
+          {loading ? <><m.span animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }} style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> Traitement…</> : <>Payer {total}</>}
         </button>
       </div>
     </div>
@@ -387,9 +387,9 @@ function ScreenFeedback({ onNext }: { onNext: () => void }) {
 
   if (phase === 'confirm') return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#FAFAFA', alignItems: 'center', justifyContent: 'center', padding: 20, textAlign: 'center' }}>
-      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 280, damping: 18 }} style={{ width: 52, height: 52, borderRadius: '50%', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, boxShadow: '0 10px 26px -6px rgba(16,185,129,0.5)' }}>
+      <m.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 280, damping: 18 }} style={{ width: 52, height: 52, borderRadius: '50%', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, boxShadow: '0 10px 26px -6px rgba(16,185,129,0.5)' }}>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-      </motion.div>
+      </m.div>
       <div style={{ fontSize: 18, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.02em' }}>Paiement confirmé</div>
       <div style={{ fontSize: 12, color: '#71717A', marginTop: 6, lineHeight: 1.5 }}>Merci pour ton repas chez<br /><strong style={{ color: '#0A0A0A' }}>Bistrot de la Paix</strong></div>
       <button type="button" onClick={() => setPhase('feedback')} style={{ marginTop: 22, height: 44, width: '100%', maxWidth: 200, borderRadius: 13, border: 0, background: '#E8920A', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 20px -6px rgba(232,146,10,0.5)' }}>
@@ -423,9 +423,9 @@ function ScreenFeedback({ onNext }: { onNext: () => void }) {
           <div style={{ fontSize: 11.5, fontWeight: 700, color: '#0A0A0A', marginBottom: 10 }}>Ton expérience globale</div>
           <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
             {[1,2,3,4,5].map((n) => (
-              <motion.button key={n} type="button" onClick={() => setStars(n)} whileTap={{ scale: 0.85 }} style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: 2 }}>
+              <m.button key={n} type="button" onClick={() => setStars(n)} whileTap={{ scale: 0.85 }} style={{ border: 0, background: 'transparent', cursor: 'pointer', padding: 2 }}>
                 <IcoStar filled={n <= stars} />
-              </motion.button>
+              </m.button>
             ))}
           </div>
         </div>
@@ -458,9 +458,9 @@ function ScreenFeedback({ onNext }: { onNext: () => void }) {
 function ScreenDone() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#FAFAFA', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
-      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }} style={{ width: 56, height: 56, borderRadius: '50%', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, boxShadow: '0 10px 28px -6px rgba(16,185,129,0.5)' }}>
+      <m.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }} style={{ width: 56, height: 56, borderRadius: '50%', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, boxShadow: '0 10px 28px -6px rgba(16,185,129,0.5)' }}>
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-      </motion.div>
+      </m.div>
       <div style={{ fontSize: 18, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.02em' }}>Merci pour ton retour</div>
       <div style={{ fontSize: 12, color: '#71717A', marginTop: 6, lineHeight: 1.55 }}>
         Bistrot de la Paix lira ton avis<br />demain matin. Il reste privé.
@@ -548,26 +548,26 @@ export function PaymentPage() {
         <div className="relative max-w-6xl mx-auto">
           {/* headline */}
           <div className="text-center mb-14 md:mb-16">
-            <motion.span
+            <m.span
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
               className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-600/10 text-orange-400 text-[11.5px] font-bold tracking-widest uppercase mb-5"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_0_4px_rgba(232,146,10,0.25)]" />
               Expérience client
-            </motion.span>
-            <motion.h1
+            </m.span>
+            <m.h1
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.08 }}
               className="text-[38px] sm:text-[48px] md:text-[60px] font-extrabold text-white tracking-[-0.04em] leading-[1.02] mb-4"
             >
               Du QR à l'avis privé,<br className="hidden sm:inline" />
               {' '}en <span className="text-orange-500">moins de 90 s</span>.
-            </motion.h1>
-            <motion.p
+            </m.h1>
+            <m.p
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}
               className="text-[15px] md:text-[17px] text-white/55 max-w-lg mx-auto leading-relaxed"
             >
               Identité légère, partage fractionnel, et un avis qui n'arrive jamais sur Google quand ça coince.
-            </motion.p>
+            </m.p>
           </div>
 
           {/* phone + nav layout */}
@@ -585,7 +585,7 @@ export function PaymentPage() {
             <div className="shrink-0">
               <PhoneShell>
                 <AnimatePresence mode="wait">
-                  <motion.div
+                  <m.div
                     key={step}
                     initial={{ opacity: 0, x: 18 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -594,7 +594,7 @@ export function PaymentPage() {
                     style={{ height: '100%' }}
                   >
                     {screens[step](next)}
-                  </motion.div>
+                  </m.div>
                 </AnimatePresence>
               </PhoneShell>
             </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { starStagger, starItem } from '../../utils/animations'
 
 interface StarRatingProps {
@@ -11,7 +11,7 @@ export function StarRating({ value, onChange }: StarRatingProps) {
   const [hovered, setHovered] = useState(0)
 
   return (
-    <motion.div
+    <m.div
       className="flex items-center justify-center gap-2"
       variants={starStagger}
       initial="initial"
@@ -20,7 +20,7 @@ export function StarRating({ value, onChange }: StarRatingProps) {
       {[1, 2, 3, 4, 5].map(star => {
         const filled = star <= (hovered || value)
         return (
-          <motion.button
+          <m.button
             key={star}
             type="button"
             variants={starItem}
@@ -40,9 +40,9 @@ export function StarRating({ value, onChange }: StarRatingProps) {
             >
               <path d="M21 3l4.9 10.1 11.1 1.6-8 7.8 1.9 11-9.9-5.2-9.9 5.2 1.9-11-8-7.8 11.1-1.6z" />
             </svg>
-          </motion.button>
+          </m.button>
         )
       })}
-    </motion.div>
+    </m.div>
   )
 }

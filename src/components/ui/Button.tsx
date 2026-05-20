@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 
 type ButtonVariant = 'brand' | 'dark' | 'ghost'
 
@@ -30,7 +30,7 @@ export function Button({
   type = 'button',
 }: ButtonProps) {
   return (
-    <motion.button
+    <m.button
       type={type}
       whileTap={disabled ? undefined : { scale: 0.97 }}
       onClick={onClick}
@@ -45,6 +45,6 @@ export function Button({
       `}
     >
       {children}
-    </motion.button>
+    </m.button>
   )
 }

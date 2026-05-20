@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
+import { m, AnimatePresence, LayoutGroup } from 'framer-motion'
 import { fadeInUp, useFadeInView } from './shared'
 import {
   IconMenuBook, IconQr, IconWallet,
@@ -45,7 +45,7 @@ function TabButton({
       }
     >
       {active && (
-        <motion.span
+        <m.span
           layoutId="hw-tab-pill"
           className="absolute inset-0 bg-white shadow-[0_2px_8px_-2px_rgba(24,24,27,0.12)] rounded-full"
           transition={{ type: 'spring', stiffness: 320, damping: 28 }}
@@ -59,7 +59,7 @@ function TabButton({
 function StepCard({ step, idx }: { step: StepData; idx: number }) {
   const { Icon: StepIcon, title, desc, chip } = step
   return (
-    <motion.div variants={fadeInUp} className="relative group">
+    <m.div variants={fadeInUp} className="relative group">
       <div className="relative h-full">
         <div className="relative bg-white border border-ink-100 rounded-2xl p-6 md:p-7 transition-all duration-200 hover:border-orange-200 hover:shadow-lg hover:shadow-orange-600/5 hover:-translate-y-0.5 h-full flex flex-col">
           <div className="flex items-center justify-between mb-5">
@@ -88,7 +88,7 @@ function StepCard({ step, idx }: { step: StepData; idx: number }) {
           </div>
         )}
       </div>
-    </motion.div>
+    </m.div>
   )
 }
 
@@ -104,34 +104,34 @@ export function HowItWorks() {
       aria-labelledby="hw-heading"
     >
       <div ref={ref} className="max-w-6xl mx-auto px-4 md:px-6">
-        <motion.div
+        <m.div
           className="text-center"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
           variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
         >
-          <motion.span
+          <m.span
             variants={fadeInUp}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold uppercase tracking-[0.08em]"
           >
             Simple comme bonjour
-          </motion.span>
-          <motion.h2
+          </m.span>
+          <m.h2
             id="hw-heading"
             variants={fadeInUp}
             className="mt-5 text-[28px] md:text-[40px] font-bold text-ink-900 leading-[1.15] text-balance"
           >
             En 3 étapes, c'est réglé.
-          </motion.h2>
-          <motion.p
+          </m.h2>
+          <m.p
             variants={fadeInUp}
             className="mt-4 text-[16px] md:text-[18px] text-ink-500 max-w-xl mx-auto leading-[1.6]"
           >
             Pour le restaurant comme pour le client. Aucune formation, aucune installation, aucun matériel.
-          </motion.p>
+          </m.p>
 
           <LayoutGroup>
-            <motion.div variants={fadeInUp} className="mt-8 inline-block">
+            <m.div variants={fadeInUp} className="mt-8 inline-block">
               <div
                 role="tablist"
                 aria-label="Choisir le parcours"
@@ -154,9 +154,9 @@ export function HowItWorks() {
                   Pour le client
                 </TabButton>
               </div>
-            </motion.div>
+            </m.div>
           </LayoutGroup>
-        </motion.div>
+        </m.div>
 
         <div
           role="tabpanel"
@@ -165,7 +165,7 @@ export function HowItWorks() {
           className="mt-10 md:mt-14"
         >
           <AnimatePresence mode="wait">
-            <motion.div
+            <m.div
               key={tab}
               initial="hidden"
               animate="visible"
@@ -176,7 +176,7 @@ export function HowItWorks() {
               {steps.map((s, i) => (
                 <StepCard key={`${tab}-${i}`} step={s} idx={i} />
               ))}
-            </motion.div>
+            </m.div>
           </AnimatePresence>
         </div>
 

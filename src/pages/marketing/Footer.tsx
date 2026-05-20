@@ -17,7 +17,7 @@ const FOOTER_COLS = [
       { label: 'À propos',  href: '/about' },
       { label: 'Blog',      href: '/blog' },
       { label: 'Presse',    href: '/press' },
-      { label: 'Carrières', href: '/carrieres' },
+      { label: 'Carrières', href: '/careers' },
     ],
   },
   {

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useQuery } from 'convex/react'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
@@ -71,7 +71,7 @@ export function Items() {
     : 0
 
   return (
-    <motion.div
+    <m.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -332,7 +332,7 @@ export function Items() {
             {subtotal > 0 ? formatEur(subtotal) : '—'}
           </div>
         </div>
-        <motion.button
+        <m.button
           type="button"
           whileTap={{ scale: 0.985 }}
           disabled={subtotal <= 0}
@@ -353,9 +353,9 @@ export function Items() {
               <path d="M6.75 3.75L11.25 9L6.75 14.25" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
-        </motion.button>
+        </m.button>
       </div>
-    </motion.div>
+    </m.div>
   )
 }
 

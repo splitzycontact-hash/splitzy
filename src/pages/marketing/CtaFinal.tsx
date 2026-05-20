@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useFadeInView } from './shared'
 import { IconArrowRight, IconCheck } from './Icons'
 
@@ -38,7 +38,7 @@ export function CtaFinal() {
       />
 
       <div ref={ref} className="relative max-w-3xl mx-auto px-4 md:px-6 text-center">
-        <motion.div
+        <m.div
           initial={{ opacity: 0, scale: 0.97, y: 20 }}
           animate={inView ? { opacity: 1, scale: 1, y: 0, transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] } } : {}}
         >
@@ -53,7 +53,7 @@ export function CtaFinal() {
           </p>
 
           <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
-            <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+            <m.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
               <a
                 href="/restaurant/onboarding"
                 className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 bg-white text-orange-700 font-semibold text-[15px] px-7 py-3.5 rounded-xl shadow-lg shadow-black/15 hover:shadow-xl hover:shadow-black/20 transition-all"
@@ -63,15 +63,15 @@ export function CtaFinal() {
                   <IconArrowRight size={16} />
                 </span>
               </a>
-            </motion.div>
-            <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+            </m.div>
+            <m.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
               <a
                 href="/demo"
                 className="inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-white/10 backdrop-blur-sm border border-white/30 text-white font-medium text-[15px] px-7 py-3.5 rounded-xl hover:bg-white/15 hover:border-white/40 transition-colors"
               >
                 <span className="whitespace-nowrap">Parler à un expert</span>
               </a>
-            </motion.div>
+            </m.div>
           </div>
 
           <ul className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] text-white/70">
@@ -82,7 +82,7 @@ export function CtaFinal() {
               </li>
             ))}
           </ul>
-        </motion.div>
+        </m.div>
       </div>
     </section>
   )

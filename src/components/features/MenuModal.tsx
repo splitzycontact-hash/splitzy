@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { MENU_ITEMS } from '../../data/menu'
 import { formatEur } from '../../utils/formatCurrency'
 
@@ -21,14 +21,14 @@ export function MenuModal({ open, onClose }: MenuModalProps) {
     <AnimatePresence>
       {open && (
         <>
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 z-40"
             onClick={onClose}
           />
-          <motion.div
+          <m.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -67,7 +67,7 @@ export function MenuModal({ open, onClose }: MenuModalProps) {
                 </div>
               ))}
             </div>
-          </motion.div>
+          </m.div>
         </>
       )}
     </AnimatePresence>

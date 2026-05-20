@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { fadeInUp, useFadeInView, useCountUp } from './shared'
 
 function StatMetric({
@@ -51,27 +51,27 @@ export function Stats() {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 hero-grid opacity-50" />
 
       <div ref={ref} className="relative max-w-6xl mx-auto px-4 md:px-6">
-        <motion.div
+        <m.div
           className="text-center mb-12 md:mb-16"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
           variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
         >
-          <motion.span
+          <m.span
             variants={fadeInUp}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.06] border border-white/10 text-white/70 text-[11px] font-semibold uppercase tracking-[0.08em]"
           >
             Les chiffres
-          </motion.span>
-          <motion.h2
+          </m.span>
+          <m.h2
             id="stats-heading"
             variants={fadeInUp}
             className="mt-5 text-[28px] md:text-[40px] font-bold text-white leading-[1.15] text-balance max-w-2xl mx-auto"
           >
             Le partage d'addition,{' '}
             <span className="text-orange-500">à l'échelle.</span>
-          </motion.h2>
-        </motion.div>
+          </m.h2>
+        </m.div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-y-12 gap-x-6 md:gap-x-8 md:divide-x divide-white/10 max-w-5xl mx-auto">
           <div className="md:px-4">
