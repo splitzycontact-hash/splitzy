@@ -18,6 +18,14 @@ import { Feedback } from './pages/Feedback'
 import { FeedbackSent } from './pages/FeedbackSent'
 import { TableEntry } from './pages/TableEntry'
 
+import { Homepage } from './pages/marketing/Homepage'
+import { AboutPage } from './pages/marketing/AboutPage'
+import { BlogPage } from './pages/marketing/BlogPage'
+import { ContactPage } from './pages/marketing/ContactPage'
+import { PricingPage } from './pages/marketing/PricingPage'
+import { CarriersPage } from './pages/marketing/CarriersPage'
+import { PaymentPage } from './pages/marketing/PaymentPage'
+
 const clerkReady = (() => {
   const k = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined
   return typeof k === 'string' && k.startsWith('pk_') && k.length > 20
@@ -26,7 +34,7 @@ const clerkReady = (() => {
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { state } = useSession()
   if (!state.userName.trim()) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/welcome" replace />
   }
   return <>{children}</>
 }
@@ -38,7 +46,7 @@ function ConsumerAppContent() {
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/t/:slug/:tableNumber" element={<TableEntry />} />
-          <Route path="/" element={<Landing />} />
+          <Route path="/welcome" element={<Landing />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/table"         element={<ProtectedRoute><Table /></ProtectedRoute>} />
           <Route path="/items"         element={<ProtectedRoute><Items /></ProtectedRoute>} />
@@ -48,7 +56,7 @@ function ConsumerAppContent() {
           <Route path="/confirmation"  element={<ProtectedRoute><Confirmation /></ProtectedRoute>} />
           <Route path="/feedback"      element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
           <Route path="/feedback/sent" element={<ProtectedRoute><FeedbackSent /></ProtectedRoute>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/welcome" replace />} />
         </Routes>
       </AnimatePresence>
     </PhoneWrapper>
@@ -93,7 +101,19 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Marketing pages */}
+        <Route path="/" element={<Homepage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/careers" element={<CarriersPage />} />
+        <Route path="/how-it-works" element={<PaymentPage />} />
+
+        {/* Restaurant owner dashboard */}
         <Route path="/restaurant/*" element={<RestaurantApp />} />
+
+        {/* Consumer QR client — /welcome + /t/:slug/:tableNumber + flow */}
         <Route
           path="/*"
           element={

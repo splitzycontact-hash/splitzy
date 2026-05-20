@@ -15,7 +15,7 @@ export function FeedbackSent() {
 
   const handleReset = () => {
     dispatch({ type: 'RESET_SESSION' })
-    navigate('/')
+    navigate('/welcome')
   }
 
   return (

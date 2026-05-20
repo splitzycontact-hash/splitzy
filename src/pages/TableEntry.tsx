@@ -40,7 +40,7 @@ export function TableEntry() {
     if (context.table?._id) {
       updateStatus({ tableId: context.table._id, status: 'dining', guests: context.table.capacity }).catch(() => {})
     }
-    navigate('/', { replace: true })
+    navigate('/welcome', { replace: true })
   }, [context])
 
   // Loading
