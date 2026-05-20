@@ -1,35 +1,45 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useQuery } from 'convex/react'
 import { useSession } from '../context/SessionContext'
-import { Avatar } from '../components/ui/Avatar'
-import { Button } from '../components/ui/Button'
-import { MenuModal } from '../components/features/MenuModal'
 import { pageVariants } from '../utils/animations'
-import { MENU_ITEMS } from '../data/menu'
 import { formatEur } from '../utils/formatCurrency'
+import { api } from '../../convex/_generated/api'
+import type { Id } from '../../convex/_generated/dataModel'
 
-// Items already on the table (those with takenBy set + some free ones)
-const TABLE_ITEMS = MENU_ITEMS.filter(item =>
-  ['e1', 'e2', 'p1', 'p2', 'b1', 'b2'].includes(item.id)
-)
+const AVATAR_COLORS = ['#E8920A', '#10B981', '#3B82F6', '#8B5CF6', '#F43F5E', '#14B8A6']
+
+function StepBar({ current }: { current: number }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 14 }}>
+      {[0, 1, 2].map(i => (
+        <div key={i} style={{
+          width: 28, height: 4, borderRadius: 2,
+          background: i < current ? '#E8920A' : '#E4E4E7',
+          transition: 'background 0.2s',
+        }} />
+      ))}
+    </div>
+  )
+}
 
 export function Table() {
   const { state } = useSession()
   const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
 
-  const tableTotal = TABLE_ITEMS.reduce((sum, item) => sum + item.price, 0)
+  const userColor = AVATAR_COLORS[state.userAvatarIndex] ?? '#E8920A'
+  const userInitial = (state.userName.trim()[0] ?? '?').toUpperCase()
 
-  // Build user convive entry
-  const me = {
-    id: 'me',
-    name: state.userName,
-    avatarIndex: state.userAvatarIndex,
-    color: '#E8920A',
-  }
+  const convexItems = useQuery(
+    api.menuItems.listByRestaurant,
+    state.convexRestaurantId
+      ? { restaurantId: state.convexRestaurantId as Id<'restaurants'> }
+      : 'skip',
+  )
 
-  const allConvives = [me, ...state.convives]
+  const billItems = convexItems && convexItems.length > 0
+    ? convexItems.slice(0, 8)
+    : []
 
   return (
     <motion.div
@@ -37,108 +47,162 @@ export function Table() {
       initial="initial"
       animate="animate"
       exit="exit"
-      className="flex flex-col min-h-full bg-bg"
+      style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#FAFAFA' }}
     >
-      {/* Top bar */}
-      <div
-        className="flex-shrink-0 flex items-center justify-between px-5 py-4"
-        style={{ background: '#18181B' }}
-      >
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px 6px' }}>
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="flex items-center gap-1 text-white/70 hover:text-white text-sm font-medium min-h-[44px]"
+          style={{
+            width: 34, height: 34, borderRadius: 11, border: '1px solid #E4E4E7',
+            background: '#fff', color: '#0A0A0A', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <path d="M9.5 3L5 7.5L9.5 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Retour
         </button>
-        <h1 className="text-white font-black text-lg">Table {state.tableNumber}</h1>
-        <div className="w-16" />
+        <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 700, color: '#0A0A0A', letterSpacing: '-0.01em' }}>
+          Table {state.tableNumber}
+        </div>
+        <div style={{ width: 34 }} />
+      </div>
+
+      {/* Step bar + restaurant name */}
+      <div style={{ padding: '0 20px', textAlign: 'center' }}>
+        <StepBar current={2} />
+        <div style={{ fontSize: 13.5, color: '#52525B', marginTop: -2 }}>
+          {state.restaurantName}
+        </div>
       </div>
 
       {/* Convives row */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="px-5 py-4 bg-white border-b border-border"
-      >
-        <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
+      <div style={{ padding: '24px 20px 4px' }}>
+        <div style={{ fontSize: 11.5, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>
           À cette table
-        </p>
-        <div className="flex items-center gap-3 overflow-x-auto hide-scrollbar py-1 px-0.5">
-          {allConvives.map((c, idx) => (
-            <div key={c.id} className="flex flex-col items-center gap-1 flex-shrink-0">
-              <div
-                className={`rounded-full p-0.5 ${idx === 0 ? 'ring-2 ring-brand' : ''}`}
-              >
-                <Avatar index={c.avatarIndex} size="md" />
+        </div>
+        <div style={{ display: 'flex', gap: 18, justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+          {/* Me — ringed */}
+          <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%',
+              background: userColor, color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 700, fontSize: 20,
+              outline: `2.5px solid #E8920A`, outlineOffset: 2,
+              boxShadow: `inset 0 0 0 0.5px rgba(255,255,255,0.18)`,
+            }}>
+              {userInitial}
+            </div>
+            <div style={{ fontSize: 10.5, color: '#E8920A', fontWeight: 600 }}>Toi</div>
+          </div>
+          {/* Other convives */}
+          {state.convives.map(c => (
+            <div key={c.id} style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%',
+                background: c.color || AVATAR_COLORS[c.avatarIndex] || '#A1A1AA',
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: 20,
+                boxShadow: 'inset 0 0 0 0.5px rgba(255,255,255,0.18)',
+              }}>
+                {(c.name[0] ?? '?').toUpperCase()}
               </div>
-              <span className={`text-[10px] font-semibold ${idx === 0 ? 'text-brand' : 'text-muted'}`}>
-                {idx === 0 ? 'Toi' : c.name}
-              </span>
+              <div style={{ fontSize: 10.5, color: '#52525B', fontWeight: 500 }}>{c.name}</div>
             </div>
           ))}
         </div>
-      </motion.div>
+      </div>
 
       {/* Bill card */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="mx-5 mt-5 bg-white rounded-2xl shadow-card overflow-hidden"
-      >
-        <div
-          className="px-4 py-3 flex items-center justify-between"
-          style={{ background: '#18181B' }}
-        >
-          <p className="text-white font-bold text-sm">Addition en cours</p>
-          <span className="text-xs text-white/50">{TABLE_ITEMS.length} articles</span>
+      <div style={{
+        margin: '24px 20px 0',
+        padding: '6px 16px 6px',
+        background: '#fff', borderRadius: 18, border: '1px solid #E4E4E7',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0 10px', borderBottom: '1px dashed #E4E4E7' }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#0A0A0A', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Addition en cours
+          </div>
+          <div style={{ fontSize: 11, color: '#52525B', fontWeight: 600 }}>
+            {billItems.length > 0 ? `${billItems.length} articles` : 'En cours'}
+          </div>
         </div>
 
-        <div className="px-4 py-3 space-y-2">
-          {TABLE_ITEMS.map(item => (
-            <div key={item.id} className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-base flex-shrink-0">{item.emoji}</span>
-                <span className="text-sm text-dark truncate">{item.name}</span>
-                {item.takenBy && (
-                  <Avatar index={item.takenBy.avatarIndex} size="sm" />
-                )}
+        {billItems.length > 0 ? (
+          <>
+            {billItems.map((it, idx) => (
+              <div key={it._id} style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0',
+                borderBottom: idx < billItems.length - 1 ? '1px solid #F1F1F2' : 'none',
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#0A0A0A' }}>{it.name}</div>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#0A0A0A', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                  {formatEur(it.priceCents)}
+                </div>
               </div>
-              <span className="text-sm font-semibold text-dark flex-shrink-0">
-                {formatEur(item.price)}
-              </span>
+            ))}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '14px 0 12px', borderTop: '1px solid #E4E4E7', marginTop: 4,
+            }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0A0A0A' }}>Total table</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                {state.tableTotalCents > 0
+                  ? formatEur(state.tableTotalCents)
+                  : formatEur(billItems.reduce((s, it) => s + it.priceCents, 0))}
+              </div>
             </div>
-          ))}
-        </div>
+          </>
+        ) : (
+          <div style={{ padding: '14px 0 12px', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+              {state.tableTotalCents > 0 ? formatEur(state.tableTotalCents) : '—'}
+            </div>
+            <div style={{ fontSize: 12, color: '#52525B', marginTop: 4 }}>
+              {state.tableCapacity > 0 ? `Pour ${state.tableCapacity} personnes` : 'Addition en cours'}
+            </div>
+          </div>
+        )}
+      </div>
 
-        <div className="border-t border-dashed border-border mx-4" />
-        <div className="px-4 py-3 flex items-center justify-between">
-          <span className="text-sm font-bold text-dark">Total table</span>
-          <span className="text-lg font-black text-dark">{formatEur(tableTotal)}</span>
-        </div>
-      </motion.div>
+      <div style={{ flex: 1, minHeight: 20 }} />
 
       {/* CTAs */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="px-5 mt-6 pb-4 safe-bottom flex flex-col gap-3"
-      >
-        <Button variant="brand" onClick={() => navigate('/items')}>
-          Choisir mes articles
-        </Button>
-        <Button variant="ghost" onClick={() => setMenuOpen(true)}>
-          Voir le menu
-        </Button>
-      </motion.div>
-
-      <MenuModal open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <div style={{ padding: '16px 20px 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.985 }}
+          onClick={() => navigate('/items')}
+          style={{
+            width: '100%', height: 56, borderRadius: 16, border: 0,
+            background: '#E8920A', color: '#fff',
+            fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            boxShadow: '0 10px 28px -8px rgba(232,146,10,0.55), inset 0 0 0 1px rgba(255,255,255,0.12)',
+          }}
+        >
+          Choisir ma part
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M6.75 3.75L11.25 9L6.75 14.25" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </motion.button>
+        <button
+          type="button"
+          style={{
+            width: '100%', height: 48, borderRadius: 14, border: '1px solid #E4E4E7',
+            background: '#fff', color: '#0A0A0A',
+            fontSize: 14, fontWeight: 600, cursor: 'pointer',
+          }}
+          onClick={() => {/* menu modal — kept for future */}}
+        >
+          Voir le menu complet
+        </button>
+      </div>
     </motion.div>
   )
 }

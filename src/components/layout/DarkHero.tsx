@@ -4,29 +4,31 @@ interface DarkHeroProps {
   children: ReactNode
   className?: string
   minHeight?: string
+  tall?: boolean
 }
 
-export function DarkHero({ children, className = '', minHeight = '220px' }: DarkHeroProps) {
+export function DarkHero({ children, className = '', tall = false }: DarkHeroProps) {
   return (
     <div
-      className={`relative overflow-hidden flex flex-col items-center justify-center ${className}`}
-      style={{ background: '#18181B', minHeight }}
+      className={`relative overflow-hidden ${className}`}
+      style={{
+        background: '#0A0A0A',
+        padding: tall ? '60px 24px 36px' : '50px 24px 28px',
+        color: '#fff',
+      }}
     >
-      {/* Decorative ticket stubs top-right */}
-      <div
-        className="absolute top-4 right-4 opacity-[0.16] pointer-events-none"
-        aria-hidden="true"
-      >
-        <div
-          className="w-12 h-5 rounded-sm border border-white rotate-12 mb-1"
-          style={{ background: 'transparent' }}
-        />
-        <div
-          className="w-8 h-3 rounded-sm border border-white rotate-6 ml-2"
-          style={{ background: 'transparent' }}
-        />
-      </div>
-      {children}
+      {/* Diagonal stripes */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.5,
+        background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.022) 0 1px, transparent 1px 14px)',
+      }} />
+      {/* Radial orange glow top-right */}
+      <div style={{
+        position: 'absolute', top: -60, right: -60, width: 280, height: 280,
+        background: 'radial-gradient(circle, rgba(232,146,10,0.22) 0%, transparent 60%)',
+        pointerEvents: 'none',
+      }} />
+      <div style={{ position: 'relative' }}>{children}</div>
     </div>
   )
 }

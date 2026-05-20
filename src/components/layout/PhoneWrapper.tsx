@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 
 interface PhoneWrapperProps {
   children: ReactNode
@@ -10,13 +9,6 @@ export function PhoneWrapper({ children }: PhoneWrapperProps) {
     <>
       {/* Desktop: iPhone-style frame */}
       <div className="hidden md:flex items-center justify-center min-h-screen w-full bg-bg py-8 relative">
-        <Link
-          to="/restaurant/sign-in"
-          className="absolute top-6 left-6 flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-border text-dark text-sm font-semibold shadow-sm hover:shadow-md hover:border-brand transition-all duration-150"
-        >
-          <span style={{ color: '#E8920A' }}>●</span>
-          Se connecter
-        </Link>
         <div
           className="relative flex flex-col overflow-hidden bg-white"
           style={{

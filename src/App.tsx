@@ -109,6 +109,7 @@ export default function App() {
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/careers" element={<CarriersPage />} />
         <Route path="/how-it-works" element={<PaymentPage />} />
+        <Route path="/demo" element={<PaymentPage />} />
 
         {/* Restaurant owner dashboard */}
         <Route path="/restaurant/*" element={<RestaurantApp />} />

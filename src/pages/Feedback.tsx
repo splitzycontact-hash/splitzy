@@ -3,13 +3,21 @@ import { motion } from 'framer-motion'
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { useSession } from '../context/SessionContext'
-import { DarkHero } from '../components/layout/DarkHero'
 import { StarRating } from '../components/features/StarRating'
-import { FeedbackTag } from '../components/features/FeedbackTag'
-import { Button } from '../components/ui/Button'
 import { pageVariants } from '../utils/animations'
 import type { Id } from '../../convex/_generated/dataModel'
 import { FEEDBACK_TAGS } from '../data/session'
+
+const FEEDBACK_CHIP_DOTS: Record<string, string> = {
+  'Super ambiance': '#F59E0B',
+  'Serveur top': '#10B981',
+  'Rapport qualité-prix': '#14B8A6',
+  'On reviendra': '#E8920A',
+  'Plat froid': '#3B82F6',
+  'Service lent': '#A855F7',
+  'Carte des vins': '#EC4899',
+  'Trop bruyant': '#EF4444',
+}
 
 export function Feedback() {
   const { state, dispatch } = useSession()
@@ -34,97 +42,197 @@ export function Feedback() {
     navigate('/feedback/sent')
   }
 
+  const starLabel = state.feedbackStars === 0 ? ''
+    : state.feedbackStars <= 2 ? 'Désolé que ça ait coincé.'
+    : state.feedbackStars <= 3 ? 'Pas tout à fait au top.'
+    : state.feedbackStars === 4 ? 'Une bonne soirée.'
+    : 'Une super soirée !'
+
   return (
     <motion.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
       exit="exit"
-      className="flex flex-col min-h-full bg-bg"
+      style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#FAFAFA' }}
     >
-      <DarkHero minHeight="180px" className="flex-shrink-0 py-8">
-        <span className="text-4xl mb-3">☀️</span>
-        <h1 className="text-white text-xl font-black text-center px-6">
-          Comment s'est passée ta soirée ?
-        </h1>
-        <p className="text-white/50 text-sm mt-1">{state.restaurantName}</p>
-      </DarkHero>
-
-      <div className="flex-1 overflow-y-auto px-5 pt-5 pb-6">
-        {/* Private notice */}
-        <div className="flex items-center gap-3 bg-brand-light border border-brand/20 rounded-xl p-3 mb-5">
-          <span className="text-xl flex-shrink-0">☀️</span>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-dark">Ton avis restera privé</p>
-            <p className="text-xs text-muted mt-0.5">Uniquement visible par le gérant</p>
+      {/* Dark hero */}
+      <div style={{
+        position: 'relative', overflow: 'hidden',
+        background: '#0A0A0A', padding: '50px 24px 28px', color: '#fff', flexShrink: 0,
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.5,
+          background: 'repeating-linear-gradient(135deg, rgba(255,255,255,0.022) 0 1px, transparent 1px 14px)',
+        }} />
+        <div style={{
+          position: 'absolute', top: -60, right: -60, width: 280, height: 280,
+          background: 'radial-gradient(circle, rgba(232,146,10,0.22) 0%, transparent 60%)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+              background: 'rgba(255,255,255,0.06)', border: 0, borderRadius: 10, color: '#fff',
+              fontSize: 13, fontWeight: 500, cursor: 'pointer', marginBottom: 14,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M9 2.5L4.5 7L9 11.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            Retour
+          </button>
+          {/* Orange icon */}
+          <div style={{
+            width: 40, height: 40, borderRadius: '50%', background: '#E8920A',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+          }}>
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <path d="M11 2L13.5 8L20 9L15 13.8L16.3 20L11 17.1L5.7 20L7 13.8L2 9L8.5 8L11 2Z" fill="white" />
+            </svg>
           </div>
-          <span className="text-xs font-bold text-brand bg-white px-2 py-1 rounded-full flex-shrink-0">
+          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.15 }}>
+            Comment s'est passée<br />ta soirée ?
+          </div>
+          <div style={{ fontSize: 13, color: '#A1A1AA', marginTop: 6 }}>
+            {state.restaurantName}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 0' }}>
+        {/* Privacy badge */}
+        <div style={{
+          padding: 14, borderRadius: 14, background: '#FFF4E5',
+          border: '1px solid rgba(232,146,10,0.2)',
+          display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14,
+        }}>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M9 1.5L2.25 4.5v5.25C2.25 13.5 9 16.5 9 16.5S15.75 13.5 15.75 9.75V4.5L9 1.5z" stroke="#E8920A" strokeWidth="1.4" />
+          </svg>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#0A0A0A' }}>Ton avis reste privé</div>
+            <div style={{ fontSize: 11.5, color: '#52525B' }}>Uniquement visible par le gérant · jamais sur Google</div>
+          </div>
+          <div style={{ padding: '3px 8px', borderRadius: 999, background: '#fff', fontSize: 10.5, color: '#52525B', fontWeight: 600 }}>
             Lu demain matin
-          </span>
+          </div>
         </div>
 
-        {/* Stars */}
-        <div className="bg-white rounded-2xl p-5 shadow-card mb-4">
-          <p className="text-sm font-bold text-dark text-center mb-4">Ton expérience globale</p>
-          <StarRating
-            value={state.feedbackStars}
-            onChange={s => dispatch({ type: 'SET_FEEDBACK_STARS', payload: s })}
-          />
-          {state.feedbackStars === 0 && (
-            <p className="text-xs text-muted text-center mt-3">
+        {/* Stars card */}
+        <div style={{
+          background: '#fff', border: '1px solid #E4E4E7', borderRadius: 16,
+          padding: '16px 14px 20px', textAlign: 'center', marginBottom: 14,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0A0A0A' }}>Ton expérience globale</div>
+          <div style={{ marginTop: 10 }}>
+            <StarRating
+              value={state.feedbackStars}
+              onChange={s => dispatch({ type: 'SET_FEEDBACK_STARS', payload: s })}
+            />
+          </div>
+          {state.feedbackStars === 0 ? (
+            <div style={{ fontSize: 12, color: '#A1A1AA', marginTop: 8 }}>
               Sélectionne au moins une étoile pour envoyer ton avis
-            </p>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: '#52525B', marginTop: 8 }}>{starLabel}</div>
           )}
         </div>
 
-        {/* Tags */}
-        <div className="mb-4">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
-            Ce qui t'a marqué
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {FEEDBACK_TAGS.map(tag => (
-              <FeedbackTag
-                key={tag}
-                label={tag}
-                selected={state.feedbackTags.includes(tag)}
-                onToggle={() => dispatch({ type: 'TOGGLE_FEEDBACK_TAG', payload: tag })}
-              />
-            ))}
+        {/* Chips */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+            Ce qui t'a marqué{' '}
+            <span style={{ textTransform: 'none', letterSpacing: 0, color: '#A1A1AA' }}>(optionnel)</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {FEEDBACK_TAGS.map(tag => {
+              const sel = state.feedbackTags.includes(tag)
+              const dot = FEEDBACK_CHIP_DOTS[tag] ?? '#E4E4E7'
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => dispatch({ type: 'TOGGLE_FEEDBACK_TAG', payload: tag })}
+                  style={{
+                    padding: '9px 12px', borderRadius: 999,
+                    border: `1.5px solid ${sel ? '#E8920A' : '#E4E4E7'}`,
+                    background: sel ? '#FFF4E5' : '#fff',
+                    color: sel ? '#E8920A' : '#0A0A0A',
+                    fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 7,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <span style={{
+                    width: 7, height: 7, borderRadius: '50%', background: dot,
+                    boxShadow: `0 0 0 2px ${sel ? '#FFF4E5' : '#fff'}`,
+                    flexShrink: 0,
+                  }} />
+                  {tag}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* Textarea */}
-        <div className="mb-6">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-            Un mot en plus ? (optionnel)
-          </p>
+        {/* Note */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+            Un mot en plus ?{' '}
+            <span style={{ textTransform: 'none', letterSpacing: 0, color: '#A1A1AA' }}>(optionnel)</span>
+          </div>
           <textarea
             value={state.feedbackText}
             onChange={e => dispatch({ type: 'SET_FEEDBACK_TEXT', payload: e.target.value })}
             maxLength={500}
             rows={3}
             placeholder="Décris ton expérience…"
-            className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm text-dark resize-none outline-none focus:border-brand transition-colors"
+            style={{
+              width: '100%', padding: 14, borderRadius: 14,
+              border: '1px solid #E4E4E7', background: '#fff', color: '#0A0A0A',
+              fontSize: 13.5, fontFamily: 'inherit', resize: 'none', outline: 'none',
+              boxSizing: 'border-box',
+              transition: 'border-color 0.15s',
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = '#E8920A')}
+            onBlur={e => (e.currentTarget.style.borderColor = '#E4E4E7')}
           />
-          <p className="text-right text-xs text-muted mt-1">
+          <div style={{ fontSize: 11, color: '#A1A1AA', textAlign: 'right', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
             {state.feedbackText.length}/500
-          </p>
+          </div>
         </div>
+      </div>
 
-        {/* CTAs */}
-        <Button
-          variant="brand"
-          disabled={!canSend}
+      {/* CTAs */}
+      <div style={{ padding: '14px 20px 24px', flexShrink: 0 }}>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.985 }}
           onClick={handleSend}
+          disabled={!canSend}
+          style={{
+            width: '100%', height: 56, borderRadius: 16, border: 0,
+            background: canSend ? '#E8920A' : '#E4E4E7',
+            color: canSend ? '#fff' : '#A1A1AA',
+            fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em',
+            cursor: canSend ? 'pointer' : 'default',
+            boxShadow: canSend ? '0 10px 28px -8px rgba(232,146,10,0.55), inset 0 0 0 1px rgba(255,255,255,0.12)' : 'none',
+          }}
         >
           Envoyer mon avis
-        </Button>
-
+        </motion.button>
         <button
           type="button"
           onClick={() => navigate('/feedback/sent')}
-          className="w-full text-center text-sm text-muted font-medium py-3 mt-3 min-h-[44px]"
+          style={{
+            width: '100%', background: 'transparent', border: 0, color: '#52525B',
+            fontSize: 13.5, fontWeight: 600, cursor: 'pointer', padding: '12px 0 0',
+          }}
         >
           Passer
         </button>
