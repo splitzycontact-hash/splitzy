@@ -53,7 +53,7 @@ export function Sidebar() {
   ) ?? 0
 
   return (
-    <aside className="w-60 h-screen flex flex-col bg-white border-r border-border shrink-0">
+    <aside className="w-60 h-full hidden md:flex flex-col bg-white border-r border-border shrink-0">
       <div className="px-5 pt-6 pb-4">
         <div className="text-xl font-bold tracking-tight text-dark">
           Split<span className="text-brand">zy</span>

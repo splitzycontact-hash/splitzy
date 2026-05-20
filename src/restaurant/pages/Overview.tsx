@@ -87,10 +87,10 @@ export function Overview() {
         subtitle="Tableau de bord temps réel"
         live
       />
-      <main className="flex-1 overflow-y-auto p-6 space-y-5">
+      <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6 space-y-5">
 
         {/* KPIs */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard label="CA DU JOUR" value={formatEur(caTotal)}
             sub={caTotal > 0 ? undefined : 'Aucune vente aujourd\'hui'}
             subColor="text-muted" accent="text-brand" />
@@ -116,7 +116,7 @@ export function Overview() {
         </div>
 
         {/* Grid 2 cols */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           {/* Tables live */}
           <div className="bg-white rounded-xl border border-border shadow-card p-5">

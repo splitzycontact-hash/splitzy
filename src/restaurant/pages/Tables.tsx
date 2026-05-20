@@ -159,9 +159,9 @@ export function Tables() {
   return (
     <RestaurantLayout>
       <Topbar title="Tables live" subtitle="Mise à jour en temps réel" live />
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6">
         {/* Filters */}
-        <div className="flex items-center gap-2 mb-5">
+        <div className="flex items-center gap-2 mb-5 overflow-x-auto flex-nowrap pb-1 -mx-1 px-1">
           {FILTER_LABELS.map(({ key, label, count }) => (
             <button
               key={key}
@@ -199,7 +199,7 @@ export function Tables() {
 
         {/* Grid */}
         {!isLoading && visible.length > 0 && (
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {visible.map((table) => (
               <TableCard
                 key={table.id}

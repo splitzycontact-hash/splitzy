@@ -27,7 +27,7 @@ export function Topbar({ title, subtitle, live = false, right }: TopbarProps) {
         )}
         <button
           onClick={openPrint}
-          className="flex items-center gap-2 text-sm font-medium text-mid border border-border rounded-lg px-3 py-1.5 hover:bg-bg transition-colors"
+          className="hidden md:flex items-center gap-2 text-sm font-medium text-mid border border-border rounded-lg px-3 py-1.5 hover:bg-bg transition-colors"
         >
           <Printer size={15} />
           Imprimer rapport

@@ -198,7 +198,7 @@ export function Table() {
             background: '#fff', color: '#0A0A0A',
             fontSize: 14, fontWeight: 600, cursor: 'pointer',
           }}
-          onClick={() => {/* menu modal — kept for future */}}
+          onClick={() => navigate('/items')}
         >
           Voir le menu complet
         </button>

@@ -19,6 +19,7 @@ export interface Convive {
 export interface SelectedItem {
   menuItemId: string
   splitFactor: 1 | 2 | 3 | 4
+  priceCents: number
 }
 
 export type TipChoice = number | null // 0-30 as percentage, or null
@@ -52,7 +53,7 @@ export type SessionAction =
   | { type: 'SET_SPLIT_MODE'; payload: 'item' | 'equal' | 'custom' }
   | { type: 'SET_EQUAL_SPLIT_COUNT'; payload: number }
   | { type: 'SET_CUSTOM_AMOUNT'; payload: number }
-  | { type: 'TOGGLE_ITEM'; payload: string }
+  | { type: 'TOGGLE_ITEM'; payload: { itemId: string; priceCents: number } }
   | { type: 'SET_ITEM_SPLIT'; payload: { itemId: string; factor: 1 | 2 | 3 | 4 } }
   | { type: 'SET_TIP_PERCENT'; payload: number }
   | { type: 'SET_SELECTED_CARD'; payload: string }

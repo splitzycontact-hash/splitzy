@@ -1,5 +1,4 @@
 import { useSession } from '../context/SessionContext'
-import { MENU_ITEMS } from '../data/menu'
 
 export function useSessionCalcs() {
   const { state } = useSession()
@@ -8,9 +7,7 @@ export function useSessionCalcs() {
 
   if (state.splitMode === 'item') {
     subtotal = state.selectedItems.reduce((acc, sel) => {
-      const item = MENU_ITEMS.find(m => m.id === sel.menuItemId)
-      if (!item) return acc
-      return acc + Math.round(item.price / sel.splitFactor)
+      return acc + Math.round(sel.priceCents / sel.splitFactor)
     }, 0)
   } else if (state.splitMode === 'equal') {
     subtotal = Math.round(state.tableTotalCents / state.equalSplitCount)

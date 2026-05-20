@@ -38,11 +38,12 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
     case 'SET_CUSTOM_AMOUNT':
       return { ...state, customAmount: action.payload }
     case 'TOGGLE_ITEM': {
-      const exists = state.selectedItems.find(i => i.menuItemId === action.payload)
+      const { itemId, priceCents } = action.payload
+      const exists = state.selectedItems.find(i => i.menuItemId === itemId)
       if (exists) {
-        return { ...state, selectedItems: state.selectedItems.filter(i => i.menuItemId !== action.payload) }
+        return { ...state, selectedItems: state.selectedItems.filter(i => i.menuItemId !== itemId) }
       }
-      return { ...state, selectedItems: [...state.selectedItems, { menuItemId: action.payload, splitFactor: 1 }] }
+      return { ...state, selectedItems: [...state.selectedItems, { menuItemId: itemId, splitFactor: 1, priceCents }] }
     }
     case 'SET_ITEM_SPLIT': {
       return {

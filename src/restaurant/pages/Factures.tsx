@@ -54,9 +54,9 @@ export function Factures() {
   return (
     <RestaurantLayout>
       <Topbar title="Factures" subtitle="Historique des paiements" />
-      <main className="flex-1 overflow-y-auto p-6 space-y-5">
+      <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6 space-y-5">
         {/* KPIs */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl border border-border shadow-card p-5">
             <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">CA BRUT</div>
             <div className="text-2xl font-bold text-brand">{formatEur(caGros)}</div>
@@ -76,13 +76,13 @@ export function Factures() {
         </div>
 
         {/* Toolbar */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2 overflow-x-auto flex-nowrap pb-1">
             {PERIODS.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setPeriod(key)}
-                className={`text-sm font-medium rounded-lg px-3.5 py-1.5 border transition-colors ${
+                className={`shrink-0 text-sm font-medium rounded-lg px-3.5 py-1.5 border transition-colors ${
                   period === key
                     ? 'bg-brand text-white border-brand'
                     : 'bg-white text-mid border-border hover:bg-bg'
@@ -95,13 +95,13 @@ export function Factures() {
           <div className="flex items-center gap-2">
             <button className="flex items-center gap-2 text-sm font-medium text-mid border border-border bg-white rounded-lg px-3 py-1.5 hover:bg-bg transition-colors">
               <SlidersHorizontal size={14} />
-              Tri
+              <span className="hidden sm:inline">Tri</span>
             </button>
             <button className="flex items-center gap-2 text-sm font-medium text-mid border border-border bg-white rounded-lg px-3 py-1.5 hover:bg-bg transition-colors">
               <Download size={14} />
-              Exporter CSV
+              <span className="hidden sm:inline">Exporter CSV</span>
             </button>
-            <button className="flex items-center gap-2 text-sm font-medium text-mid border border-border bg-white rounded-lg px-3 py-1.5 hover:bg-bg transition-colors">
+            <button className="hidden md:flex items-center gap-2 text-sm font-medium text-mid border border-border bg-white rounded-lg px-3 py-1.5 hover:bg-bg transition-colors">
               <Printer size={14} />
               Imprimer
             </button>
@@ -110,7 +110,8 @@ export function Factures() {
 
         {/* Table */}
         <div className="bg-white rounded-xl border border-border shadow-card overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
             <thead>
               <tr style={{ background: '#2a2724' }}>
                 {['Date', 'Table', 'Convives', 'Montant', 'Pourboire', 'Commission', 'Statut'].map((h) => (
@@ -141,6 +142,7 @@ export function Factures() {
               ))}
             </tbody>
           </table>
+          </div>
 
           {/* Pagination */}
           <div className="flex items-center justify-between px-5 py-3 border-t border-border">

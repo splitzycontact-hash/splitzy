@@ -91,7 +91,7 @@ export function Feedbacks() {
         title="Feedbacks matin"
         subtitle="Récap du service · hier soir"
       />
-      <main className="flex-1 overflow-y-auto p-6 space-y-5">
+      <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6 space-y-5">
         {/* Hero */}
         <div
           className="rounded-2xl p-6 flex items-center gap-5"
@@ -110,7 +110,7 @@ export function Feedbacks() {
         </div>
 
         {/* Row: Filtres + Distribution */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-white rounded-xl border border-border shadow-card p-5">
             <div className="text-sm font-bold text-dark mb-3">Filtrer</div>
             <div className="flex flex-wrap gap-2">

@@ -364,7 +364,7 @@ function PosSection({ tables, restaurantId }: { tables: TableRef[]; restaurantId
           {/* Available */}
           <div className="mb-6">
             <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Disponibles</div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {POS_INTEGRATIONS.filter(p => !isConnected(p.id) && p.status !== 'soon').map(pos => (
                 <PosCard key={pos.id} pos={pos} connected={false} onClick={() => openModal(pos)} />
               ))}
@@ -374,7 +374,7 @@ function PosSection({ tables, restaurantId }: { tables: TableRef[]; restaurantId
           {/* Soon */}
           <div>
             <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Bientôt disponibles</div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {POS_INTEGRATIONS.filter(p => p.status === 'soon').map(pos => (
                 <PosCard key={pos.id} pos={pos} connected={false} onClick={() => {}} />
               ))}
@@ -760,7 +760,7 @@ function QRCodesSection({
         <p className="text-sm text-muted mb-5">
           Chaque QR code ouvre directement la page de paiement pour la table correspondante.
         </p>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {tables.map(table => {
             const url = `${baseUrl}/t/${restaurantSlug}/${table.number}`
             return (
@@ -1288,7 +1288,7 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
       {showPlans && (
         <div className="bg-white rounded-xl border border-border shadow-card p-6">
           <h3 className="text-base font-bold text-dark mb-5">Choisir un plan</h3>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {PLANS.map(plan => (
               <div
                 key={plan.id}
@@ -1742,24 +1742,26 @@ export function Settings() {
   return (
     <RestaurantLayout>
       <Topbar title="Paramètres" subtitle="Gérez votre établissement" />
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="flex gap-5 h-full">
+      <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6">
+        <div className="flex flex-col md:flex-row gap-5 min-h-full">
           {/* Sub-nav */}
-          <aside className="w-[230px] shrink-0">
+          <aside className="w-full md:w-[230px] md:shrink-0">
             <div className="bg-white rounded-xl border border-border shadow-card overflow-hidden">
-              {SUB_NAV.map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setSection(key)}
-                  className={`w-full text-left px-4 py-3 text-sm font-medium border-b border-border last:border-b-0 transition-colors ${
-                    section === key
-                      ? 'bg-brand-bg text-brand border-l-[3px] border-l-brand pl-[13px]'
-                      : 'text-mid hover:bg-bg border-l-[3px] border-l-transparent pl-[13px]'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+              <div className="flex overflow-x-auto md:block">
+                {SUB_NAV.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setSection(key)}
+                    className={`shrink-0 md:w-full text-left px-4 py-2.5 md:py-3 text-sm font-medium md:border-b md:last:border-b-0 border-border transition-colors whitespace-nowrap ${
+                      section === key
+                        ? 'md:bg-brand-bg text-brand md:border-l-[3px] md:border-l-brand md:pl-[13px] font-semibold border-b-2 border-b-brand'
+                        : 'text-mid hover:bg-bg md:border-l-[3px] md:border-l-transparent md:pl-[13px]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </aside>
 
@@ -1873,11 +1875,16 @@ export function Settings() {
             )}
 
             {section === 'qr' && (
-              <QRCodesSection
-                tables={(rawTables ?? []) as { number: number; capacity: number }[]}
-                restaurantSlug={restaurant?.slug ?? ''}
-  
-              />
+              rawTables === undefined ? (
+                <div className="bg-white rounded-xl border border-border shadow-card p-12 flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
+                <QRCodesSection
+                  tables={rawTables as { number: number; capacity: number }[]}
+                  restaurantSlug={restaurant?.slug ?? ''}
+                />
+              )
             )}
 
             {section === 'menu' && (
