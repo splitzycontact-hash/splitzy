@@ -72,14 +72,15 @@ export function Logos() {
         </m.div>
 
         {/* Mobile: infinite marquee */}
-        <div className="md:hidden mt-8 marquee-mask overflow-hidden">
+        <div className="md:hidden mt-8 overflow-hidden">
           <m.div
-            className="flex items-center gap-x-10 whitespace-nowrap"
+            className="flex items-center gap-x-12"
+            style={{ width: 'max-content' }}
             animate={{ x: ['0%', '-50%'] }}
             transition={{ duration: 28, ease: 'linear', repeat: Infinity }}
           >
             {[...RESTAURANT_LOGOS, ...RESTAURANT_LOGOS].map((logo, i) => (
-              <div key={i} className="opacity-40">
+              <div key={i} className="opacity-40 shrink-0">
                 <LogoWordmark logo={logo} />
               </div>
             ))}
