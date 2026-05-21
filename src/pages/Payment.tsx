@@ -23,30 +23,31 @@ export function Payment() {
 
   const totalStr = formatEur(total).replace('€', '')
 
-  const handlePay = async (method: string) => {
+  const handlePay = (method: string) => {
     setLoading(method)
-    try {
-      if (state.convexRestaurantId && state.convexTableId) {
-        await createPayment({
-          restaurantId: state.convexRestaurantId as Id<'restaurants'>,
-          tableId: state.convexTableId as Id<'tables'>,
-          tableNumber: state.tableNumber,
-          guests: state.equalSplitCount ?? 1,
-          subtotalCents: subtotal,
-          tipCents: tipAmount,
-          commissionCents: splitzyFee,
-          totalCents: total,
-          paymentMethod: method,
-        }).catch(() => {})
-      }
-      if (state.convexTableId) {
-        await updateTableStatus({
-          tableId: state.convexTableId as Id<'tables'>,
-          status: 'paid',
-          amountCents: total,
-        }).catch(() => {})
-      }
-    } catch {}
+    // Fire-and-forget : la navigation ne doit pas attendre la WS Convex.
+    // Safari iOS peut suspendre la WS — un `await` ici resterait pending
+    // indéfiniment (le .catch ne se déclenche que sur rejet, pas sur pending).
+    if (state.convexRestaurantId && state.convexTableId) {
+      void createPayment({
+        restaurantId: state.convexRestaurantId as Id<'restaurants'>,
+        tableId: state.convexTableId as Id<'tables'>,
+        tableNumber: state.tableNumber,
+        guests: state.equalSplitCount ?? 1,
+        subtotalCents: subtotal,
+        tipCents: tipAmount,
+        commissionCents: splitzyFee,
+        totalCents: total,
+        paymentMethod: method,
+      }).catch(() => {})
+    }
+    if (state.convexTableId) {
+      void updateTableStatus({
+        tableId: state.convexTableId as Id<'tables'>,
+        status: 'paid',
+        amountCents: total,
+      }).catch(() => {})
+    }
     dispatch({ type: 'CONFIRM_PAYMENT' })
     navigate('/confirmation')
   }
@@ -188,6 +189,8 @@ export function Payment() {
               flex: 1, height: 50, borderRadius: 12, border: 0, background: '#000', color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               fontSize: 17, fontWeight: 500, cursor: 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
               opacity: loading && loading !== 'apple_pay' ? 0.5 : 1,
             }}
           >
@@ -211,6 +214,8 @@ export function Payment() {
               flex: 1, height: 50, borderRadius: 12, border: '1px solid #E4E4E7', background: '#fff', color: '#3C4043',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
               opacity: loading && loading !== 'google_pay' ? 0.5 : 1,
             }}
           >
@@ -256,6 +261,8 @@ export function Payment() {
             fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             boxShadow: '0 10px 28px -8px rgba(232,146,10,0.55), inset 0 0 0 1px rgba(255,255,255,0.12)',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
             opacity: loading && loading !== selectedCard.brand.toLowerCase() ? 0.5 : 1,
           }}
         >
