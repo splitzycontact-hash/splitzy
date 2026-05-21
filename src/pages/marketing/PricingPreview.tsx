@@ -1,101 +1,147 @@
 import { m } from 'framer-motion'
 import { fadeInUp, useFadeInView } from './shared'
-import { IconCheck, IconArrowRight, IconSparkles } from './Icons'
+import { IconCheck } from './Icons'
 
-const PLANS = [
+interface Plan {
+  id: string
+  name: string
+  price: string
+  period: string
+  desc: string
+  features: string[]
+  cta: string
+  href: string
+  highlighted?: boolean
+  badge?: string
+  ctaStyle: 'ghost' | 'filled' | 'dark'
+}
+
+const PLANS: Plan[] = [
   {
     id: 'free',
-    name: 'Gratuit',
-    description: 'Pour démarrer sans engagement.',
-    price: '0',
-    period: '/ mois',
+    name: 'GRATUIT',
+    price: '0€',
+    period: '/mois',
+    desc: 'Pour tester sans risque',
     features: [
-      "Jusqu'à 50 règlements / mois",
-      'QR codes illimités',
-      'Apple Pay & Google Pay',
+      "Jusqu'à 3 tables",
+      '10 feedbacks / mois',
+      'Dashboard basique',
       'Support par email',
     ],
-    cta: 'Commencer',
+    cta: 'Commencer →',
     href: '/restaurant/onboarding',
-    popular: false,
+    ctaStyle: 'ghost',
+  },
+  {
+    id: 'essentiel',
+    name: 'ESSENTIEL',
+    price: '59€',
+    period: '/mois HT',
+    desc: 'Pour protéger votre réputation',
+    features: [
+      'Tables illimitées',
+      'Feedbacks illimités',
+      'Notifications temps réel',
+      'Analytics avancés',
+      'Export données clients',
+      'Frais bancaires inclus',
+    ],
+    cta: "Démarrer l'essai →",
+    href: '/restaurant/onboarding?plan=essentiel',
+    highlighted: true,
+    badge: 'LE PLUS POPULAIRE',
+    ctaStyle: 'filled',
   },
   {
     id: 'pro',
-    name: 'Pro',
-    description: 'Pour les restaurants qui tournent.',
-    price: '49',
-    period: '/ mois HT',
+    name: 'PRO',
+    price: '99€',
+    period: '/mois HT',
+    desc: 'Pour les établissements ambitieux',
     features: [
-      'Règlements illimités',
-      'Dashboard temps réel & exports',
-      'Multi-utilisateurs (équipe)',
-      'Notifications instantanées',
-      'Support prioritaire 7j/7',
+      'Tout le plan Essentiel',
+      'Intégrations POS',
+      'White-label',
+      'Multi-établissements',
+      'Support téléphonique',
     ],
-    cta: 'Essai 14 jours',
-    href: '/restaurant/onboarding?plan=pro',
-    popular: true,
+    cta: 'Nous contacter →',
+    href: '/contact?sujet=Pro',
+    ctaStyle: 'dark',
   },
 ]
-
-type Plan = typeof PLANS[number]
 
 function PlanCard({ plan }: { plan: Plan }) {
   return (
     <m.div
       variants={fadeInUp}
-      whileHover={{ y: -3, transition: { duration: 0.2 } }}
-      className={
-        'relative rounded-2xl p-7 md:p-8 flex flex-col h-full transition-all duration-300 ' +
-        (plan.popular
-          ? 'bg-white border-2 border-orange-600 shadow-2xl shadow-orange-600/15'
-          : 'bg-white border border-ink-100 hover:border-ink-200 hover:shadow-lg')
-      }
+      whileHover={{ y: -5, transition: { duration: 0.2 } }}
+      className="relative bg-white rounded-2xl flex flex-col"
+      style={{
+        border: plan.highlighted ? '2px solid #E8920A' : '1px solid #E4E4E7',
+        boxShadow: plan.highlighted ? '0 16px 48px rgba(232,146,10,0.12)' : undefined,
+        padding: plan.highlighted ? '40px 28px 28px' : '28px',
+      }}
     >
-      {plan.popular && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-orange-600 text-white text-[11px] font-semibold uppercase tracking-wider shadow-md shadow-orange-600/30">
-          <IconSparkles size={11} stroke={2.4} />
-          Le plus populaire
-        </span>
+      {/* Badge */}
+      {plan.badge && (
+        <div
+          className="absolute -top-[14px] left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full text-white text-[11px] font-bold uppercase tracking-[0.08em] whitespace-nowrap"
+          style={{ background: '#E8920A' }}
+        >
+          {plan.badge}
+        </div>
       )}
 
-      <header>
-        <h3 className="text-[20px] font-semibold text-ink-900">{plan.name}</h3>
-        <p className="mt-1.5 text-[14px] text-ink-500">{plan.description}</p>
-      </header>
-
-      <div className="mt-6 flex items-baseline gap-1">
-        <span className="text-[44px] md:text-[52px] font-bold text-ink-900 leading-none tabular-nums">
-          {plan.price}€
-        </span>
-        <span className="text-[14px] text-ink-500">{plan.period}</span>
+      {/* Plan name */}
+      <div className="text-[12px] font-bold uppercase tracking-[0.08em] mb-3" style={{ color: '#52525B' }}>
+        {plan.name}
       </div>
 
-      <ul className="mt-6 space-y-3 flex-1">
+      {/* Price */}
+      <div className="flex items-baseline gap-1.5 mb-1">
+        <span
+          className="font-black leading-none tabular-nums"
+          style={{ fontSize: 40, color: '#0A0A0A', letterSpacing: '-0.03em' }}
+        >
+          {plan.price}
+        </span>
+        <span className="text-[14px]" style={{ color: '#52525B' }}>{plan.period}</span>
+      </div>
+      <p className="text-[14px] mb-5" style={{ color: '#52525B' }}>{plan.desc}</p>
+
+      {/* Divider */}
+      <div className="border-t mb-5" style={{ borderColor: '#E4E4E7' }} />
+
+      {/* Features */}
+      <ul className="space-y-3 flex-1">
         {plan.features.map((f) => (
           <li key={f} className="flex items-start gap-2.5">
-            <span className={
-              'shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full mt-0.5 ' +
-              (plan.popular ? 'bg-orange-100 text-orange-700' : 'bg-ink-100 text-ink-600')
-            }>
-              <IconCheck size={12} stroke={2.6} />
+            <span
+              className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full mt-0.5"
+              style={{ background: '#F0FDF4', color: '#22C55E' }}
+            >
+              <IconCheck size={10} stroke={2.8} />
             </span>
-            <span className="text-[14px] leading-[1.55] text-ink-700">{f}</span>
+            <span className="text-[14px] leading-snug" style={{ color: '#0A0A0A' }}>{f}</span>
           </li>
         ))}
       </ul>
 
+      {/* CTA */}
       <a
         href={plan.href}
-        className={
-          'mt-8 inline-flex items-center justify-center gap-1.5 w-full px-6 py-3.5 rounded-xl font-medium text-[15px] transition-all duration-200 ' +
-          (plan.popular
-            ? 'bg-orange-600 text-white hover:bg-orange-700 shadow-lg shadow-orange-600/30 hover:shadow-xl hover:shadow-orange-600/40 hover:-translate-y-0.5'
-            : 'bg-ink-900 text-white hover:bg-ink-800 hover:-translate-y-0.5')
+        className="mt-7 inline-flex items-center justify-center w-full px-5 py-3.5 rounded-xl text-[15px] font-semibold transition-opacity hover:opacity-85"
+        style={
+          plan.ctaStyle === 'filled'
+            ? { background: '#E8920A', color: '#FFFFFF' }
+            : plan.ctaStyle === 'dark'
+            ? { background: 'transparent', border: '1px solid #0A0A0A', color: '#0A0A0A' }
+            : { background: 'transparent', border: '1px solid #E4E4E7', color: '#0A0A0A' }
         }
       >
         {plan.cta}
-        <IconArrowRight size={15} />
       </a>
     </m.div>
   )
@@ -105,56 +151,75 @@ export function PricingPreview() {
   const { ref, inView } = useFadeInView()
 
   return (
-    <section
-      id="tarifs"
-      className="relative py-16 md:py-24 bg-white"
-      aria-labelledby="pricing-heading"
-    >
+    <section id="tarifs" className="py-24 md:py-32" style={{ background: '#FAFAFA' }}>
       <div ref={ref} className="max-w-6xl mx-auto px-4 md:px-6">
-        <m.div
-          className="text-center"
-          initial="hidden"
-          animate={inView ? 'visible' : 'hidden'}
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
-        >
+        {/* Header */}
+        <div className="text-center mb-14">
           <m.span
-            variants={fadeInUp}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold uppercase tracking-[0.08em]"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4 }}
+            className="inline-block text-[11px] font-bold uppercase tracking-[0.12em] mb-5"
+            style={{ color: '#E8920A' }}
           >
             Tarifs
           </m.span>
-          <m.h2
-            id="pricing-heading"
-            variants={fadeInUp}
-            className="mt-5 text-[28px] md:text-[40px] font-bold text-ink-900 leading-[1.15] text-balance"
-          >
-            Un tarif simple et transparent.
-          </m.h2>
-          <m.p
-            variants={fadeInUp}
-            className="mt-4 text-[16px] md:text-[18px] text-ink-500 max-w-xl mx-auto leading-[1.6]"
-          >
-            Commencez gratuitement, évoluez quand vous êtes prêts.
-          </m.p>
-        </m.div>
 
+          <m.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45, delay: 0.08 }}
+            className="text-balance"
+            style={{ fontWeight: 900, fontSize: 'clamp(28px, 4.5vw, 48px)', lineHeight: 1.05, letterSpacing: '-0.03em', color: '#0A0A0A' }}
+          >
+            Simple. Transparent.
+            <br />
+            Sans surprise.
+          </m.h2>
+
+          <m.p
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45, delay: 0.18 }}
+            className="mt-5 text-[16px] leading-[1.6] max-w-[440px] mx-auto"
+            style={{ color: '#52525B' }}
+          >
+            Aucune commission prélevée sur vos clients. Jamais.
+          </m.p>
+        </div>
+
+        {/* Cards */}
         <m.div
-          className="mt-12 md:mt-14 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-3xl mx-auto"
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-5 items-center max-w-[920px] mx-auto"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08, delayChildren: 0.15 } } }}
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1, delayChildren: 0.15 } } }}
         >
           {PLANS.map((p) => (
             <PlanCard key={p.id} plan={p} />
           ))}
         </m.div>
 
-        <p className="mt-10 text-center text-[14px] text-ink-500">
-          Besoin de plus ?{' '}
-          <a href="/pricing" className="text-orange-600 font-medium hover:text-orange-700">
-            Voir tous les détails →
+        {/* Details link */}
+        <m.p
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="mt-8 text-center text-[14px]"
+          style={{ color: '#52525B' }}
+        >
+          <a
+            href="/pricing"
+            className="underline underline-offset-4 font-medium hover:opacity-80 transition-opacity"
+            style={{ color: '#E8920A' }}
+          >
+            Voir tous les détails, la FAQ et le comparatif concurrents →
           </a>
-        </p>
+        </m.p>
       </div>
     </section>
   )

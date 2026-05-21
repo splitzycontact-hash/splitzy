@@ -1,37 +1,53 @@
-import { useState } from 'react'
-import { m } from 'framer-motion'
+import { useRef, useState } from 'react'
+import { m, useMotionValue, useSpring } from 'framer-motion'
 import { fadeInUp, useFadeInView } from './shared'
-import { IconQuote, IconStar } from './Icons'
+
+function TextReveal({ children }: { children: string }) {
+  const words = children.split(' ')
+  return (
+    <span>
+      {words.map((word, i) => (
+        <m.span
+          key={i}
+          style={{ display: 'inline-block' }}
+          initial={{ opacity: 0, y: 22 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-20px' }}
+          transition={{ duration: 0.5, delay: i * 0.07, ease: [0.25, 0.46, 0.45, 0.94] }}
+        >
+          {word}{i < words.length - 1 ? ' ' : ''}
+        </m.span>
+      ))}
+    </span>
+  )
+}
 
 const TESTIMONIALS = [
   {
-    name: 'Camille Dorel',
-    role: 'Gérante',
-    restaurant: 'La Belle Époque',
-    city: 'Lyon',
-    initials: 'CD',
-    color: '#E8920A',
-    quote: "On a divisé par 3 le temps passé sur les additions le vendredi soir. Mes serveurs sont enfin disponibles pour les clients, pas pour la calculatrice.",
+    quote: "Splitzy m'a permis de récupérer un client mécontent avant qu'il ne laisse un avis 1 étoile. En deux messages, le problème était réglé. C'est la première fois qu'un outil fait vraiment ça.",
+    name: 'Marie D.',
+    restaurant: 'Le Petit Zinc — Paris 6e',
+    initials: 'MD',
+    bgColor: '#FFF4E5',
+    textColor: '#E8920A',
     stars: 5,
   },
   {
-    name: 'Marc Pellegrini',
-    role: 'Patron',
-    restaurant: 'Chez Marcel',
-    city: 'Bordeaux',
-    initials: 'MP',
-    color: '#3B82F6',
-    quote: "Mes clients adorent — surtout les groupes. Plus de gêne au moment de l'addition, chacun paie sa part et tout le monde repart de bonne humeur.",
+    quote: "On a passé notre note Google de 4,1 à 4,4 en deux mois. Les feedbacks négatifs qu'on recevait avant partaient directement sur Google. Maintenant ils viennent chez nous et on peut réagir.",
+    name: 'Thomas R.',
+    restaurant: 'Brasserie du Marché — Paris 11e',
+    initials: 'TR',
+    bgColor: '#18181B',
+    textColor: '#FFFFFF',
     stars: 5,
   },
   {
-    name: 'Jeanne Achkar',
-    role: 'Cheffe propriétaire',
-    restaurant: 'Petit Bistrot',
-    city: 'Marseille',
-    initials: 'JA',
-    color: '#059669',
-    quote: "Installé en un après-midi. L'équipe Splitzy a configuré notre menu, on s'est concentrés sur le service. Aucun matériel à acheter, c'est rare.",
+    quote: "Le setup a pris 10 minutes. Dès le premier soir, on a reçu trois feedbacks. Dont un insatisfait qu'on a pu rappeler le lendemain. Il est revenu la semaine d'après.",
+    name: 'Sophie C.',
+    restaurant: "L'Ardoise — Paris 9e",
+    initials: 'SC',
+    bgColor: '#FFF4E5',
+    textColor: '#E8920A',
     stars: 5,
   },
 ]
@@ -39,38 +55,73 @@ const TESTIMONIALS = [
 type Testimonial = typeof TESTIMONIALS[number]
 
 function TestimonialCard({ t }: { t: Testimonial }) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const mx = useMotionValue(0)
+  const my = useMotionValue(0)
+  const rotateY = useSpring(mx, { stiffness: 300, damping: 30 })
+  const rotateX = useSpring(my, { stiffness: 300, damping: 30 })
+
+  function onMouseMove(e: React.MouseEvent) {
+    if (!cardRef.current) return
+    const rect = cardRef.current.getBoundingClientRect()
+    mx.set(((e.clientX - rect.left) / rect.width - 0.5) * 10)
+    my.set(-((e.clientY - rect.top) / rect.height - 0.5) * 10)
+  }
+
+  function onMouseLeave() {
+    mx.set(0)
+    my.set(0)
+  }
+
   return (
-    <m.figure
+    <m.div
       variants={fadeInUp}
-      whileHover={{ y: -3, transition: { duration: 0.2 } }}
-      className="relative bg-white border border-ink-100 rounded-2xl p-7 md:p-8 h-full flex flex-col hover:border-orange-200 hover:shadow-xl hover:shadow-orange-600/5 transition-all duration-300"
+      style={{ perspective: '1000px' }}
+      className="h-full"
     >
-      <span aria-hidden="true" className="absolute -top-3 left-7 text-orange-500/80">
-        <IconQuote size={26} />
-      </span>
-      <div className="flex items-center gap-0.5 text-orange-500 mb-4">
-        {Array.from({ length: t.stars }).map((_, i) => (
-          <IconStar key={i} size={16} />
-        ))}
-      </div>
-      <blockquote className="text-[15px] md:text-[16px] leading-[1.65] text-ink-700 flex-1">
-        « {t.quote} »
-      </blockquote>
-      <figcaption className="mt-6 pt-6 border-t border-ink-100 flex items-center gap-3">
-        <div
-          className="shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-white text-[14px] font-bold"
-          style={{ background: t.color }}
-        >
-          {t.initials}
+      <m.div
+        ref={cardRef}
+        style={{ rotateX, rotateY }}
+        initial={{ borderColor: '#E4E4E7' }}
+        whileHover={{ borderColor: '#E8920A', boxShadow: '0 8px 32px rgba(0,0,0,0.08)', transition: { duration: 0.2 } }}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+        className="bg-white rounded-[12px] p-7 border flex flex-col h-full cursor-default"
+      >
+        {/* Stars */}
+        <div className="flex items-center gap-0.5 mb-5">
+          {Array.from({ length: t.stars }).map((_, i) => (
+            <span key={i} className="text-[18px]" style={{ color: '#E8920A' }}>★</span>
+          ))}
         </div>
-        <div className="min-w-0">
-          <p className="text-[14px] font-semibold text-ink-900 truncate">{t.name}</p>
-          <p className="text-[12px] text-ink-500 truncate">
-            {t.role} · {t.restaurant} · {t.city}
-          </p>
+
+        {/* Quote */}
+        <p className="text-[15px] leading-[1.7] flex-1" style={{ color: '#0A0A0A', fontStyle: 'italic' }}>
+          "{t.quote}"
+        </p>
+
+        {/* Separator */}
+        <div className="my-5 border-t" style={{ borderColor: '#E4E4E7' }} />
+
+        {/* Author */}
+        <div className="flex items-center gap-3">
+          <div
+            className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-bold"
+            style={{ background: t.bgColor, color: t.textColor }}
+          >
+            {t.initials}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[14px] font-semibold truncate" style={{ color: '#0A0A0A' }}>
+              {t.name}
+            </p>
+            <p className="text-[13px] truncate" style={{ color: '#52525B' }}>
+              {t.restaurant}
+            </p>
+          </div>
         </div>
-      </figcaption>
-    </m.figure>
+      </m.div>
+    </m.div>
   )
 }
 
@@ -79,39 +130,48 @@ export function Testimonials() {
   const [index, setIndex] = useState(0)
 
   return (
-    <section
-      id="temoignages"
-      className="relative py-16 md:py-24 bg-ink-50"
-      aria-labelledby="testimonials-heading"
-    >
+    <section id="temoignages" className="py-24 md:py-32" style={{ background: '#FAFAFA' }}>
       <div ref={ref} className="max-w-6xl mx-auto px-4 md:px-6">
-        <m.div
-          className="text-center"
-          initial="hidden"
-          animate={inView ? 'visible' : 'hidden'}
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
-        >
+        {/* Header */}
+        <div className="text-center mb-14 md:mb-16">
           <m.span
-            variants={fadeInUp}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold uppercase tracking-[0.08em]"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4 }}
+            className="inline-block text-[11px] font-bold uppercase tracking-[0.12em] mb-5"
+            style={{ color: '#E8920A' }}
           >
-            Ils en parlent mieux que nous
+            Ils en parlent
           </m.span>
-          <m.h2
-            id="testimonials-heading"
-            variants={fadeInUp}
-            className="mt-5 text-[28px] md:text-[40px] font-bold text-ink-900 leading-[1.15] text-balance max-w-2xl mx-auto"
+
+          <h2
+            className="text-balance"
+            style={{ fontWeight: 900, fontSize: 'clamp(28px, 4.5vw, 48px)', lineHeight: 1.05, letterSpacing: '-0.03em', color: '#0A0A0A' }}
           >
-            Nos restaurants adorent Splitzy.
-          </m.h2>
-        </m.div>
+            <TextReveal>{"Ils ont protégé"}</TextReveal>
+            <br />
+            <TextReveal>{"leur note Google."}</TextReveal>
+          </h2>
+
+          <m.p
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45, delay: 0.3 }}
+            className="mt-5 text-[16px] leading-[1.6] max-w-[480px] mx-auto"
+            style={{ color: '#52525B' }}
+          >
+            Des restaurants parisiens qui utilisent Splitzy au quotidien.
+          </m.p>
+        </div>
 
         {/* Desktop grid */}
         <m.div
-          className="hidden md:grid mt-14 grid-cols-3 gap-6 lg:gap-8"
+          className="hidden md:grid grid-cols-3 gap-6 lg:gap-8"
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08, delayChildren: 0.15 } } }}
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } } }}
         >
           {TESTIMONIALS.map((t) => (
             <TestimonialCard key={t.name} t={t} />
@@ -119,7 +179,7 @@ export function Testimonials() {
         </m.div>
 
         {/* Mobile carousel */}
-        <div className="md:hidden mt-10">
+        <div className="md:hidden">
           <div className="overflow-hidden">
             <m.div
               className="flex"
@@ -140,14 +200,31 @@ export function Testimonials() {
                 type="button"
                 onClick={() => setIndex(i)}
                 aria-label={`Témoignage ${i + 1}`}
-                className={
-                  'h-2 rounded-full transition-all duration-200 ' +
-                  (i === index ? 'w-6 bg-orange-600' : 'w-2 bg-ink-300')
-                }
+                className="h-2 rounded-full transition-all duration-200"
+                style={{ width: i === index ? 24 : 8, background: i === index ? '#E8920A' : '#D4D4D4' }}
               />
             ))}
           </div>
         </div>
+
+        {/* Trust line */}
+        <m.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.45, delay: 0.3 }}
+          className="mt-12 text-center"
+          style={{ color: '#52525B', fontSize: 14 }}
+        >
+          Rejoignez +47 établissements parisiens qui protègent leur réputation.{' '}
+          <a
+            href="/restaurant/onboarding"
+            className="underline underline-offset-4 font-medium hover:opacity-80 transition-opacity"
+            style={{ color: '#E8920A' }}
+          >
+            Commencer gratuitement →
+          </a>
+        </m.div>
       </div>
     </section>
   )

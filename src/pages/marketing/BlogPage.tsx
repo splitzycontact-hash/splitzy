@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 
@@ -17,7 +18,7 @@ const COVERS: Record<string, React.CSSProperties> = {
 // ── Data ─────────────────────────────────────────────────────────────────────
 const ARTICLES = [
   {
-    id: 1, cover: 'stripes-warm',
+    id: 1, slug: 'comparatif-sunday-pleez-obypay', cover: 'stripes-warm',
     category: 'Comparatif', catStyle: { color: '#7A4D05', background: 'rgba(255,255,255,0.8)' } as React.CSSProperties,
     date: '14 mai', readTime: '8 min',
     title: 'Sunday, Pleez, Obypay : on a comparé honnêtement.',
@@ -27,7 +28,7 @@ const ARTICLES = [
     bigLabel: null as string | null,
   },
   {
-    id: 2, cover: 'stripes-dark',
+    id: 2, slug: 'quelle-heure-avis-google-ecrits', cover: 'stripes-dark',
     category: 'Data', catStyle: { color: 'white', background: 'rgba(255,255,255,0.15)' } as React.CSSProperties,
     date: '07 mai', readTime: '4 min',
     title: 'À quelle heure les avis Google sont vraiment écrits ?',
@@ -37,17 +38,17 @@ const ARTICLES = [
     bigLabel: '21:43',
   },
   {
-    id: 3, cover: 'grid-cream',
+    id: 3, slug: 'repondre-avis-1-etoile', cover: 'grid-cream',
     category: 'Opinion', catStyle: { color: '#0A0A0A', background: 'white' } as React.CSSProperties,
     date: '29 avril', readTime: '6 min',
-    title: 'Restaurateurs : comment répondre à un avis 1 étoile sans s\'humilier.',
-    excerpt: '3 patrons parisiens nous racontent leur méthode. Aucun ne supplie. Aucun n\'ignore. Voici le bon milieu.',
+    title: "Restaurateurs : comment répondre à un avis 1 étoile sans s'humilier.",
+    excerpt: "3 patrons parisiens nous racontent leur méthode. Aucun ne supplie. Aucun n'ignore. Voici le bon milieu.",
     author: { initials: 'TJ', name: 'Théo Jamous', bg: '#0A0A0A' },
     dark: false,
     bigLabel: null,
   },
   {
-    id: 4, cover: 'cream-block',
+    id: 4, slug: 'guide-pourboire-france-2026', cover: 'cream-block',
     category: 'Guide', catStyle: { color: '#7A4D05', background: 'rgba(255,255,255,0.8)' } as React.CSSProperties,
     date: '22 avril', readTime: '12 min',
     title: 'Le guide complet du pourboire en France en 2026.',
@@ -57,7 +58,7 @@ const ARTICLES = [
     bigLabel: null,
   },
   {
-    id: 5, cover: 'dot-light',
+    id: 5, slug: 'pourquoi-clients-abandonnent-paiement', cover: 'dot-light',
     category: 'UX', catStyle: { color: '#0A0A0A', background: 'white' } as React.CSSProperties,
     date: '15 avril', readTime: '7 min',
     title: 'Pourquoi vos clients abandonnent au moment de payer.',
@@ -67,17 +68,17 @@ const ARTICLES = [
     bigLabel: null,
   },
   {
-    id: 6, cover: 'dot-dark',
+    id: 6, slug: 'installation-100-restaurants', cover: 'dot-dark',
     category: 'Backstage', catStyle: { color: 'white', background: 'rgba(255,255,255,0.15)' } as React.CSSProperties,
     date: '02 avril', readTime: '9 min',
-    title: 'On a installé Splitzy chez 100 restos. Voici ce qu\'on a appris.',
+    title: "On a installé Splitzy chez 100 restos. Voici ce qu'on a appris.",
     excerpt: "L'imprimante qui ne marche pas, le wifi en sous-sol, le serveur qui refuse de scanner. Le terrain bat les slides.",
     author: { initials: 'YG', name: 'Yann Grigoriev', bg: '#E8920A' },
     dark: false,
     bigLabel: null,
   },
   {
-    id: 7, cover: 'dark-editorial',
+    id: 7, slug: 'premium-qui-veut-dire-cher', cover: 'dark-editorial',
     category: 'Opinion', catStyle: {} as React.CSSProperties,
     date: '26 mars', readTime: '5 min',
     title: null,
@@ -87,17 +88,17 @@ const ARTICLES = [
     bigLabel: null,
   },
   {
-    id: 8, cover: 'stripes-cool',
+    id: 8, slug: 'tva-partage-addition-loi', cover: 'stripes-cool',
     category: 'Juridique', catStyle: { color: '#0A0A0A', background: 'white' } as React.CSSProperties,
     date: '19 mars', readTime: '11 min',
-    title: 'TVA et partage d\'addition : ce que dit vraiment la loi.',
-    excerpt: 'Un comptable, un avocat fiscaliste et nous. On a démêlé les règles. Spoiler : c\'est plus simple qu\'on pense.',
+    title: "TVA et partage d'addition : ce que dit vraiment la loi.",
+    excerpt: "Un comptable, un avocat fiscaliste et nous. On a démêlé les règles. Spoiler : c'est plus simple qu'on pense.",
     author: { initials: 'TJ', name: 'Théo Jamous', bg: '#0A0A0A' },
     dark: false,
     bigLabel: null,
   },
   {
-    id: 9, cover: 'stars-grad',
+    id: 9, slug: 'lardoise-plus-03-etoiles-3-mois', cover: 'stars-grad',
     category: 'Étude de cas', catStyle: { color: '#7A4D05', background: 'rgba(255,255,255,0.85)' } as React.CSSProperties,
     date: '12 mars', readTime: '8 min',
     title: "L'Ardoise : comment ils ont récupéré 0,3 étoiles en 3 mois.",
@@ -387,7 +388,7 @@ export function BlogPage() {
           </div>
 
           {/* Featured article */}
-          <a href="#" className="blog-post group block bg-white border border-zinc-200 rounded-3xl overflow-hidden mb-10">
+          <Link to="/blog/3-avis-50000-euros" onClick={() => window.scrollTo(0, 0)} className="blog-post group block bg-white border border-zinc-200 rounded-3xl overflow-hidden mb-10">
             <div className="grid grid-cols-1 lg:grid-cols-2">
               <div className="relative overflow-hidden aspect-[16/10] lg:aspect-auto" style={{ background: '#E8920A' }}>
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -426,14 +427,14 @@ export function BlogPage() {
                 </div>
               </div>
             </div>
-          </a>
+          </Link>
 
           {/* Article grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {ARTICLES.map(article => {
               if (article.dark) {
                 return (
-                  <a key={article.id} href="#" className="blog-post group rounded-2xl overflow-hidden flex flex-col p-7 border" style={{ background: '#0A0A0A', borderColor: 'rgba(255,255,255,0.05)' }}>
+                  <Link key={article.id} to={`/blog/${article.slug}`} onClick={() => window.scrollTo(0, 0)} className="blog-post group rounded-2xl overflow-hidden flex flex-col p-7 border" style={{ background: '#0A0A0A', borderColor: 'rgba(255,255,255,0.05)' }}>
                     <div className="flex items-center justify-between">
                       <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold" style={{ background: 'rgba(232,146,10,0.12)', color: '#E8920A' }}>
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#E8920A' }} />
@@ -456,12 +457,12 @@ export function BlogPage() {
                         <ArrowUpRight color="#E8920A" />
                       </div>
                     </div>
-                  </a>
+                  </Link>
                 )
               }
 
               return (
-                <a key={article.id} href="#" className="blog-post group bg-white border border-zinc-200 rounded-2xl overflow-hidden flex flex-col">
+                <Link key={article.id} to={`/blog/${article.slug}`} onClick={() => window.scrollTo(0, 0)} className="blog-post group bg-white border border-zinc-200 rounded-2xl overflow-hidden flex flex-col">
                   <ArticleCover article={article} />
                   <div className="p-6 flex-1 flex flex-col">
                     <p className="text-[11px] tracking-[0.14em] uppercase text-zinc-500 font-semibold">{article.date} · {article.readTime}</p>
@@ -481,7 +482,7 @@ export function BlogPage() {
                       </div>
                     </div>
                   </div>
-                </a>
+                </Link>
               )
             })}
           </div>

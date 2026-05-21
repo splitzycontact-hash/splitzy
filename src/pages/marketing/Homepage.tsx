@@ -4,6 +4,7 @@ import { Logos } from './Logos'
 import { HowItWorks } from './HowItWorks'
 import { Features } from './Features'
 import { Stats } from './Stats'
+import { Solution } from './Solution'
 import { Testimonials } from './Testimonials'
 import { PricingPreview } from './PricingPreview'
 import { Faq } from './Faq'
@@ -20,6 +21,7 @@ export function Homepage() {
         <HowItWorks />
         <Features />
         <Stats />
+        <Solution />
         <Testimonials />
         <PricingPreview />
         <Faq />

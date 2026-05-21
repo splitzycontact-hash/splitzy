@@ -6,7 +6,7 @@ const FOOTER_COLS = [
   {
     title: 'Produit',
     links: [
-      { label: 'Fonctionnalités', to: '/#fonctionnalites' },
+      { label: 'Fonctionnalités', to: '/fonctionnalites' },
       { label: 'Tarifs',          to: '/pricing' },
       { label: 'Démo',            to: '/demo' },
       { label: 'Changelog',       to: '/changelog' },
@@ -17,7 +17,7 @@ const FOOTER_COLS = [
     links: [
       { label: 'À propos',  to: '/about' },
       { label: 'Blog',      to: '/blog' },
-      { label: 'Presse',    to: '/press' },
+      { label: 'Presse',    to: '/presse' },
       { label: 'Carrières', to: '/careers' },
     ],
   },
@@ -25,8 +25,8 @@ const FOOTER_COLS = [
     title: 'Support',
     links: [
       { label: 'Contact',       to: '/contact' },
-      { label: "Centre d'aide", to: '/help' },
-      { label: 'Sécurité',      to: '/security' },
+      { label: "Centre d'aide", to: '/aide' },
+      { label: 'Sécurité',      to: '/securite' },
     ],
   },
 ]
@@ -75,6 +75,7 @@ export function Footer() {
                   <li key={l.to}>
                     <Link
                       to={l.to}
+                      onClick={() => window.scrollTo(0, 0)}
                       className="text-[14px] text-white/75 hover:text-orange-400 transition-colors"
                     >
                       {l.label}
@@ -109,9 +110,9 @@ export function Footer() {
             © {new Date().getFullYear()} Splitzy SAS · Tous droits réservés.
           </p>
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-white/55">
-            <li><Link to="/legal"   className="hover:text-white transition-colors">CGU</Link></li>
-            <li><Link to="/privacy" className="hover:text-white transition-colors">Confidentialité</Link></li>
-            <li><Link to="/legal"   className="hover:text-white transition-colors">Mentions légales</Link></li>
+            <li><Link to="/legal"   onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition-colors">CGU</Link></li>
+            <li><Link to="/privacy" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition-colors">Confidentialité</Link></li>
+            <li><Link to="/legal"   onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition-colors">Mentions légales</Link></li>
             <li className="inline-flex items-center gap-1.5 text-white/40">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse-dot" />
               <a

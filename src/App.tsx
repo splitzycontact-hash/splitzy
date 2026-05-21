@@ -29,6 +29,12 @@ const ContactPage = lazy(() => import('./pages/marketing/ContactPage').then(({ C
 const PricingPage = lazy(() => import('./pages/marketing/PricingPage').then(({ PricingPage }) => ({ default: PricingPage })))
 const CarriersPage = lazy(() => import('./pages/marketing/CarriersPage').then(({ CarriersPage }) => ({ default: CarriersPage })))
 const MarketingPaymentPage = lazy(() => import('./pages/marketing/PaymentPage').then(({ PaymentPage }) => ({ default: PaymentPage })))
+const FonctionnalitesPage = lazy(() => import('./pages/marketing/Fonctionnalites').then(({ FonctionnalitesPage }) => ({ default: FonctionnalitesPage })))
+const ChangelogPage = lazy(() => import('./pages/marketing/Changelog').then(({ ChangelogPage }) => ({ default: ChangelogPage })))
+const PressePage = lazy(() => import('./pages/marketing/PressePage').then(({ PressePage }) => ({ default: PressePage })))
+const AidePage = lazy(() => import('./pages/marketing/AidePage').then(({ AidePage }) => ({ default: AidePage })))
+const SecuritePage = lazy(() => import('./pages/marketing/SecuritePage').then(({ SecuritePage }) => ({ default: SecuritePage })))
+const BlogArticlePage = lazy(() => import('./pages/marketing/BlogArticlePage').then(({ BlogArticlePage }) => ({ default: BlogArticlePage })))
 
 function PageLoader() {
   return (
@@ -92,11 +98,17 @@ export default function App() {
             <Route path="/" element={<Homepage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/blog" element={<BlogPage />} />
+            <Route path="/blog/:slug" element={<BlogArticlePage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/careers" element={<CarriersPage />} />
             <Route path="/how-it-works" element={<MarketingPaymentPage />} />
             <Route path="/demo" element={<MarketingPaymentPage />} />
+            <Route path="/fonctionnalites" element={<FonctionnalitesPage />} />
+            <Route path="/changelog" element={<ChangelogPage />} />
+            <Route path="/presse" element={<PressePage />} />
+            <Route path="/aide" element={<AidePage />} />
+            <Route path="/securite" element={<SecuritePage />} />
 
             {/* Dashboard restaurant — Clerk chargé ici uniquement, absent du bundle initial */}
             <Route path="/restaurant/*" element={<RestaurantRoot />} />
