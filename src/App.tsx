@@ -4,8 +4,11 @@ import { AnimatePresence, LazyMotion, domAnimation } from 'framer-motion'
 import { SessionProvider, useSession } from './context/SessionContext'
 import { PhoneWrapper } from './components/layout/PhoneWrapper'
 
+// TableEntry est l'entrée QR — eager-load pour éviter un round-trip chunk
+// supplémentaire sur Safari iOS (économise 300-500ms sur le chemin critique).
+import { TableEntry } from './pages/TableEntry'
+
 // Consumer flow — chargé à la demande
-const TableEntry   = lazy(() => import('./pages/TableEntry').then(({ TableEntry })     => ({ default: TableEntry })))
 const Landing      = lazy(() => import('./pages/Landing').then(({ Landing })           => ({ default: Landing })))
 const Profile      = lazy(() => import('./pages/Profile').then(({ Profile })           => ({ default: Profile })))
 const Items        = lazy(() => import('./pages/Items').then(({ Items })               => ({ default: Items })))

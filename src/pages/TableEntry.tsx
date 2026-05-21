@@ -6,6 +6,19 @@ import { api } from '../../convex/_generated/api'
 import { useSession } from '../context/SessionContext'
 import { TABLE_TOTAL_CENTS } from '../data/session'
 
+declare global {
+  interface Window {
+    __tableBootstrap?: Promise<unknown>
+  }
+}
+
+type LiveContext = ReturnType<typeof useQuery<typeof api.restaurants.getTableContext>>
+type Bootstrap = NonNullable<LiveContext> | null
+
+function isBootstrap(v: unknown): v is NonNullable<Bootstrap> {
+  return !!v && typeof v === 'object' && 'restaurant' in (v as object) && 'table' in (v as object)
+}
+
 export function TableEntry() {
   const { slug, tableNumber } = useParams<{ slug: string; tableNumber: string }>()
   const navigate = useNavigate()
@@ -13,15 +26,40 @@ export function TableEntry() {
   const updateStatus = useMutation(api.tables.updateStatus)
   const [timedOut, setTimedOut] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
+  const [bootstrap, setBootstrap] = useState<NonNullable<Bootstrap> | null | undefined>(undefined)
 
   // Ref utilisé comme verrou : empêche le double-fire de l'effet en StrictMode
   // et sur les re-renders entre le dispatch et la navigation.
   const navigated = useRef(false)
 
-  const context = useQuery(api.restaurants.getTableContext, {
+  // Lit la pré-requête HTTP lancée depuis index.html avant même que le bundle
+  // ne soit parsé. Court-circuite le cold start WebSocket Safari iOS.
+  useEffect(() => {
+    const promise = typeof window !== 'undefined' ? window.__tableBootstrap : undefined
+    if (!promise) {
+      setBootstrap(null)
+      return
+    }
+    let cancelled = false
+    promise.then(value => {
+      if (cancelled) return
+      setBootstrap(isBootstrap(value) ? (value as NonNullable<Bootstrap>) : null)
+    })
+    return () => { cancelled = true }
+  }, [retryKey])
+
+  const liveContext = useQuery(api.restaurants.getTableContext, {
     slug: slug ?? '',
     tableNumber: Number(tableNumber ?? 0),
   })
+
+  // Priorité au résultat WebSocket (source de vérité, réactive).
+  // Sinon, utilise le bootstrap HTTP s'il a renvoyé une donnée exploitable.
+  // Si le bootstrap a fini sans donnée (null) ou échoué, on attend la WS comme avant.
+  const context: LiveContext =
+    liveContext !== undefined
+      ? liveContext
+      : (bootstrap && isBootstrap(bootstrap) ? bootstrap : undefined)
 
   // Countdown 20s. retryKey redémarre le timer sans reload complet.
   // Toutes les UI d'attente/erreur restent sur /t/:slug/:tableNumber.
