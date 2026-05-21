@@ -82,7 +82,7 @@ export function CtaFinal() {
           className="text-white text-balance"
           style={{ fontWeight: 900, fontSize: 'clamp(34px, 5.5vw, 52px)', lineHeight: 1.05, letterSpacing: '-0.04em' }}
         >
-          <TextReveal>{'Votre prochaine'}</TextReveal>
+          <TextReveal>{'Votre prochaine '}</TextReveal>
           <br />
           <TextReveal>{'1 étoile peut attendre.'}</TextReveal>
         </h2>

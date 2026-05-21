@@ -149,7 +149,7 @@ export function Testimonials() {
             className="text-balance"
             style={{ fontWeight: 900, fontSize: 'clamp(28px, 4.5vw, 48px)', lineHeight: 1.05, letterSpacing: '-0.03em', color: '#0A0A0A' }}
           >
-            <TextReveal>{"Ils ont protégé"}</TextReveal>
+            <TextReveal>{"Ils ont protégé "}</TextReveal>
             <br />
             <TextReveal>{"leur note Google."}</TextReveal>
           </h2>
