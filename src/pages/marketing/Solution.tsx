@@ -196,16 +196,18 @@ function TextReveal({ line, baseDelay = 0 }: { line: string; baseDelay?: number 
   return (
     <span style={{ display: 'block' }}>
       {words.map((word, i) => (
-        <m.span
-          key={i}
-          style={{ display: 'inline-block' }}
-          initial={{ opacity: 0, y: 22 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-20px' }}
-          transition={{ duration: 0.5, delay: baseDelay + i * 0.065, ease: [0.25, 0.46, 0.45, 0.94] }}
-        >
-          {word}{i < words.length - 1 ? ' ' : ''}
-        </m.span>
+        <span key={i}>
+          <m.span
+            style={{ display: 'inline-block' }}
+            initial={{ opacity: 0, y: 22 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-20px' }}
+            transition={{ duration: 0.5, delay: baseDelay + i * 0.065, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            {word}
+          </m.span>
+          {i < words.length - 1 ? ' ' : ''}
+        </span>
       ))}
     </span>
   )
