@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
-import { m, useScroll, useTransform } from 'framer-motion'
+import { m } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 import { useFadeInView, useCountUp } from './shared'
+import FonctionnalitesHero from '../../components/Fonctionnalites/FonctionnalitesHero'
 
 // ── Text reveal (mot par mot au scroll) ─────────────────────────────────
 function TextReveal({ children, className = '' }: { children: string; className?: string }) {
@@ -443,76 +444,10 @@ export function FonctionnalitesPage() {
     <div className="w-full min-h-screen" style={{ background: '#FAFAFA' }}>
       <Navbar />
 
-      {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden pt-44 pb-28" style={{ background: '#FAFAFA' }}>
-        {/* Gradient for navbar readability */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-24"
-          style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.22) 0%, transparent 100%)' }}
-        />
-        {/* Decorative orb */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full opacity-40"
-          style={{ background: 'radial-gradient(closest-side, rgba(232,146,10,0.12), transparent 70%)' }}
-        />
-        <div className="relative max-w-[1100px] mx-auto px-6 text-center">
-          <div className="flex justify-center mb-8">
-            <span
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-[0.1em]"
-              style={{ background: '#FFF4E5', color: '#E8920A' }}
-            >
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#E8920A' }} />
-              Fonctionnalités
-            </span>
-          </div>
-          <h1
-            className="text-balance"
-            style={{ fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, fontSize: 'clamp(42px, 6.5vw, 72px)', color: '#0A0A0A' }}
-          >
-            <TextReveal>Tout ce qu'il faut pour protéger votre restaurant.</TextReveal>
-          </h1>
-          <p className="mt-7 max-w-[600px] mx-auto text-[17px] leading-relaxed" style={{ color: '#52525B' }}>
-            Un QR code. Un dashboard. Et la seule feature du marché qui{' '}
-            <em
-              style={{ fontFamily: "'Instrument Serif', Georgia, serif", color: '#E8920A', fontStyle: 'italic' }}
-            >
-              intercepte
-            </em>{' '}
-            les avis négatifs avant Google.
-          </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <MagneticCta href="/restaurant/onboarding">
-              Commencer gratuitement
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-              </svg>
-            </MagneticCta>
-            <Link
-              to="/pricing"
-              className="inline-flex items-center gap-1 text-[15px] font-semibold px-7 py-3.5 rounded-xl border transition-colors hover:border-zinc-400"
-              style={{ color: '#0A0A0A', borderColor: '#E4E4E7' }}
-            >
-              Voir les tarifs
-            </Link>
-          </div>
-          {/* Trust badges */}
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-[12px]" style={{ color: '#71717A' }}>
-            {['Installation en 15 min', 'Sans engagement', 'Support français'].map((t) => (
-              <span key={t} className="flex items-center gap-1.5">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                {t}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
+      <FonctionnalitesHero />
 
       {/* ── FEATURE 1 : QR Paiement (#FAFAFA) ───────────────────────────── */}
-      <section className="py-24 md:py-32" style={{ background: '#FAFAFA', borderTop: '1px solid #E4E4E7' }}>
+      <section id="feature-01" className="py-24 md:py-32" style={{ background: '#FAFAFA', borderTop: '1px solid #E4E4E7' }}>
         <div className="max-w-[1100px] mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
             {/* Left: text */}
@@ -557,7 +492,7 @@ export function FonctionnalitesPage() {
       </section>
 
       {/* ── FEATURE 2 : Feedback interception (#18181B) ──────────────────── */}
-      <section className="py-24 md:py-32" style={{ background: '#18181B' }}>
+      <section id="feature-02" className="py-24 md:py-32" style={{ background: '#18181B' }}>
         <div className="max-w-[1100px] mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
             {/* Left: diagram */}
@@ -598,7 +533,7 @@ export function FonctionnalitesPage() {
       </section>
 
       {/* ── FEATURE 3 : Dashboard (#FAFAFA) ──────────────────────────────── */}
-      <section className="py-24 md:py-32" style={{ background: '#FAFAFA' }}>
+      <section id="feature-03" className="py-24 md:py-32" style={{ background: '#FAFAFA' }}>
         <div className="max-w-[1100px] mx-auto px-6">
           <div className="text-center mb-16">
             <span
