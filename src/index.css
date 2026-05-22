@@ -80,4 +80,4 @@
 }
 .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
 
-.marketing-site { width: 100%; min-height: 100vh; }
+.marketing-site { width: 100%; min-height: 100dvh; }

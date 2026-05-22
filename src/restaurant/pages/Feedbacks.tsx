@@ -3,7 +3,6 @@ import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { Topbar } from '../layout/Topbar'
-import { FEEDBACKS } from '../data/mockData'
 import type { FeedbackItem } from '../data/mockData'
 import { useRestaurantId } from '../../hooks/useRestaurant'
 
@@ -60,9 +59,10 @@ export function Feedbacks() {
 
   type ConvexFeedback = { stars: number; tableNumber: number; timeLabel: string; isNew: boolean; text: string; tags: string[] }
 
-  // Map Convex feedbacks to local FeedbackItem shape, or fall back to mocks
-  const feedbackItems: FeedbackItem[] = rawFeedbacks
-    ? (rawFeedbacks as ConvexFeedback[]).map((fb, i) => ({
+  const isLoading = rawFeedbacks === undefined
+  const feedbackItems: FeedbackItem[] = isLoading
+    ? []
+    : (rawFeedbacks as ConvexFeedback[]).map((fb, i) => ({
         id: i,
         stars: fb.stars,
         tableId: fb.tableNumber,
@@ -71,7 +71,6 @@ export function Feedbacks() {
         text: fb.text,
         tags: fb.tags,
       }))
-    : FEEDBACKS
 
   const filtered = applyFilter(feedbackItems, filter)
 
@@ -150,7 +149,14 @@ export function Feedbacks() {
 
         {/* Feedback list */}
         <div className="space-y-3">
-          {filtered.map((fb) => (
+          {isLoading && Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-border shadow-card p-5 animate-pulse">
+              <div className="h-4 bg-gray-100 rounded w-1/3 mb-3" />
+              <div className="h-3 bg-gray-100 rounded w-full mb-2" />
+              <div className="h-3 bg-gray-100 rounded w-2/3" />
+            </div>
+          ))}
+          {!isLoading && filtered.map((fb) => (
             <div
               key={fb.id}
               className={`bg-white rounded-xl border border-border shadow-card p-5 border-l-4 ${borderColor(fb)}`}
@@ -180,7 +186,7 @@ export function Feedbacks() {
               </div>
             </div>
           ))}
-          {filtered.length === 0 && (
+          {!isLoading && filtered.length === 0 && (
             <div className="text-center py-12 text-muted text-sm">Aucun feedback pour ce filtre.</div>
           )}
         </div>

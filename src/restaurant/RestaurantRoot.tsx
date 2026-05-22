@@ -11,6 +11,7 @@ export default function RestaurantRoot() {
     return (
       <ClerkProvider
         publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY!}
+        allowedRedirectOrigins={['https://www.splitzy.fr', 'https://splitzy-client.vercel.app']}
         signInForceRedirectUrl="/restaurant/onboarding"
         signUpForceRedirectUrl="/restaurant/onboarding"
       >
