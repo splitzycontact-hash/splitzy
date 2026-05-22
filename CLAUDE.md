@@ -153,7 +153,7 @@ Every sensitive Convex mutation checks `ctx.auth.getUserIdentity()` → looks up
 | `tables.ts` | `list`, `createBulk`, `updateStatus`, `resetToFree`, `importAmounts` |
 | `menuItems.ts` | `listByRestaurant`, `addItem`, `updateItem`, `deleteItem`, `replaceAll`, `syncFromSquare` |
 | `payments.ts` | `list`, `create`, `getOverviewStats` |
-| `feedbacks.ts` | `list`, `create`, `markRead` |
+| `feedbacks.ts` | `list`, `create`, `markRead`, `markAllRead`, `getNewCount` |
 | `posIntegrations.ts` | `getByProvider`, `upsert`, `syncLive` |
 
 ### Files to add (admin + interconnexion phases)
@@ -190,7 +190,7 @@ Full schema — all tables, all indexes. `_id` and `_creationTime` are auto-gene
 restaurants      slug*, clerkUserId*, status*, plan, healthScore?, stripeAccountId?, kycStatus?, suspended?, posProvider?
 users            clerkUserId*, role*, email, firstName?, lastName?, totpEnabled?
 restaurantMembers restaurantId*, userId*, role
-tables           restaurantId*, qrToken*, number, capacity, status, guests?, amountCents?, orderItems?, alert?
+tables           restaurantId*, qrToken*, number, capacity, status, guests?, amountCents?, paidCents?, paidTipCents?, orderItems?, alert?
 menuCategories   restaurantId*, name, displayOrder?
 menuItems        restaurantId*, categoryId?, name, priceCents, emoji?, category?, isAvailable?, externalId?
 sessions         restaurantId*, tableId*, status, by_restaurant_status*, closedAt?, totalCents?
@@ -448,6 +448,8 @@ NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentio
 | `FeedbackSent` | Centré, check vert | Note privé, download PDF, bouton reset session |
 
 ## Known issues fixed (context for future sessions)
+
+- **Sync paiements client↔dashboard + déploiement Convex prod** (v5, 2026-05-22) : (1) `payments.create` réconcilie désormais la table — cumule `paidCents` (Σ `subtotalCents`) et `paidTipCents` (Σ `tipCents`), passe `status` à `payment` puis `paid` dès que `paidCents >= amountCents`, **sans jamais modifier `amountCents`** (total de la commande figé pendant la session). `tables.updateStatus` (quand `amountCents` est fourni), `resetToFree` et `importAmounts` remettent `paidCents`/`paidTipCents` à zéro (nouvelle sitting / libération). Le dashboard `Tables.tsx` + `Overview.tsx` lisent payé/restant en réactif. (2) **Leçon déploiement critique** : un fix qui ne change que le *corps d'un handler* Convex reste cassé en prod tant que `npx convex deploy --yes` n'est pas lancé depuis `splitzy-client/` — `vercel --prod` ne déploie QUE le frontend, jamais les fonctions Convex. Les deux déploiements sont indépendants et tous deux requis. Piège diagnostic : `npx convex function-spec --prod` ne révèle PAS un handler périmé quand les args sont inchangés. Vérifier le comportement réel via `npx convex run --prod <module>:<fn> '{...}'` ; pour tester sans polluer la prod, créer un resto jetable (`restaurants:create` + `tables:createBulk`) puis `restaurants:deleteAll` — les tables `payments`/`feedbacks` n'ont **pas** de mutation delete (un test sur un vrai resto laisse des résidus permanents dans le ledger CA).
 
 - **CTAs fixes + /items articles commandés + schéma Convex** (sauvegarde v11) : (1) Tous les CTAs consumer passés en `position: fixed; bottom: 0; left: 0; width: 100%` (Landing, Profile, Items, Tip, Payment, Confirmation, Feedback) — `sticky` ne fonctionnait pas dans flex column. (2) Page `/items` : suppression du menu complet, affichage des seuls articles commandés (`state.orderItems`) issus de `tables.orderItems` en Convex. Pipeline complet : `Tables.tsx` (dashboard) → `tables.updateStatus` (avec `orderItems`) → `TableEntry` → `SET_TABLE_CONTEXT` → `state.orderItems`. (3) `/confirmation` simplifiée : boutons PDF et email supprimés, CTA fixé. (4) Schéma Convex : dérive pré-existante corrigée — `feedbacks.deliveredAt`, `restaurants.plan`, `restaurants.status` ajoutés en `v.optional(...)` pour valider les docs existants. Le push échouait doc par doc. (5) `tipPercent` initialisé à 10 (était 0). (6) Bug `TABLE_TOTAL_CENTS = 0` dans `generateInvoice.ts` corrigé (mode equal utilisait la constante au lieu de `state.tableTotalCents`).
 
