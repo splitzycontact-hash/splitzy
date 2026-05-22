@@ -14,7 +14,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 const BAR_DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
-type ConvexTable   = { number: number; status: string; amountCents?: number; alert?: boolean }
+type ConvexTable   = { number: number; status: string; amountCents?: number; paidCents?: number; alert?: boolean }
 type ConvexPayment = { tableNumber: number; totalCents: number; tipCents: number; subtotalCents: number; createdAt: number; dateLabel: string; status: string }
 type ConvexFeedback = { stars: number }
 
@@ -45,7 +45,10 @@ export function Overview() {
   }
   const statusToLabel = (t: ConvexTable) => {
     if (t.status === 'dining')  return 'En repas'
-    if (t.status === 'payment') return '⏳ Paiement'
+    if (t.status === 'payment') {
+      const remaining = Math.max(0, (t.amountCents ?? 0) - (t.paidCents ?? 0))
+      return remaining > 0 ? `Reste ${formatEur(remaining)}` : '⏳ Paiement'
+    }
     if (t.status === 'paid')    return t.amountCents ? `${formatEur(t.amountCents)} payé` : '✓ Payé'
     return 'Libre'
   }

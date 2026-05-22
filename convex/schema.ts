@@ -26,6 +26,11 @@ export default defineSchema({
     guests: v.optional(v.number()),
     durationMinutes: v.optional(v.number()),
     amountCents: v.optional(v.number()),
+    // Paiements partiels cumulés sur la sitting courante (remis à zéro au release
+    // et à chaque nouveau montant). Le détail par paiement vit dans `payments` (ledger CA) ;
+    // ces agrégats servent au calcul payé/restant temps réel côté dashboard.
+    paidCents: v.optional(v.number()),
+    paidTipCents: v.optional(v.number()),
     orderItems: v.optional(v.array(v.object({
       name: v.string(),
       qty: v.number(),

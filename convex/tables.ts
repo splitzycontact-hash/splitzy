@@ -44,7 +44,12 @@ export const updateStatus = mutation({
   handler: async (ctx, { tableId, status, guests, amountCents, orderItems }) => {
     const patch: Record<string, unknown> = { status }
     if (guests !== undefined) patch.guests = guests
-    if (amountCents !== undefined) patch.amountCents = amountCents
+    if (amountCents !== undefined) {
+      patch.amountCents = amountCents
+      // Nouveau montant = nouvelle sitting → on repart d'un payé vierge.
+      patch.paidCents = undefined
+      patch.paidTipCents = undefined
+    }
     if (orderItems !== undefined) patch.orderItems = orderItems
     await ctx.db.patch(tableId, patch)
   },
@@ -53,7 +58,7 @@ export const updateStatus = mutation({
 export const resetToFree = mutation({
   args: { tableId: v.id("tables") },
   handler: async (ctx, { tableId }) => {
-    await ctx.db.patch(tableId, { status: 'free', guests: undefined, amountCents: undefined, orderItems: undefined, alert: undefined })
+    await ctx.db.patch(tableId, { status: 'free', guests: undefined, amountCents: undefined, orderItems: undefined, alert: undefined, paidCents: undefined, paidTipCents: undefined })
   },
 })
 
@@ -63,7 +68,7 @@ export const importAmounts = mutation({
   },
   handler: async (ctx, { rows }) => {
     for (const { tableId, amountCents } of rows) {
-      await ctx.db.patch(tableId, { amountCents, status: 'dining' })
+      await ctx.db.patch(tableId, { amountCents, status: 'dining', paidCents: undefined, paidTipCents: undefined })
     }
   },
 })

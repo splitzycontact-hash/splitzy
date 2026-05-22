@@ -17,7 +17,6 @@ export function Payment() {
   const [loading, setLoading] = useState<string | null>(null)
 
   const createPayment = useMutation(api.payments.create)
-  const updateTableStatus = useMutation(api.tables.updateStatus)
 
   const selectedCard = MOCK_CARDS.find(c => c.id === state.selectedCardId) ?? MOCK_CARDS[0]
 
@@ -28,6 +27,9 @@ export function Payment() {
     // Fire-and-forget : la navigation ne doit pas attendre la WS Convex.
     // Safari iOS peut suspendre la WS — un `await` ici resterait pending
     // indéfiniment (le .catch ne se déclenche que sur rejet, pas sur pending).
+    // `createPayment` enregistre le paiement (ledger) ET réconcilie la table
+    // (cumul payé + statut payment/paid). On ne touche plus à amountCents : le
+    // montant total de la table doit rester intact pour le calcul du restant.
     if (state.convexRestaurantId && state.convexTableId) {
       void createPayment({
         restaurantId: state.convexRestaurantId as Id<'restaurants'>,
@@ -39,13 +41,6 @@ export function Payment() {
         commissionCents: splitzyFee,
         totalCents: total,
         paymentMethod: method,
-      }).catch(() => {})
-    }
-    if (state.convexTableId) {
-      void updateTableStatus({
-        tableId: state.convexTableId as Id<'tables'>,
-        status: 'paid',
-        amountCents: total,
       }).catch(() => {})
     }
     dispatch({ type: 'CONFIRM_PAYMENT' })

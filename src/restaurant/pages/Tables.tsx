@@ -17,6 +17,8 @@ type TableData = {
   guests?: number
   duration?: string
   amountCents?: number
+  paidCents?: number
+  paidTipCents?: number
   alert?: boolean
   convexId: Id<'tables'> | null
 }
@@ -53,6 +55,9 @@ function generateOrder(menu: { name: string; priceCents: number }[]): SimItem[] 
 
 function TableCard({ table, onClick, onSimulate }: { table: TableData; onClick: () => void; onSimulate: () => void }) {
   const s = STATUS_STYLE[table.status]
+  const total = table.amountCents ?? 0
+  const paid = table.paidCents ?? 0
+  const remaining = Math.max(0, total - paid)
   return (
     <div
       className={`relative rounded-xl border p-4 text-left transition-all hover:shadow-card cursor-pointer ${s.card}`}
@@ -68,8 +73,21 @@ function TableCard({ table, onClick, onSimulate }: { table: TableData; onClick: 
       {table.guests && (
         <div className="text-xs text-muted">{table.guests} conv.{table.duration ? ` · ${table.duration}` : ''}</div>
       )}
-      {table.amountCents ? (
-        <div className="text-base font-bold text-dark mt-1">{formatEur(table.amountCents)}</div>
+      {total > 0 ? (
+        paid > 0 && remaining > 0 ? (
+          <div className="mt-1">
+            <div className="text-base font-bold text-brand tabular-nums leading-tight">
+              {formatEur(remaining)}<span className="text-[10px] font-semibold text-muted"> restant</span>
+            </div>
+            <div className="text-[11px] font-semibold text-success tabular-nums">
+              {formatEur(paid)} payé <span className="text-muted font-normal">/ {formatEur(total)}</span>
+            </div>
+          </div>
+        ) : paid > 0 ? (
+          <div className="text-base font-bold text-success mt-1 tabular-nums">{formatEur(total)} payé</div>
+        ) : (
+          <div className="text-base font-bold text-dark mt-1 tabular-nums">{formatEur(total)}</div>
+        )
       ) : null}
       <button
         onClick={e => { e.stopPropagation(); onSimulate() }}
@@ -125,7 +143,7 @@ export function Tables() {
     }
   }
 
-  type ConvexTable = { _id: Id<'tables'>; number: number; status: TableStatus; guests?: number; durationMinutes?: number; amountCents?: number; alert?: boolean }
+  type ConvexTable = { _id: Id<'tables'>; number: number; status: TableStatus; guests?: number; durationMinutes?: number; amountCents?: number; paidCents?: number; paidTipCents?: number; alert?: boolean }
 
   const tables: TableData[] = rawTables
     ? (rawTables as ConvexTable[]).map(t => ({
@@ -134,6 +152,8 @@ export function Tables() {
         guests: t.guests,
         duration: durationLabel(t.durationMinutes),
         amountCents: t.amountCents,
+        paidCents: t.paidCents,
+        paidTipCents: t.paidTipCents,
         alert: t.alert,
         convexId: t._id,
       }))
@@ -156,6 +176,11 @@ export function Tables() {
   const isLoading = rawTables === undefined
 
   const simTotal = simItems.reduce((s, i) => s + i.qty * i.unitCents, 0)
+
+  const detailTotal = selectedTable?.amountCents ?? 0
+  const detailPaid = selectedTable?.paidCents ?? 0
+  const detailTip = selectedTable?.paidTipCents ?? 0
+  const detailRemaining = Math.max(0, detailTotal - detailPaid)
 
   return (
     <RestaurantLayout>
@@ -268,9 +293,26 @@ export function Tables() {
                       </div>
                     )}
                     {selectedTable.amountCents ? (
-                      <div className="flex justify-between text-sm border-t border-border pt-4">
-                        <span className="text-muted">Montant</span>
-                        <span className="text-lg font-bold text-dark">{formatEur(selectedTable.amountCents)}</span>
+                      <div className="border-t border-border pt-4 space-y-2.5">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted">Total addition</span>
+                          <span className="font-semibold text-dark tabular-nums">{formatEur(detailTotal)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted">Payé</span>
+                          <span className="font-semibold text-success tabular-nums">
+                            {formatEur(detailPaid)}
+                            {detailTip > 0 && (
+                              <span className="text-muted font-normal"> · dont {formatEur(detailTip)} pourboire</span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-baseline text-sm">
+                          <span className="text-muted">Restant</span>
+                          <span className={`text-lg font-bold tabular-nums ${detailRemaining > 0 ? 'text-brand' : 'text-success'}`}>
+                            {formatEur(detailRemaining)}
+                          </span>
+                        </div>
                       </div>
                     ) : (
                       <div className="text-center py-4 text-sm text-muted">Montant non encore défini</div>

@@ -190,7 +190,7 @@ Full schema — all tables, all indexes. `_id` and `_creationTime` are auto-gene
 restaurants      slug*, clerkUserId*, status*, plan, healthScore?, stripeAccountId?, kycStatus?, suspended?, posProvider?
 users            clerkUserId*, role*, email, firstName?, lastName?, totpEnabled?
 restaurantMembers restaurantId*, userId*, role
-tables           restaurantId*, qrToken*, number, capacity, status, guests?, amountCents?, alert?
+tables           restaurantId*, qrToken*, number, capacity, status, guests?, amountCents?, orderItems?, alert?
 menuCategories   restaurantId*, name, displayOrder?
 menuItems        restaurantId*, categoryId?, name, priceCents, emoji?, category?, isAvailable?, externalId?
 sessions         restaurantId*, tableId*, status, by_restaurant_status*, closedAt?, totalCents?
@@ -200,7 +200,7 @@ payments         restaurantId*, tableId, tableNumber, guests, subtotalCents, tip
 transactions     restaurantId*, sessionId*, stripePaymentIntentId?, status, amountCents, tipCents?, commissionCents?, succeededAt*, failureCode?, paymentMethod?
 refunds          transactionId*, stripeRefundId?, amountCents, status, initiatedBy?
 disputes         transactionId*, stripeDisputeId?, amountCents, status, reason?, evidenceDueBy?
-feedbacks        restaurantId*, tableId, stars, tags[], text, isNew*, deliveredAt*, createdAt, timeLabel
+feedbacks        restaurantId*, tableId, tableNumber, stars, tags[], text, isNew*, deliveredAt?, createdAt, timeLabel
 subscriptions    restaurantId*, status*, plan, stripeSubscriptionId?, dunningAttempts?
 invoices         restaurantId*, number, amountCents, vatCents, status, issuedAt, paidAt?
 payouts          restaurantId*, stripePayoutId?, amountCents, status
@@ -240,9 +240,10 @@ Single global context: `src/context/SessionContext.tsx` — `useReducer` with `S
 - `restaurantName`, `tableNumber`, `tableCapacity` — set by `SET_TABLE_CONTEXT` when a QR code is scanned (via `TableEntry`)
 - `convexRestaurantId`, `convexTableId` — Convex IDs for the active restaurant/table
 - `tableTotalCents` — amount from `tables.amountCents` (set by POS or simulation), used in equal/custom split
+- `orderItems: OrderItem[]` — real items from `tables.orderItems` (set by simulation/POS); mapped in `SET_TABLE_CONTEXT` with synthetic IDs `order-${index}`. The `/items` page renders these, NOT the full menu.
 - `splitMode: 'item' | 'equal' | 'custom'`
-- `selectedItems: SelectedItem[]` — each has `menuItemId` + `splitFactor` (1–4)
-- `tipPercent: number` — 0–30
+- `selectedItems: SelectedItem[]` — each has `menuItemId` + `splitFactor` (1–4); `menuItemId` matches `OrderItem.id`
+- `tipPercent: number` — default **10** (changed from 0), range 0–30
 - `convives: Convive[]` — other people at the table
 
 **Derived values** (never stored in state, computed in `src/hooks/useSessionCalcs.ts`):
@@ -287,7 +288,7 @@ Located in `Tables.tsx`. Each table card has a dashed amber `[TEST] Simuler comm
 1. Queries `menuItems.listByRestaurant` for the restaurant
 2. Randomly picks 2–4 items (quantity 1–2 each) via `generateOrder()`
 3. Shows a breakdown + total in a modal with a ↺ re-roll button
-4. On confirm: calls `tables.updateStatus(tableId, status='dining', guests=totalQty, amountCents=total)`
+4. On confirm: calls `tables.updateStatus(tableId, status='dining', guests=totalQty, amountCents=total, orderItems=[...])` — persists the simulated order items so the consumer `/items` page can display them (not the full menu).
 
 ---
 
@@ -415,7 +416,7 @@ Source de vérité : `../Splitzy Interface Restaurateur/uploads/splitzy_mockup (
 - Tous les inputs ont `font-size: 16px` minimum (en dessous → iOS zoom automatique)
 - Touch targets : `min-height: 44px`, `min-width: 44px` sur tous les boutons interactifs
 - Zones scrollables : `WebkitOverflowScrolling: 'touch'` + `overscrollBehavior: 'contain'`
-- CTAs en bas de page : `paddingBottom: 'max(Xpx, calc(Ypx + env(safe-area-inset-bottom)))'`
+- CTAs en bas de page : `position: fixed; bottom: 0; left: 0; width: 100%; zIndex: 50` + `paddingBottom: 'max(Xpx, calc(Ypx + env(safe-area-inset-bottom)))'`. Le container scrollable doit avoir un padding-bottom suffisant (≥140–160px) pour ne pas être masqué par le CTA fixe. Ne pas utiliser `position: sticky` dans un flex column `minHeight: 100%` — ça ne fonctionne pas.
 - `viewport-fit=cover` déjà en place dans `index.html`
 
 ### Palette (ne jamais hardcoder en dehors des pages consumer)
@@ -447,6 +448,8 @@ NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentio
 | `FeedbackSent` | Centré, check vert | Note privé, download PDF, bouton reset session |
 
 ## Known issues fixed (context for future sessions)
+
+- **CTAs fixes + /items articles commandés + schéma Convex** (sauvegarde v11) : (1) Tous les CTAs consumer passés en `position: fixed; bottom: 0; left: 0; width: 100%` (Landing, Profile, Items, Tip, Payment, Confirmation, Feedback) — `sticky` ne fonctionnait pas dans flex column. (2) Page `/items` : suppression du menu complet, affichage des seuls articles commandés (`state.orderItems`) issus de `tables.orderItems` en Convex. Pipeline complet : `Tables.tsx` (dashboard) → `tables.updateStatus` (avec `orderItems`) → `TableEntry` → `SET_TABLE_CONTEXT` → `state.orderItems`. (3) `/confirmation` simplifiée : boutons PDF et email supprimés, CTA fixé. (4) Schéma Convex : dérive pré-existante corrigée — `feedbacks.deliveredAt`, `restaurants.plan`, `restaurants.status` ajoutés en `v.optional(...)` pour valider les docs existants. Le push échouait doc par doc. (5) `tipPercent` initialisé à 10 (était 0). (6) Bug `TABLE_TOTAL_CENTS = 0` dans `generateInvoice.ts` corrigé (mode equal utilisait la constante au lieu de `state.tableTotalCents`).
 
 - **Bugs texte landing page + marquee logos** (sauvegarde v10) : (1) `TextReveal` dans `CtaFinal.tsx`, `Testimonials.tsx`, `Solution.tsx` : le trailing `' '` à l'intérieur d'un `span` `display:inline-block` est strippé par le browser. Fix documenté dans la section "Marketing site" ci-dessus. (2) Marquee logos mobile (`Logos.tsx`) : le `m.div` flex prenait la largeur du parent `overflow-hidden` (= viewport), les items se compressaient → gaps invisibles. Fix : `style={{ width: 'max-content' }}` + `shrink-0` sur chaque item.
 - **Marketing pages redesign + FonctionnalitesHero** (sauvegarde v9) : Refonte complète des pages secondaires (Changelog, Presse, Aide, Sécurité) + `FonctionnalitesHero.tsx` dans `src/components/Fonctionnalites/`. `package.json` : ajout `"sonner": "^2.0.7"` — manquait (existait en node_modules orphelin → build Vercel échouait avec TS2307). Règle : toujours vérifier que les dépendances sont dans `package.json`, le build local peut passer si elles sont en node_modules orphelin.
