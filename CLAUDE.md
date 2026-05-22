@@ -58,7 +58,7 @@ All three apps share **one Convex deployment** (one schema, one set of functions
 |---|---|---|
 | Convex backend | `scintillating-viper-372` (`.env.local`) | `mellow-chinchilla-481` (Convex deploy) |
 | Vercel frontend | `http://localhost:5173` | `https://www.splitzy.fr` |
-| Clerk auth | `pk_test_bm92ZWwtY291Z2FyLTg4…` (dev instance) | `pk_test_…` + origin `splitzy-client.vercel.app` autorisée |
+| Clerk auth | `pk_test_bm92ZWwtY291Z2FyLTg4…` (dev instance) | `pk_live_Y2xlcmsuc3BsaXR6eS5mciQ` (prod instance, activée 2026-05-22) |
 | Square POS | `connect.squareup.com` (production) | same |
 | Stripe Connect | Stripe Connect Express | platform: Splitzy, 1.5% commission |
 
@@ -70,15 +70,12 @@ Clerk a deux types d'instances :
 - **Dev instance** (`pk_test_...`) — supporte n'importe quel domaine si ajouté dans **Allowed origins**. Utilisée en local ET sur Vercel pour l'instant.
 - **Prod instance** (`pk_live_...`) — nécessite un domaine custom vérifié. Les domaines `.vercel.app` ne sont **pas** supportés en prod Clerk.
 
-**État actuel** : on utilise la clé `pk_test_...` sur Vercel avec `https://splitzy-client.vercel.app` ajouté dans Clerk dashboard → Configure → Restrictions → **Allowed origins**.
+**État actuel (2026-05-22)** : instance Clerk **prod** activée sur Vercel.
+- `VITE_CLERK_PUBLISHABLE_KEY=pk_live_Y2xlcmsuc3BsaXR6eS5mciQ` sur Vercel Production
+- `CLERK_SECRET_KEY=sk_live_*` (rotatée 2026-05-22) sur Convex prod `mellow-chinchilla-481`
+- `allowedRedirectOrigins: ['https://www.splitzy.fr', 'https://splitzy-client.vercel.app']` dans `RestaurantRoot.tsx`
 
-**Quand on aura un domaine custom** (ex: `app.splitzy.fr`) :
-1. Créer une instance Clerk prod → récupérer `pk_live_...`
-2. Ajouter le domaine dans Clerk dashboard → Domains (vérification DNS)
-3. Remplacer `VITE_CLERK_PUBLISHABLE_KEY` dans Vercel par `pk_live_...`
-4. Redéployer
-
-Une instance Clerk prod est déjà créée (`pk_live_Y2x1cmsuc3BsaXR6eXRleHQuY29tJ2Rldi1wcm9k`) — en attente d'un domaine custom pour être activée.
+**Si le domaine custom change** : mettre à jour `allowedRedirectOrigins` dans `RestaurantRoot.tsx` + vérifier Clerk dashboard → Domains.
 
 ### Convex env vars (set on dev deployment)
 
@@ -448,6 +445,8 @@ NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentio
 | `FeedbackSent` | Centré, check vert | Note privé, download PDF, bouton reset session |
 
 ## Known issues fixed (context for future sessions)
+
+- **Clerk prod + fixes CSS/feedbacks** (v6, 2026-05-22) : (1) Basculé sur instance Clerk prod (`pk_live_*`) — `VITE_CLERK_PUBLISHABLE_KEY` mis à jour sur Vercel, `CLERK_SECRET_KEY` (`sk_live_*`, rotatée) mis à jour sur Convex prod. `allowedRedirectOrigins` ajouté dans `RestaurantRoot.tsx`. (2) `index.css` : `.marketing-site` `min-height: 100vh` → `100dvh`. (3) `Feedbacks.tsx` : fallback mocks statiques supprimé — skeleton `animate-pulse` affiché pendant le chargement Convex ; import `FEEDBACKS` supprimé.
 
 - **Sync paiements client↔dashboard + déploiement Convex prod** (v5, 2026-05-22) : (1) `payments.create` réconcilie désormais la table — cumule `paidCents` (Σ `subtotalCents`) et `paidTipCents` (Σ `tipCents`), passe `status` à `payment` puis `paid` dès que `paidCents >= amountCents`, **sans jamais modifier `amountCents`** (total de la commande figé pendant la session). `tables.updateStatus` (quand `amountCents` est fourni), `resetToFree` et `importAmounts` remettent `paidCents`/`paidTipCents` à zéro (nouvelle sitting / libération). Le dashboard `Tables.tsx` + `Overview.tsx` lisent payé/restant en réactif. (2) **Leçon déploiement critique** : un fix qui ne change que le *corps d'un handler* Convex reste cassé en prod tant que `npx convex deploy --yes` n'est pas lancé depuis `splitzy-client/` — `vercel --prod` ne déploie QUE le frontend, jamais les fonctions Convex. Les deux déploiements sont indépendants et tous deux requis. Piège diagnostic : `npx convex function-spec --prod` ne révèle PAS un handler périmé quand les args sont inchangés. Vérifier le comportement réel via `npx convex run --prod <module>:<fn> '{...}'` ; pour tester sans polluer la prod, créer un resto jetable (`restaurants:create` + `tables:createBulk`) puis `restaurants:deleteAll` — les tables `payments`/`feedbacks` n'ont **pas** de mutation delete (un test sur un vrai resto laisse des résidus permanents dans le ledger CA).
 
