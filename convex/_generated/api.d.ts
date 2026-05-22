@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as dependencyStatus from "../dependencyStatus.js";
 import type * as feedbacks from "../feedbacks.js";
 import type * as menuItems from "../menuItems.js";
 import type * as payments from "../payments.js";
@@ -23,6 +24,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  dependencyStatus: typeof dependencyStatus;
   feedbacks: typeof feedbacks;
   menuItems: typeof menuItems;
   payments: typeof payments;

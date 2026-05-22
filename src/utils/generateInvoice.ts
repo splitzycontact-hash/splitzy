@@ -1,18 +1,16 @@
 import { jsPDF } from 'jspdf'
 import type { SessionState } from '../context/types'
-import { MENU_ITEMS } from '../data/menu'
 import { formatEur } from './formatCurrency'
-import { TABLE_TOTAL_CENTS } from '../data/session'
 
 function calcAmounts(state: SessionState) {
   let subtotal = 0
   if (state.splitMode === 'item') {
     subtotal = state.selectedItems.reduce((acc, si) => {
-      const item = MENU_ITEMS.find(m => m.id === si.menuItemId)
-      return item ? acc + Math.round(item.price / si.splitFactor) : acc
+      const item = state.orderItems.find(o => o.id === si.menuItemId)
+      return item ? acc + Math.round((item.qty * item.unitCents) / si.splitFactor) : acc
     }, 0)
   } else if (state.splitMode === 'equal') {
-    subtotal = Math.round(TABLE_TOTAL_CENTS / state.equalSplitCount)
+    subtotal = Math.round(state.tableTotalCents / state.equalSplitCount)
   } else {
     subtotal = state.customAmount
   }
@@ -82,10 +80,11 @@ export function generateInvoicePDF(state: SessionState) {
 
   if (state.splitMode === 'item') {
     state.selectedItems.forEach(si => {
-      const item = MENU_ITEMS.find(m => m.id === si.menuItemId)
+      const item = state.orderItems.find(o => o.id === si.menuItemId)
       if (!item) return
-      const linePrice = Math.round(item.price / si.splitFactor)
-      const label = si.splitFactor > 1 ? `${item.name}  (÷${si.splitFactor})` : item.name
+      const linePrice = Math.round((item.qty * item.unitCents) / si.splitFactor)
+      const baseName = item.qty > 1 ? `${item.qty}× ${item.name}` : item.name
+      const label = si.splitFactor > 1 ? `${baseName}  (÷${si.splitFactor})` : baseName
 
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')

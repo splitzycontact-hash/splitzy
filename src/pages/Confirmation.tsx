@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
-import { MENU_ITEMS } from '../data/menu'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
 
@@ -23,7 +22,7 @@ export function Confirmation() {
   }, [countdown, navigate])
 
   const selectedMenuItems = state.selectedItems.map(sel => {
-    const item = MENU_ITEMS.find(m => m.id === sel.menuItemId)
+    const item = state.orderItems.find(o => o.id === sel.menuItemId)
     return { sel, item }
   }).filter(({ item }) => !!item)
 
@@ -40,7 +39,7 @@ export function Confirmation() {
       {/* Dark hero */}
       <div style={{
         position: 'relative', overflow: 'hidden',
-        background: '#0A0A0A', padding: '60px 24px 36px', color: '#fff', flexShrink: 0,
+        background: '#0A0A0A', padding: '36px 24px 20px', color: '#fff', flexShrink: 0,
       }}>
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.5,
@@ -112,11 +111,11 @@ export function Confirmation() {
           {/* Items (item mode only) */}
           {state.splitMode === 'item' && selectedMenuItems.map(({ sel, item }) => {
             if (!item) return null
-            const linePrice = Math.round(item.price / sel.splitFactor)
+            const linePrice = Math.round((item.qty * item.unitCents) / sel.splitFactor)
             return (
               <div key={sel.menuItemId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', gap: 8 }}>
                 <span style={{ fontSize: 13.5, color: '#52525B', fontWeight: 500 }}>
-                  {item.emoji ? `${item.emoji} ` : ''}{item.name}
+                  {item.qty > 1 ? `${item.qty}× ` : ''}{item.name}
                   {sel.splitFactor > 1 && <span style={{ fontSize: 11, color: '#A1A1AA', marginLeft: 4 }}>÷{sel.splitFactor}</span>}
                 </span>
                 <span style={{ fontSize: 13.5, color: '#52525B', fontWeight: 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
@@ -153,44 +152,28 @@ export function Confirmation() {
           </div>
         </m.div>
 
-        {/* Receipt actions */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          <button
-            type="button"
-            onClick={async () => {
-              const { generateInvoicePDF } = await import('../utils/generateInvoice')
-              generateInvoicePDF(state)
-            }}
-            style={{
-              flex: 1, height: 40, borderRadius: 11, border: '1px solid #E4E4E7',
-              background: '#fff', color: '#0A0A0A', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M7 1v8M7 9L4.5 6.5M7 9L9.5 6.5M2 12h10" stroke="#374151" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Reçu PDF
-          </button>
-          <button
-            type="button"
-            style={{
-              flex: 1, height: 40, borderRadius: 11, border: '1px solid #E4E4E7',
-              background: '#fff', color: '#0A0A0A', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-            }}
-          >
-            Par e-mail
-          </button>
-        </div>
       </div>
 
-      {/* Feedback teaser */}
-      <div style={{ padding: '14px 20px 0' }}>
+      <div style={{ height: 140 }} />
+
+      {/* Fixed CTA */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        width: '100%',
+        background: '#FAFAFA',
+        borderTop: '1px solid #E4E4E7',
+        padding: '12px 20px',
+        paddingBottom: 'max(28px, calc(16px + env(safe-area-inset-bottom)))',
+        zIndex: 50,
+        boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
+      }}>
         <button
           type="button"
           onClick={() => navigate('/feedback')}
           style={{
-            width: '100%', padding: 16, borderRadius: 16,
+            width: '100%', padding: '14px 16px', borderRadius: 16,
             border: '1px solid rgba(232,146,10,0.2)', background: '#FFF4E5',
             display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left',
           }}
@@ -210,7 +193,6 @@ export function Confirmation() {
             <div style={{ fontSize: 11.5, color: '#52525B', marginTop: 2 }}>
               Ton avis est <strong style={{ color: '#0A0A0A', fontWeight: 700 }}>100 % privé</strong> · 30 secondes
             </div>
-            {/* Progress bar */}
             <div style={{
               height: 4, borderRadius: 2, background: 'rgba(232,146,10,0.18)',
               marginTop: 10, overflow: 'hidden',
@@ -229,23 +211,6 @@ export function Confirmation() {
             <path d="M6 3L10 8L6 13" stroke="#E8920A" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
         </button>
-      </div>
-
-      <div style={{ flex: 1 }} />
-
-      <div style={{ padding: '14px 20px', paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))', textAlign: 'center' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <span style={{
-            width: 16, height: 16, borderRadius: 4, background: '#0A0A0A',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 3, gap: 1,
-          }}>
-            <span style={{ flex: 1, height: '100%', background: '#fff', borderRadius: 1 }} />
-            <span style={{ flex: 1, height: '100%', background: '#E8920A', borderRadius: 1 }} />
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#52525B', letterSpacing: '-0.01em' }}>
-            Split<span style={{ color: '#E8920A' }}>zy</span>
-          </span>
-        </span>
       </div>
     </m.div>
   )

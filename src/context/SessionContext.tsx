@@ -15,6 +15,7 @@ const initialState: SessionState = {
   splitMode: 'item',
   equalSplitCount: 2,
   customAmount: 0,
+  orderItems: [],
   selectedItems: [],
   tipPercent: 10,
   selectedCardId: 'visa',
@@ -73,8 +74,15 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
       return { ...state, feedbackText: action.payload }
     case 'SEND_FEEDBACK':
       return { ...state, feedbackSent: true }
-    case 'SET_TABLE_CONTEXT':
-      return { ...state, ...action.payload }
+    case 'SET_TABLE_CONTEXT': {
+      const { orderItems, ...rest } = action.payload
+      return {
+        ...state,
+        ...rest,
+        orderItems: orderItems.map((it, i) => ({ id: `order-${i}`, name: it.name, qty: it.qty, unitCents: it.unitCents })),
+        selectedItems: [],
+      }
+    }
     case 'RESET_SESSION':
       return { ...initialState }
     default:

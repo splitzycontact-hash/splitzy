@@ -152,25 +152,37 @@ export function Landing() {
         </div>
 
         <div style={{ flex: 1 }} />
+      </div>
 
-        {/* CTAs */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 'max(32px, calc(20px + env(safe-area-inset-bottom)))' }}>
-          <m.button
-            type="button"
-            whileTap={{ scale: 0.985 }}
-            onClick={() => navigate('/profile')}
-            style={{
-              width: '100%', height: 56, borderRadius: 18, border: 0,
-              background: '#E8920A', color: '#fff',
-              fontSize: 16, fontWeight: 800, letterSpacing: '0.01em', cursor: 'pointer',
-              boxShadow: '0 4px 18px rgba(232,146,10,0.32), 0 1px 4px rgba(0,0,0,0.1)',
-            }}
-          >
-            C'est parti →
-          </m.button>
-          <div style={{ textAlign: 'center', fontSize: 11, color: '#9CA3AF', paddingBottom: 4 }}>
-            ✓ Aucune app · <span style={{ color: '#E8920A', fontWeight: 600 }}>Paiement sécurisé Stripe</span>
-          </div>
+      {/* Fixed CTA */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        padding: '14px 20px',
+        paddingBottom: 'max(32px, calc(20px + env(safe-area-inset-bottom)))',
+        background: '#18181B',
+        zIndex: 50,
+      }}>
+        <m.button
+          type="button"
+          whileTap={{ scale: 0.985 }}
+          onClick={() => navigate('/profile')}
+          style={{
+            width: '100%', height: 56, borderRadius: 18, border: 0,
+            background: '#E8920A', color: '#fff',
+            fontSize: 16, fontWeight: 800, letterSpacing: '0.01em', cursor: 'pointer',
+            boxShadow: '0 4px 18px rgba(232,146,10,0.32), 0 1px 4px rgba(0,0,0,0.1)',
+          }}
+        >
+          C'est parti →
+        </m.button>
+        <div style={{ textAlign: 'center', fontSize: 11, color: '#9CA3AF', paddingBottom: 4 }}>
+          ✓ Aucune app · <span style={{ color: '#E8920A', fontWeight: 600 }}>Paiement sécurisé Stripe</span>
         </div>
       </div>
     </m.div>

@@ -11,6 +11,10 @@ export default defineSchema({
     type: v.string(),
     clerkUserId: v.optional(v.string()),
     suspended: v.optional(v.boolean()),
+    // Champs legacy présents sur d'anciens documents (plus écrits par create/update).
+    // Déclarés en optionnel pour que le schéma valide les docs existants.
+    plan: v.optional(v.string()),
+    status: v.optional(v.string()),
   }).index("by_slug", ["slug"])
     .index("by_clerk_user", ["clerkUserId"]),
 
@@ -22,6 +26,11 @@ export default defineSchema({
     guests: v.optional(v.number()),
     durationMinutes: v.optional(v.number()),
     amountCents: v.optional(v.number()),
+    orderItems: v.optional(v.array(v.object({
+      name: v.string(),
+      qty: v.number(),
+      unitCents: v.number(),
+    }))),
     alert: v.optional(v.boolean()),
   }).index("by_restaurant", ["restaurantId"]),
 
@@ -48,6 +57,7 @@ export default defineSchema({
     tags: v.array(v.string()),
     text: v.string(),
     isNew: v.boolean(),
+    deliveredAt: v.optional(v.number()),
     createdAt: v.number(),
     timeLabel: v.string(),
   }).index("by_restaurant", ["restaurantId"])

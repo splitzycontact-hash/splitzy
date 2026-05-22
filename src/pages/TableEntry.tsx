@@ -99,6 +99,7 @@ export function TableEntry() {
           convexRestaurantId: context.restaurant._id,
           convexTableId: context.table!._id,
           tableTotalCents: context.table!.amountCents ?? TABLE_TOTAL_CENTS,
+          orderItems: context.table!.orderItems ?? [],
         },
       })
     })

@@ -22,6 +22,15 @@ export interface SelectedItem {
   priceCents: number
 }
 
+// Article réellement commandé sur la table (posé par le POS ou la simulation
+// dashboard). `id` est synthétique et stable pour la session (index dans la commande).
+export interface OrderItem {
+  id: string
+  name: string
+  qty: number
+  unitCents: number
+}
+
 export type TipChoice = number | null // 0-30 as percentage, or null
 
 export interface SessionState {
@@ -37,6 +46,7 @@ export interface SessionState {
   splitMode: 'item' | 'equal' | 'custom'
   equalSplitCount: number
   customAmount: number
+  orderItems: OrderItem[]
   selectedItems: SelectedItem[]
   tipPercent: number // 0-30
   selectedCardId: string
@@ -62,5 +72,5 @@ export type SessionAction =
   | { type: 'TOGGLE_FEEDBACK_TAG'; payload: string }
   | { type: 'SET_FEEDBACK_TEXT'; payload: string }
   | { type: 'SEND_FEEDBACK' }
-  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number } }
+  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number; orderItems: { name: string; qty: number; unitCents: number }[] } }
   | { type: 'RESET_SESSION' }

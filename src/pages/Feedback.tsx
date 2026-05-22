@@ -103,7 +103,7 @@ export function Feedback() {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', padding: '16px 20px 0' }}>
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', padding: '16px 20px 160px' }}>
         {/* Privacy badge */}
         <div style={{
           padding: 14, borderRadius: 14, background: '#FFF4E5',
@@ -208,8 +208,18 @@ export function Feedback() {
         </div>
       </div>
 
-      {/* CTAs */}
-      <div style={{ padding: '14px 20px', paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))', flexShrink: 0 }}>
+      {/* Fixed CTA */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        width: '100%',
+        background: '#F4F4F5',
+        padding: '14px 20px',
+        paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))',
+        zIndex: 50,
+        boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
+      }}>
         <m.button
           type="button"
           whileTap={{ scale: 0.985 }}

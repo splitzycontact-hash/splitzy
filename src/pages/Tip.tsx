@@ -60,7 +60,7 @@ export function Tip() {
       </div>
 
       {/* Body */}
-      <div style={{ padding: '0 20px 28px', flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ padding: '0 20px 140px', flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ fontSize: 14, fontWeight: 800, margin: '18px 0 12px', color: '#111827' }}>
           Laisser un pourboire
         </div>
@@ -127,8 +127,18 @@ export function Tip() {
         </div>
       </div>
 
-      {/* CTA */}
-      <div style={{ padding: '14px 20px', paddingBottom: 'max(28px, calc(16px + env(safe-area-inset-bottom)))', flexShrink: 0 }}>
+      {/* Fixed CTA */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        width: '100%',
+        background: '#F4F4F5',
+        padding: '14px 20px',
+        paddingBottom: 'max(28px, calc(16px + env(safe-area-inset-bottom)))',
+        zIndex: 50,
+        boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
+      }}>
         <m.button
           type="button"
           whileTap={{ scale: 0.985 }}

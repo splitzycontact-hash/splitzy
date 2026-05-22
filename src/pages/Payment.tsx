@@ -240,16 +240,25 @@ export function Payment() {
 
       <div style={{ flex: 1, minHeight: 16 }} />
 
-      {/* Security + CTA */}
-      <div style={{ padding: '12px 20px 8px', textAlign: 'center' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#A1A1AA', fontSize: 11 }}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M6 1L1.5 3v4c0 2.5 4.5 4 4.5 4s4.5-1.5 4.5-4V3L6 1z" stroke="#A1A1AA" strokeWidth="1.2" />
-          </svg>
-          Paiement sécurisé · Stripe · 3D Secure
+      {/* Fixed CTA */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        width: '100%',
+        background: '#0A0A0A',
+        padding: '8px 20px',
+        paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))',
+        zIndex: 50,
+      }}>
+        <div style={{ padding: '8px 0', textAlign: 'center' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#A1A1AA', fontSize: 11 }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1L1.5 3v4c0 2.5 4.5 4 4.5 4s4.5-1.5 4.5-4V3L6 1z" stroke="#A1A1AA" strokeWidth="1.2" />
+            </svg>
+            Paiement sécurisé · Stripe · 3D Secure
+          </div>
         </div>
-      </div>
-      <div style={{ padding: '8px 20px', paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))' }}>
         <m.button
           type="button"
           whileTap={{ scale: 0.985 }}

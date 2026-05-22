@@ -227,31 +227,42 @@ export function Profile() {
           ))}
         </div>
 
-        <div style={{ flex: 1, minHeight: 16 }} />
+        <div style={{ minHeight: 130 }} />
+      </div>
 
-        {/* CTA */}
-        <div style={{ paddingBottom: 'max(32px, calc(20px + env(safe-area-inset-bottom)))', flexShrink: 0 }}>
-          <m.button
-            type="button"
-            whileTap={{ scale: 0.985 }}
-            onClick={() => navigate('/items')}
-            disabled={!canContinue}
-            style={{
-              width: '100%', height: 56, borderRadius: 18, border: 0,
-              background: canContinue ? '#E8920A' : '#E5E7EB',
-              color: canContinue ? '#fff' : '#9CA3AF',
-              fontSize: 16, fontWeight: 800, letterSpacing: '0.01em',
-              cursor: canContinue ? 'pointer' : 'default',
-              boxShadow: canContinue ? '0 4px 18px rgba(232,146,10,0.32), 0 1px 4px rgba(0,0,0,0.1)' : 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-          >
-            Rejoindre la table
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M6.75 3.75L11.25 9L6.75 14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </m.button>
-        </div>
+      {/* Fixed CTA */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        width: '100%',
+        background: '#fff',
+        borderTop: '1px solid #E5E7EB',
+        padding: '14px 24px',
+        paddingBottom: 'max(32px, calc(20px + env(safe-area-inset-bottom)))',
+        zIndex: 50,
+        boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
+      }}>
+        <m.button
+          type="button"
+          whileTap={{ scale: 0.985 }}
+          onClick={() => navigate('/items')}
+          disabled={!canContinue}
+          style={{
+            width: '100%', height: 56, borderRadius: 18, border: 0,
+            background: canContinue ? '#E8920A' : '#E5E7EB',
+            color: canContinue ? '#fff' : '#9CA3AF',
+            fontSize: 16, fontWeight: 800, letterSpacing: '0.01em',
+            cursor: canContinue ? 'pointer' : 'default',
+            boxShadow: canContinue ? '0 4px 18px rgba(232,146,10,0.32), 0 1px 4px rgba(0,0,0,0.1)' : 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          Rejoindre la table
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M6.75 3.75L11.25 9L6.75 14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </m.button>
       </div>
     </m.div>
   )

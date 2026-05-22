@@ -1,24 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
-import { useQuery } from 'convex/react'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
-import { MENU_ITEMS } from '../data/menu'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
-import { api } from '../../convex/_generated/api'
-import type { Id } from '../../convex/_generated/dataModel'
-import type { MenuItem } from '../context/types'
-
-type Category = 'entrees' | 'plats' | 'desserts' | 'boissons'
-
-const CATEGORY_LABELS: Record<Category, string> = {
-  entrees: 'Entrées',
-  plats: 'Plats',
-  desserts: 'Desserts',
-  boissons: 'Boissons',
-}
 
 function StepBar({ current }: { current: number }) {
   return (
@@ -37,34 +23,10 @@ export function Items() {
   const { state, dispatch } = useSession()
   const navigate = useNavigate()
   const { subtotal } = useSessionCalcs()
-  const [openCat, setOpenCat] = useState<Category | null>('entrees')
-
-  const convexItems = useQuery(
-    api.menuItems.listByRestaurant,
-    state.convexRestaurantId
-      ? { restaurantId: state.convexRestaurantId as Id<'restaurants'> }
-      : 'skip',
-  )
-
-  const menuItems: MenuItem[] = convexItems && convexItems.length > 0
-    ? convexItems.map(item => ({
-        id: item._id,
-        category: item.category as MenuItem['category'],
-        emoji: item.emoji,
-        name: item.name,
-        description: item.description ?? '',
-        price: item.priceCents,
-      }))
-    : MENU_ITEMS
 
   const isSelected = (id: string) => state.selectedItems.some(i => i.menuItemId === id)
   const getSplitFactor = (id: string) => state.selectedItems.find(i => i.menuItemId === id)?.splitFactor ?? 1
   const selectedCount = state.selectedItems.length
-
-  const categorized = (['entrees', 'plats', 'desserts', 'boissons'] as Category[]).map(cat => ({
-    cat,
-    items: menuItems.filter(m => m.category === cat),
-  })).filter(g => g.items.length > 0)
 
   const perPerson = state.tableTotalCents > 0
     ? Math.round(state.tableTotalCents / state.equalSplitCount)
@@ -134,120 +96,110 @@ export function Items() {
         </div>
       </div>
 
-      {/* Mode content */}
+      {/* Mode content — articles réellement commandés sur la table (POS ou simulation) */}
       {state.splitMode === 'item' && (
-        <div style={{ padding: '14px 20px 0', flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
-          {categorized.map(({ cat, items }) => {
-            const open = openCat === cat
-            return (
-              <div key={cat} style={{
-                background: '#fff', borderRadius: 14, border: '1px solid #E4E4E7',
-                marginBottom: 10, overflow: 'hidden',
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setOpenCat(open ? null : cat)}
-                  style={{
-                    width: '100%', padding: '14px 16px', border: 0, background: 'transparent',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
-                  }}
-                >
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#0A0A0A' }}>
-                    {CATEGORY_LABELS[cat]}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#52525B', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    {items.length} articles
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: open ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 0.18s' }}>
-                      <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </span>
-                </button>
-                {open && (
-                  <div style={{ borderTop: '1px solid #F1F1F2' }}>
-                    {items.map((it, idx) => {
-                      const sel = isSelected(it.id)
-                      const factor = getSplitFactor(it.id)
-                      return (
-                        <div key={it.id} style={{
-                          borderBottom: idx < items.length - 1 ? '1px solid #F1F1F2' : 'none',
+        <div style={{ padding: '14px 20px 160px', flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+          {state.orderItems.length === 0 ? (
+            <div style={{ marginTop: 40, textAlign: 'center', padding: '0 20px' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#0A0A0A', marginBottom: 6 }}>
+                Aucun article sur cette table
+              </div>
+              <div style={{ fontSize: 13, color: '#52525B', lineHeight: 1.5 }}>
+                Utilise « Parts égales » ou « Montant libre » ci-dessus pour régler ta part.
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 12.5, color: '#52525B', fontWeight: 600, margin: '4px 2px 12px' }}>
+                Sélectionne les articles que tu règles
+              </div>
+              <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E4E4E7', overflow: 'hidden' }}>
+                {state.orderItems.map((it, idx) => {
+                  const lineCents = it.qty * it.unitCents
+                  const sel = isSelected(it.id)
+                  const factor = getSplitFactor(it.id)
+                  return (
+                    <div key={it.id} style={{
+                      borderBottom: idx < state.orderItems.length - 1 ? '1px solid #F1F1F2' : 'none',
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => dispatch({ type: 'TOGGLE_ITEM', payload: { itemId: it.id, priceCents: lineCents } })}
+                        style={{
+                          width: '100%', padding: '14px 16px', border: 0, background: 'transparent',
+                          display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{
+                          width: 22, height: 22, borderRadius: 7,
+                          border: `1.5px solid ${sel ? '#E8920A' : '#E4E4E7'}`,
+                          background: sel ? '#E8920A' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          flexShrink: 0,
                         }}>
-                          <button
-                            type="button"
-                            onClick={() => dispatch({ type: 'TOGGLE_ITEM', payload: { itemId: it.id, priceCents: it.price } })}
-                            style={{
-                              width: '100%', padding: '12px 16px', border: 0, background: 'transparent',
-                              display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
-                            }}
-                          >
-                            <div style={{
-                              width: 22, height: 22, borderRadius: 7,
-                              border: `1.5px solid ${sel ? '#E8920A' : '#E4E4E7'}`,
-                              background: sel ? '#E8920A' : 'transparent',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              flexShrink: 0,
-                            }}>
-                              {sel && (
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                  <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-                                </svg>
-                              )}
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                              <div style={{ fontSize: 14, fontWeight: 500, color: '#0A0A0A' }}>
-                                {it.emoji ? `${it.emoji} ` : ''}{it.name}
-                              </div>
-                              {it.description && (
-                                <div style={{ fontSize: 11.5, color: '#52525B', marginTop: 1 }}>{it.description}</div>
-                              )}
-                            </div>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: sel ? '#E8920A' : '#0A0A0A', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                              {formatEur(it.price)}
-                            </div>
-                          </button>
                           {sel && (
-                            <div style={{ padding: '4px 16px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <span style={{ fontSize: 11.5, color: '#52525B', fontWeight: 600 }}>Partager :</span>
-                              <div style={{ display: 'flex', gap: 6 }}>
-                                {([1, 2, 3, 4] as const).map(s => {
-                                  const isActive = factor === s
-                                  return (
-                                    <button
-                                      key={s}
-                                      type="button"
-                                      onClick={() => dispatch({ type: 'SET_ITEM_SPLIT', payload: { itemId: it.id, factor: s } })}
-                                      style={{
-                                        height: 44, minWidth: 44, padding: '0 10px',
-                                        borderRadius: 10,
-                                        border: `1.5px solid ${isActive ? '#E8920A' : '#E4E4E7'}`,
-                                        background: isActive ? '#FFF4E5' : '#fff',
-                                        color: isActive ? '#E8920A' : '#52525B',
-                                        fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                                      }}
-                                    >
-                                      ÷{s}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                              <div style={{ flex: 1 }} />
-                              <span style={{ fontSize: 12, color: '#E8920A', fontWeight: 700 }}>
-                                = {formatEur(Math.round(it.price / factor))}
-                              </span>
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                              <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+                            </svg>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: '#0A0A0A' }}>
+                            {it.qty > 1 ? `${it.qty}× ` : ''}{it.name}
+                          </div>
+                          {it.qty > 1 && (
+                            <div style={{ fontSize: 11.5, color: '#52525B', marginTop: 1 }}>
+                              {formatEur(it.unitCents)} l'unité
                             </div>
                           )}
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
+                        <div style={{ fontSize: 14, fontWeight: 700, color: sel ? '#E8920A' : '#0A0A0A', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                          {formatEur(lineCents)}
+                        </div>
+                      </button>
+                      {sel && (
+                        <div style={{ padding: '4px 16px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 11.5, color: '#52525B', fontWeight: 600 }}>Partager :</span>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            {([1, 2, 3, 4] as const).map(s => {
+                              const isActive = factor === s
+                              return (
+                                <button
+                                  key={s}
+                                  type="button"
+                                  onClick={() => dispatch({ type: 'SET_ITEM_SPLIT', payload: { itemId: it.id, factor: s } })}
+                                  style={{
+                                    height: 44, minWidth: 44, padding: '0 10px',
+                                    borderRadius: 10,
+                                    border: `1.5px solid ${isActive ? '#E8920A' : '#E4E4E7'}`,
+                                    background: isActive ? '#FFF4E5' : '#fff',
+                                    color: isActive ? '#E8920A' : '#52525B',
+                                    fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                                  }}
+                                >
+                                  ÷{s}
+                                </button>
+                              )
+                            })}
+                          </div>
+                          <div style={{ flex: 1 }} />
+                          <span style={{ fontSize: 12, color: '#E8920A', fontWeight: 700 }}>
+                            = {formatEur(Math.round(lineCents / factor))}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-            )
-          })}
+            </>
+          )}
         </div>
       )}
 
       {state.splitMode === 'equal' && (
-        <div style={{ padding: '14px 20px 0', flex: 1 }}>
+        <div style={{ padding: '14px 20px 160px', flex: 1 }}>
           <div style={{
             background: '#fff', borderRadius: 18, border: '1px solid #E4E4E7',
             padding: 22, textAlign: 'center',
@@ -303,15 +255,18 @@ export function Items() {
         <CustomAmountMode totalCents={state.tableTotalCents} />
       )}
 
-      <div style={{ minHeight: 24 }} />
-
-      {/* Sticky footer */}
+      {/* Fixed CTA */}
       <div style={{
-        position: 'sticky', bottom: 0,
-        background: 'linear-gradient(to top, #FAFAFA 70%, rgba(250,250,250,0))',
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        width: '100%',
+        background: '#fff',
+        borderTop: '1px solid #E5E7EB',
         padding: '14px 20px',
-        paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))',
-        flexShrink: 0,
+        paddingBottom: 'max(28px, calc(16px + env(safe-area-inset-bottom)))',
+        zIndex: 50,
+        boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
       }}>
         <div style={{
           background: '#fff', border: '1px solid #E4E4E7', borderRadius: 14,
@@ -383,7 +338,7 @@ function CustomAmountMode({ totalCents }: { totalCents: number }) {
   }
 
   return (
-    <div style={{ padding: '20px 20px 0', flex: 1 }}>
+    <div style={{ padding: '20px 20px 160px', flex: 1 }}>
       <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #E4E4E7', padding: 22 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>
           Je paie le montant de mon choix

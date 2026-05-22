@@ -116,6 +116,7 @@ export function Tables() {
         status: 'dining',
         guests: simItems.reduce((s, i) => s + i.qty, 0),
         amountCents: totalCents,
+        orderItems: simItems.map(i => ({ name: i.name, qty: i.qty, unitCents: i.unitCents })),
       })
     } finally {
       setSimLoading(false)
