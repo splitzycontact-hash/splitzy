@@ -16,7 +16,7 @@ const initialState: SessionState = {
   equalSplitCount: 2,
   customAmount: 0,
   selectedItems: [],
-  tipPercent: 0,
+  tipPercent: 10,
   selectedCardId: 'visa',
   paymentConfirmed: false,
   feedbackStars: 0,
