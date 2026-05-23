@@ -113,7 +113,7 @@ export function CarriersPage() {
             <div className="md:col-span-8">
               <div className="mb-7">
                 <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[12px] font-semibold" style={{ background: 'rgba(232,146,10,0.12)', color: '#E8920A' }}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
                   Carrières
                 </span>
               </div>
@@ -168,7 +168,7 @@ export function CarriersPage() {
             <div className="md:col-span-7">
               <div className="mb-5">
                 <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 text-orange-700 text-[12px] font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
                   Ce qu'on offre
                 </span>
               </div>
@@ -205,7 +205,7 @@ export function CarriersPage() {
             <div>
               <div className="mb-5">
                 <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 text-orange-700 text-[12px] font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
                   Postes ouverts
                 </span>
               </div>
@@ -282,7 +282,7 @@ export function CarriersPage() {
             <div className="md:col-span-5">
               <div className="mb-5">
                 <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[12px] font-semibold" style={{ background: 'rgba(232,146,10,0.12)', color: '#E8920A' }}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
                   Transparence salariale
                 </span>
               </div>
@@ -348,7 +348,7 @@ export function CarriersPage() {
           <div className="text-center mb-16">
             <div className="flex justify-center mb-5">
               <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 text-orange-700 text-[12px] font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
                 Le process
               </span>
             </div>

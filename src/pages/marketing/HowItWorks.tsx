@@ -75,7 +75,7 @@ function StepCard({ step, idx }: { step: StepData; idx: number }) {
           <p className="mt-2 text-[15px] leading-[1.6] text-ink-500">{desc}</p>
           <div className="mt-5 pt-5 border-t border-dashed border-ink-200">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 text-[11px] font-medium whitespace-nowrap">
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
               {chip}
             </span>
           </div>

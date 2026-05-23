@@ -101,7 +101,7 @@ export function Overview() {
             label="TABLES ACTIVES"
             value={`${activeTables} / ${totalTables}`}
             sub={paymentTables > 0 ? `${paymentTables} en paiement` : 'Toutes libres'}
-            subColor={paymentTables > 0 ? 'text-orange-500' : 'text-muted'}
+            subColor={paymentTables > 0 ? 'text-brand' : 'text-muted'}
             accent="text-dark"
           />
           <KpiCard
@@ -161,10 +161,10 @@ export function Overview() {
                 {BAR_DAYS.map((day, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1">
                     <div
-                      className={`w-full rounded-t-md transition-all ${i === new Date().getDay() - 1 ? 'bg-brand-dark' : 'bg-brand'}`}
+                      className={`w-full rounded-t-md transition-all ${i === (new Date().getDay() + 6) % 7 ? 'bg-brand-dark' : 'bg-brand'}`}
                       style={{ height: `${barHeights[i]}%` }}
                     />
-                    <span className={`text-[11px] font-medium ${i === new Date().getDay() - 1 ? 'text-brand font-bold' : 'text-muted'}`}>{day}</span>
+                    <span className={`text-[11px] font-medium ${i === (new Date().getDay() + 6) % 7 ? 'text-brand font-bold' : 'text-muted'}`}>{day}</span>
                   </div>
                 ))}
               </div>

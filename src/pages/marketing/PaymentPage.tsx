@@ -552,7 +552,7 @@ export function PaymentPage() {
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
               className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-600/10 text-orange-400 text-[11.5px] font-bold tracking-widest uppercase mb-5"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_0_4px_rgba(232,146,10,0.25)]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-600 shadow-[0_0_0_4px_rgba(232,146,10,0.25)]" />
               Expérience client
             </m.span>
             <m.h1
@@ -560,7 +560,7 @@ export function PaymentPage() {
               className="text-[38px] sm:text-[48px] md:text-[60px] font-extrabold text-white tracking-[-0.04em] leading-[1.02] mb-4"
             >
               Du QR à l'avis privé,<br className="hidden sm:inline" />
-              {' '}en <span className="text-orange-500">moins de 90 s</span>.
+              {' '}en <span className="text-orange-600">moins de 90 s</span>.
             </m.h1>
             <m.p
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}
@@ -640,7 +640,7 @@ export function PaymentPage() {
             {/* dot indicators */}
             <div className="flex items-center gap-1.5">
               {STEPS.map((_, i) => (
-                <button key={i} type="button" onClick={() => setStep(i)} className={`rounded-full transition-all ${i === step ? 'w-5 h-2 bg-orange-500' : 'w-2 h-2 bg-white/20 hover:bg-white/40'}`} />
+                <button key={i} type="button" onClick={() => setStep(i)} className={`rounded-full transition-all ${i === step ? 'w-5 h-2 bg-orange-600' : 'w-2 h-2 bg-white/20 hover:bg-white/40'}`} />
               ))}
             </div>
             <button

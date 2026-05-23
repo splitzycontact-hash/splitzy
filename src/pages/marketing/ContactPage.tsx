@@ -288,7 +288,7 @@ function ContactSidebar() {
         <div className="absolute top-[-60px] right-[-60px] w-[200px] h-[200px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(232,146,10,0.18) 0%, transparent 60%)' }} />
         <div className="relative">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-600/15 text-orange-400 text-[10.5px] font-bold tracking-widest uppercase mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
             Direct
           </span>
           <a href="mailto:contact@splitzy.fr" className="flex items-center gap-2 text-[22px] font-bold text-white tracking-tight mt-2 no-underline hover:text-orange-400 transition-colors">
@@ -460,11 +460,11 @@ export function ContactPage() {
         <div className="absolute -bottom-[120px] -left-[80px] w-[360px] h-[360px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(232,146,10,0.08) 0%, transparent 60%)' }} />
         <div className="max-w-6xl mx-auto relative text-center">
           <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-600/10 text-orange-400 text-[11.5px] font-bold tracking-widest uppercase mb-5">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_0_4px_rgba(232,146,10,0.22)]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-600 shadow-[0_0_0_4px_rgba(232,146,10,0.22)]" />
             Contact
           </span>
           <h1 className="text-[48px] md:text-[64px] font-extrabold tracking-[-0.04em] leading-[1.02] mb-4">
-            Parlons-<span className="text-orange-500">nous</span>.
+            Parlons-<span className="text-orange-600">nous</span>.
           </h1>
           <p className="text-[16px] md:text-[17px] text-white/60 max-w-[520px] mx-auto leading-relaxed">
             Une question, une démo, un partenariat — on lit chaque message<br className="hidden md:inline" />
@@ -477,7 +477,7 @@ export function ContactPage() {
               { Icon: IcSparkle, label: 'Sans démarchage' },
             ].map(({ Icon, label }, i) => (
               <span key={i} className="inline-flex items-center gap-2 text-white/70 text-[12.5px] font-medium whitespace-nowrap">
-                <Icon className="w-3.5 h-3.5 text-orange-500" />
+                <Icon className="w-3.5 h-3.5 text-orange-600" />
                 {label}
               </span>
             ))}

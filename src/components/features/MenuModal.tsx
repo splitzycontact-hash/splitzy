@@ -33,7 +33,7 @@ export function MenuModal({ open, onClose }: MenuModalProps) {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl max-h-[85vh] overflow-hidden flex flex-col"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl max-h-[85dvh] overflow-hidden flex flex-col"
             style={{ maxWidth: 390, margin: '0 auto' }}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">

@@ -90,7 +90,7 @@ export function AboutPage() {
         <div className="relative max-w-[1100px] mx-auto px-6 text-center">
           <div className="flex justify-center mb-8">
             <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[12px] font-semibold" style={{ background: 'rgba(232,146,10,0.12)', color: '#E8920A' }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
               À propos
             </span>
           </div>
@@ -151,7 +151,7 @@ export function AboutPage() {
           <div className="text-center mb-20">
             <div className="flex justify-center mb-5">
               <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 text-orange-700 text-[12px] font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
                 L'histoire
               </span>
             </div>
@@ -207,7 +207,7 @@ export function AboutPage() {
             <div className="max-w-[640px]">
               <div className="mb-5">
                 <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 text-orange-700 text-[12px] font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
                   L'équipe
                 </span>
               </div>
@@ -325,7 +325,7 @@ export function AboutPage() {
             <div className="md:col-span-5">
               <div className="mb-5">
                 <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[12px] font-semibold" style={{ background: 'rgba(232,146,10,0.12)', color: '#E8920A' }}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
                   Notre mission
                 </span>
               </div>
@@ -369,7 +369,7 @@ export function AboutPage() {
           <div className="text-center mb-16">
             <div className="flex justify-center mb-5">
               <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-50 text-orange-700 text-[12px] font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-600" />
                 Nos valeurs
               </span>
             </div>

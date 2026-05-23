@@ -175,7 +175,7 @@ export function Hero() {
         <m.div initial="hidden" animate="visible" custom={0.1} variants={fadeInUp}>
           <h1 className="mt-6 md:mt-8 text-center text-[36px] md:text-[56px] leading-[1.05] font-bold text-white max-w-3xl mx-auto text-balance">
             <span className="block">Fini les additions qui traînent.</span>
-            <span className="block text-orange-500">Vos clients paient en 30 secondes.</span>
+            <span className="block text-orange-600">Vos clients paient en 30 secondes.</span>
           </h1>
         </m.div>
 
@@ -221,7 +221,7 @@ export function Hero() {
         >
           {['Gratuit pour commencer', 'Aucune carte requise', 'Configuré en 5 min'].map((t) => (
             <li key={t} className="inline-flex items-center gap-1.5">
-              <IconCheck size={14} stroke={2.4} className="text-orange-500" />
+              <IconCheck size={14} stroke={2.4} className="text-orange-600" />
               {t}
             </li>
           ))}
@@ -264,7 +264,7 @@ export function Hero() {
                 <div>
                   <p className="text-[13px] font-semibold text-white">Scan en cours</p>
                   <p className="text-[11px] text-white/50">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse-dot mr-1" />
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-600 animate-pulse-dot mr-1" />
                     Table 12 — en train de payer
                   </p>
                 </div>
