@@ -8,14 +8,22 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
+import type * as auditLogs from "../auditLogs.js";
+import type * as bugs from "../bugs.js";
 import type * as dependencyStatus from "../dependencyStatus.js";
+import type * as featureFlags from "../featureFlags.js";
 import type * as feedbacks from "../feedbacks.js";
 import type * as menuItems from "../menuItems.js";
 import type * as payments from "../payments.js";
 import type * as posIntegrations from "../posIntegrations.js";
+import type * as restaurantNotes from "../restaurantNotes.js";
 import type * as restaurants from "../restaurants.js";
 import type * as seed from "../seed.js";
 import type * as tables from "../tables.js";
+import type * as tickets from "../tickets.js";
+import type * as transactions from "../transactions.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -24,14 +32,22 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
+  auditLogs: typeof auditLogs;
+  bugs: typeof bugs;
   dependencyStatus: typeof dependencyStatus;
+  featureFlags: typeof featureFlags;
   feedbacks: typeof feedbacks;
   menuItems: typeof menuItems;
   payments: typeof payments;
   posIntegrations: typeof posIntegrations;
+  restaurantNotes: typeof restaurantNotes;
   restaurants: typeof restaurants;
   seed: typeof seed;
   tables: typeof tables;
+  tickets: typeof tickets;
+  transactions: typeof transactions;
+  users: typeof users;
 }>;
 
 /**

@@ -1,5 +1,20 @@
+import { ConvexError, v } from "convex/values"
 import { query, mutation } from "./_generated/server"
-import { v } from "convex/values"
+
+async function requireAdmin(ctx: any) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new ConvexError("Not authenticated");
+  const user = await ctx.db.query("users")
+    .withIndex("by_clerk_id", (q: any) => q.eq("clerkUserId", identity.subject))
+    .unique();
+  if (!user || !["super_admin", "admin_support"].includes(user.role)) {
+    throw new ConvexError("Insufficient permissions");
+  }
+  if (!user.totpEnabled) {
+    throw new ConvexError("MFA TOTP obligatoire pour les administrateurs");
+  }
+  return user;
+}
 
 export const getTableContext = query({
   args: { slug: v.string(), tableNumber: v.number() },
@@ -61,6 +76,81 @@ export const setSuspended = mutation({
   args: { id: v.id("restaurants"), suspended: v.boolean() },
   handler: async (ctx, { id, suspended }) => {
     await ctx.db.patch(id, { suspended })
+  },
+})
+
+export const getById = query({
+  args: { restaurantId: v.id("restaurants") },
+  handler: async (ctx, args) => ctx.db.get(args.restaurantId),
+})
+
+export const listAll = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const user = await ctx.db.query("users")
+      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
+      .unique();
+    if (!user || !["super_admin", "admin_support", "viewer"].includes(user.role)) return [];
+    return ctx.db.query("restaurants").collect();
+  },
+})
+
+export const listWithLastActivity = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const user = await ctx.db.query("users")
+      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
+      .unique();
+    if (!user || !["super_admin", "admin_support", "viewer"].includes(user.role)) return [];
+    const restaurants = await ctx.db.query("restaurants").collect();
+    const result = await Promise.all(restaurants.map(async (r) => {
+      const lastTx = await ctx.db.query("transactions")
+        .withIndex("by_restaurant", q => q.eq("restaurantId", r._id))
+        .order("desc")
+        .first();
+      return { ...r, lastActivityAt: lastTx?.succeededAt ?? r._creationTime };
+    }));
+    return result;
+  },
+})
+
+export const suspend = mutation({
+  args: { restaurantId: v.id("restaurants"), reason: v.string() },
+  handler: async (ctx, args) => {
+    const actor = await requireAdmin(ctx);
+    const restaurant = await ctx.db.get(args.restaurantId);
+    if (!restaurant) throw new ConvexError("Restaurant not found");
+    await ctx.db.patch(args.restaurantId, { status: "suspended", suspended: true });
+    await ctx.db.insert("auditLogs", {
+      actorId: actor._id,
+      action: "restaurant.suspended",
+      resourceType: "restaurant",
+      resourceId: args.restaurantId,
+      diff: { reason: args.reason, previousStatus: restaurant.status },
+    });
+    await ctx.db.insert("tickets", {
+      restaurantId: args.restaurantId,
+      subject: `Compte suspendu — ${restaurant.name}`,
+      status: "new",
+      priority: "high",
+      createdBy: actor._id,
+    });
+  },
+})
+
+export const unsuspend = mutation({
+  args: { restaurantId: v.id("restaurants") },
+  handler: async (ctx, args) => {
+    const actor = await requireAdmin(ctx);
+    await ctx.db.patch(args.restaurantId, { status: "active", suspended: false });
+    await ctx.db.insert("auditLogs", {
+      actorId: actor._id,
+      action: "restaurant.unsuspended",
+      resourceType: "restaurant",
+      resourceId: args.restaurantId,
+    });
   },
 })
 
