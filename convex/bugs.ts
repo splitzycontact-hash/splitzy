@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { isAdminAccess } from "./lib";
+import { isAdminAccess, resolveAdminUser } from "./lib";
 
 export const listByRestaurant = query({
   args: { restaurantId: v.id("restaurants"), authEmail: v.optional(v.string()) },
@@ -36,31 +36,25 @@ export const create = mutation({
     ),
     restaurantId: v.optional(v.id("restaurants")),
     stackTrace: v.optional(v.string()),
+    authEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new ConvexError("Not authenticated");
-    const user = await ctx.db.query("users")
-      .withIndex("by_clerk_id", (q: any) => q.eq("clerkUserId", identity.subject))
-      .unique();
+    const { authEmail, ...bug } = args;
+    const user = await resolveAdminUser(ctx, authEmail);
     if (!user || !["super_admin", "admin_support"].includes(user.role)) {
       throw new ConvexError("Insufficient permissions");
     }
     return ctx.db.insert("bugs", {
-      ...args,
+      ...bug,
       status: "open",
     });
   },
 });
 
 export const resolve = mutation({
-  args: { bugId: v.id("bugs") },
+  args: { bugId: v.id("bugs"), authEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new ConvexError("Not authenticated");
-    const user = await ctx.db.query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
-      .unique();
+    const user = await resolveAdminUser(ctx, args.authEmail);
     if (!user || !["super_admin", "admin_support"].includes(user.role)) {
       throw new ConvexError("Insufficient permissions");
     }

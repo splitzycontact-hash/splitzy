@@ -47,16 +47,23 @@ export const upsert = mutation({
 const ADMIN_EMAILS = ["splitzy.contact@gmail.com"];
 
 export const ensureSelfAdmin = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    const userEmail = identity.email;
+    // The admin app has no Clerk→Convex JWT, so identity is null there: fall
+    // back to the allowlisted authEmail so the super_admin doc still exists.
+    const userEmail = identity?.email ?? args.authEmail;
     if (!userEmail || !ADMIN_EMAILS.includes(userEmail)) return null;
 
-    const existing = await ctx.db.query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
-      .unique();
+    let existing = identity
+      ? await ctx.db.query("users")
+          .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
+          .unique()
+      : null;
+    if (!existing) {
+      const all = await ctx.db.query("users").collect();
+      existing = all.find((u) => u.email === userEmail) ?? null;
+    }
 
     if (existing) {
       if (existing.role !== "super_admin") {
@@ -66,10 +73,10 @@ export const ensureSelfAdmin = mutation({
     }
 
     return ctx.db.insert("users", {
-      clerkUserId: identity.subject,
+      clerkUserId: identity?.subject ?? `email:${userEmail}`,
       email: userEmail,
-      firstName: identity.givenName,
-      lastName: identity.familyName,
+      firstName: identity?.givenName,
+      lastName: identity?.familyName,
       role: "super_admin",
     });
   },

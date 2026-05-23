@@ -1,21 +1,17 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { isAdminAccess, resolveAdminUser } from "./lib";
 
-async function requireEditor(ctx: any) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new ConvexError("Not authenticated");
-  const user = await ctx.db.query("users")
-    .withIndex("by_clerk_id", (q: any) => q.eq("clerkUserId", identity.subject))
-    .unique();
+async function requireEditor(ctx: any, authEmail?: string) {
+  const user = await resolveAdminUser(ctx, authEmail);
   if (!user || user.role === "viewer") throw new ConvexError("Insufficient permissions");
   return user;
 }
 
 export const list = query({
-  args: { restaurantId: v.id("restaurants") },
+  args: { restaurantId: v.id("restaurants"), authEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+    if (!(await isAdminAccess(ctx, args.authEmail))) return [];
     return ctx.db.query("restaurantNotes")
       .withIndex("by_restaurant", q => q.eq("restaurantId", args.restaurantId))
       .order("desc")
@@ -24,9 +20,9 @@ export const list = query({
 });
 
 export const create = mutation({
-  args: { restaurantId: v.id("restaurants"), body: v.string() },
+  args: { restaurantId: v.id("restaurants"), body: v.string(), authEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const user = await requireEditor(ctx);
+    const user = await requireEditor(ctx, args.authEmail);
     return ctx.db.insert("restaurantNotes", {
       restaurantId: args.restaurantId,
       authorId: user._id,
@@ -36,9 +32,9 @@ export const create = mutation({
 });
 
 export const remove = mutation({
-  args: { noteId: v.id("restaurantNotes") },
+  args: { noteId: v.id("restaurantNotes"), authEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const user = await requireEditor(ctx);
+    const user = await requireEditor(ctx, args.authEmail);
     const note = await ctx.db.get(args.noteId);
     if (!note) throw new ConvexError("Note not found");
     if (note.authorId !== user._id && !["super_admin"].includes(user.role)) {

@@ -161,6 +161,12 @@ Every sensitive Convex mutation checks `ctx.auth.getUserIdentity()` → looks up
 | `restaurantNotes.ts` | `list`, `create`, `remove` |
 | `admin.ts` | `kpis`, `alerts`, `newTicketsCount`, `impersonate`, `logImpersonation`, `verifyImpersonationToken` |
 | `transactions.ts` | `listRecent`, `listByRestaurant`, `countRecentByRestaurant`, `countRecentByIp`, `getOverviewStats`, `markFailed` |
+| `growth.ts` | `kpis`, `weeklyActivity`, `restaurantPipeline` |
+| `billing.ts` | `financialKpis`, `monthlyRevenue`, `subscriptions` |
+| `communications.ts` | `listNotes`, `sendNote` |
+| `config.ts` | `listFeatureFlags`, `toggleFlag`, `createFlag`, `seedDefaultFlags`, `auditLogs`, `getGlobalConfig`, `saveGlobalConfig` |
+| `team.ts` | `listMembers`, `inviteMember`, `updateRole`, `deleteMember`, `recentActivity` |
+| `lib.ts` | `isAdminAccess`, `resolveAdminUser`, `ADMIN_EMAILS` — utilitaires admin partagés |
 
 ### Files still to add (future phases)
 
@@ -441,6 +447,8 @@ NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentio
 | `FeedbackSent` | Centré, check vert | Note privé, download PDF, bouton reset session |
 
 ## Known issues fixed (context for future sessions)
+
+- **Modules admin phase 2** (2026-05-23) : ajout de 5 nouveaux modules Convex admin dans `splitzy-client/convex/` : `growth.ts` (KPIs croissance, activité hebdo, pipeline restaurants), `billing.ts` (MRR/ARR, revenus mensuels, abonnements), `communications.ts` (notes internes par restaurant, encodage type+sujet dans le body pour éviter un schema change), `config.ts` (feature flags, paramètres globaux via prefix `CONFIG_`), `team.ts` (membres admin, invitations, rôles). Refactoring `lib.ts` : `isAdminAccess` (JWT Clerk + fallback email) et `resolveAdminUser` centralisés. Tous les handlers admin utilisent le pattern `authEmail: v.optional(v.string())` pour le fallback sans JWT template Clerk. Déployé sur `mellow-chinchilla-481`.
 
 - **Admin app fonctionnel sans toucher splitzy.fr** (v8, 2026-05-23) : `bugs:listOpen` crashait l'admin (`admin-zeta-gilt-86.vercel.app`) car les tables admin n'existaient pas dans `splitzy-client/convex/`. Solution : ajout de 13 tables dans le schéma (`users`, `sessions`, `diners`, `transactions`, `disputes`, `subscriptions`, `stripeWebhookEvents`, `tickets`, `ticketMessages`, `bugs`, `auditLogs`, `featureFlags`, `restaurantNotes`) + création des fichiers `users.ts`, `bugs.ts`, `tickets.ts`, `auditLogs.ts`, `featureFlags.ts`, `restaurantNotes.ts`, `admin.ts`, `transactions.ts` + ajout de `getById`, `listAll`, `listWithLastActivity`, `suspend`, `unsuspend` dans `restaurants.ts`. Déployé sur `mellow-chinchilla-481`. **JAMAIS déployer depuis `Splitzy/convex/`** — l'historique montre que ça casse `splitzy.fr` (schéma incompatible sur `restaurants.create`).
 

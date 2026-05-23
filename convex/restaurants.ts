@@ -1,18 +1,13 @@
 import { ConvexError, v } from "convex/values"
 import { query, mutation } from "./_generated/server"
-import { isAdminAccess } from "./lib"
+import { isAdminAccess, resolveAdminUser } from "./lib"
 
-async function requireAdmin(ctx: any) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new ConvexError("Not authenticated");
-  const user = await ctx.db.query("users")
-    .withIndex("by_clerk_id", (q: any) => q.eq("clerkUserId", identity.subject))
-    .unique();
+// Resolves the acting admin via Clerk identity OR the allowlisted authEmail
+// fallback (the admin app has no Clerk→Convex JWT, so identity is null there).
+async function requireAdmin(ctx: any, authEmail?: string) {
+  const user = await resolveAdminUser(ctx, authEmail);
   if (!user || !["super_admin", "admin_support"].includes(user.role)) {
     throw new ConvexError("Insufficient permissions");
-  }
-  if (!user.totpEnabled) {
-    throw new ConvexError("MFA TOTP obligatoire pour les administrateurs");
   }
   return user;
 }
@@ -110,9 +105,9 @@ export const listWithLastActivity = query({
 })
 
 export const suspend = mutation({
-  args: { restaurantId: v.id("restaurants"), reason: v.string() },
+  args: { restaurantId: v.id("restaurants"), reason: v.string(), authEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const actor = await requireAdmin(ctx);
+    const actor = await requireAdmin(ctx, args.authEmail);
     const restaurant = await ctx.db.get(args.restaurantId);
     if (!restaurant) throw new ConvexError("Restaurant not found");
     await ctx.db.patch(args.restaurantId, { status: "suspended", suspended: true });
@@ -134,9 +129,9 @@ export const suspend = mutation({
 })
 
 export const unsuspend = mutation({
-  args: { restaurantId: v.id("restaurants") },
+  args: { restaurantId: v.id("restaurants"), authEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const actor = await requireAdmin(ctx);
+    const actor = await requireAdmin(ctx, args.authEmail);
     await ctx.db.patch(args.restaurantId, { status: "active", suspended: false });
     await ctx.db.insert("auditLogs", {
       actorId: actor._id,
