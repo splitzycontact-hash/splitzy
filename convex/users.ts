@@ -44,6 +44,37 @@ export const upsert = mutation({
   },
 });
 
+const ADMIN_EMAILS = ["splitzy.contact@gmail.com"];
+
+export const ensureSelfAdmin = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const userEmail = identity.email;
+    if (!userEmail || !ADMIN_EMAILS.includes(userEmail)) return null;
+
+    const existing = await ctx.db.query("users")
+      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
+      .unique();
+
+    if (existing) {
+      if (existing.role !== "super_admin") {
+        await ctx.db.patch(existing._id, { role: "super_admin" });
+      }
+      return existing._id;
+    }
+
+    return ctx.db.insert("users", {
+      clerkUserId: identity.subject,
+      email: userEmail,
+      firstName: identity.givenName,
+      lastName: identity.familyName,
+      role: "super_admin",
+    });
+  },
+});
+
 export const list = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();

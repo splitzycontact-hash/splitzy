@@ -1,18 +1,36 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { isAdminAccess } from "./lib";
 
 export const listRecent = query({
-  args: { limit: v.optional(v.number()) },
+  args: { limit: v.optional(v.number()), authEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const user = await ctx.db.query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
-      .unique();
-    if (!user || !["super_admin", "admin_support", "viewer"].includes(user.role)) return [];
-    return ctx.db.query("transactions")
-      .order("desc")
-      .take(args.limit ?? 20);
+    if (!(await isAdminAccess(ctx, args.authEmail))) return [];
+    const limit = args.limit ?? 20;
+    const txs = await ctx.db.query("transactions").order("desc").take(limit);
+    if (txs.length > 0) return txs;
+    const payments = await ctx.db.query("payments").order("desc").take(limit);
+    return payments.map(p => ({
+      _id: p._id,
+      _creationTime: p._creationTime,
+      restaurantId: p.restaurantId,
+      sessionId: undefined,
+      stripePaymentIntentId: undefined,
+      stripeChargeId: undefined,
+      amountCents: p.totalCents,
+      tipCents: p.tipCents,
+      commissionCents: p.commissionCents,
+      status: (p.status === "Encaissé"
+        ? "succeeded"
+        : p.status === "Remboursé"
+        ? "refunded"
+        : "pending") as "succeeded" | "refunded" | "pending" | "failed" | "disputed",
+      failureCode: undefined,
+      paymentMethod: p.paymentMethod,
+      cardLast4: undefined,
+      succeededAt: p.createdAt,
+      ipAddress: undefined,
+    }));
   },
 });
 

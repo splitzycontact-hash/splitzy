@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { action, mutation, query } from "./_generated/server";
 import { api } from "./_generated/api";
+import { isAdminAccess } from "./lib";
 
 export const impersonate = action({
   args: { restaurantId: v.id("restaurants") },
@@ -70,18 +71,17 @@ export const verifyImpersonationToken = action({
 });
 
 export const kpis = query({
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    const user = await ctx.db.query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
-      .unique();
-    if (!user || !["super_admin", "admin_support", "viewer"].includes(user.role)) return null;
+  args: { authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx, args.authEmail))) return null;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
 
-    const [restaurants, activeSubs, todayTxs, openBugs] = await Promise.all([
+    const [restaurants, activeSubs, todayTxs, todayPayments, monthPayments, openBugs] = await Promise.all([
       ctx.db.query("restaurants").collect(),
       ctx.db.query("subscriptions")
         .withIndex("by_status", q => q.eq("status", "active"))
@@ -92,6 +92,18 @@ export const kpis = query({
           q.gte(q.field("succeededAt"), today.getTime())
         ))
         .collect(),
+      ctx.db.query("payments")
+        .filter(q => q.and(
+          q.eq(q.field("status"), "Encaissé"),
+          q.gte(q.field("createdAt"), today.getTime())
+        ))
+        .collect(),
+      ctx.db.query("payments")
+        .filter(q => q.and(
+          q.eq(q.field("status"), "Encaissé"),
+          q.gte(q.field("createdAt"), monthStart.getTime())
+        ))
+        .collect(),
       ctx.db.query("bugs")
         .filter(q => q.or(
           q.eq(q.field("status"), "open"),
@@ -100,19 +112,23 @@ export const kpis = query({
         .collect(),
     ]);
 
-    const activeRestaurants = restaurants.filter(r => r.status === "active").length;
-    const mrr = activeSubs.reduce((s, sub) => s + (sub.amountCents ?? 3900), 0);
-    const todayVolume = todayTxs.reduce((s, t) => s + t.amountCents, 0);
+    const proCount = restaurants.filter(r => r.plan === "pro").length;
+    const subsBased = activeSubs.reduce((s, sub) => s + (sub.amountCents ?? 3900), 0);
+    const mrr = subsBased > 0 ? subsBased : proCount * 3900;
+    const statusActive = restaurants.filter(r => r.status === "active").length;
+    const activeRestaurants = statusActive > 0
+      ? statusActive
+      : restaurants.filter(r => !r.suspended).length;
+    const todayVolumeFromTx = todayTxs.reduce((s, t) => s + t.amountCents, 0);
+    const todayVolumeFromPayments = todayPayments.reduce((s, p) => s + p.totalCents, 0);
+    const todayVolume = todayVolumeFromTx + todayVolumeFromPayments;
 
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
     const monthTxCount = (await ctx.db.query("transactions")
       .filter(q => q.and(
         q.eq(q.field("status"), "succeeded"),
         q.gte(q.field("succeededAt"), monthStart.getTime())
       ))
-      .collect()).length;
+      .collect()).length + monthPayments.length;
 
     return {
       mrr,
@@ -126,13 +142,9 @@ export const kpis = query({
 });
 
 export const alerts = query({
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    const user = await ctx.db.query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
-      .unique();
-    if (!user || !["super_admin", "admin_support", "viewer"].includes(user.role)) return null;
+  args: { authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx, args.authEmail))) return null;
 
     const [deadLetters, kycBlocked, openDisputes, criticalBugs] = await Promise.all([
       ctx.db.query("stripeWebhookEvents")
@@ -158,13 +170,9 @@ export const alerts = query({
 });
 
 export const newTicketsCount = query({
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return 0;
-    const user = await ctx.db.query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
-      .unique();
-    if (!user || !["super_admin", "admin_support", "viewer"].includes(user.role)) return 0;
+  args: { authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx, args.authEmail))) return 0;
     const tickets = await ctx.db.query("tickets")
       .withIndex("by_status", q => q.eq("status", "new"))
       .collect();

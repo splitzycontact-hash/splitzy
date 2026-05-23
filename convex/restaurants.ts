@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values"
 import { query, mutation } from "./_generated/server"
+import { isAdminAccess } from "./lib"
 
 async function requireAdmin(ctx: any) {
   const identity = await ctx.auth.getUserIdentity();
@@ -85,25 +86,17 @@ export const getById = query({
 })
 
 export const listAll = query({
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const user = await ctx.db.query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
-      .unique();
-    if (!user || !["super_admin", "admin_support", "viewer"].includes(user.role)) return [];
+  args: { authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx, args.authEmail))) return [];
     return ctx.db.query("restaurants").collect();
   },
 })
 
 export const listWithLastActivity = query({
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const user = await ctx.db.query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
-      .unique();
-    if (!user || !["super_admin", "admin_support", "viewer"].includes(user.role)) return [];
+  args: { authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx, args.authEmail))) return [];
     const restaurants = await ctx.db.query("restaurants").collect();
     const result = await Promise.all(restaurants.map(async (r) => {
       const lastTx = await ctx.db.query("transactions")

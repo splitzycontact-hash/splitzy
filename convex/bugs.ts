@@ -1,15 +1,11 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { isAdminAccess } from "./lib";
 
 export const listByRestaurant = query({
-  args: { restaurantId: v.id("restaurants") },
+  args: { restaurantId: v.id("restaurants"), authEmail: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const user = await ctx.db.query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
-      .unique();
-    if (!user || !["super_admin", "admin_support", "viewer"].includes(user.role)) return [];
+    if (!(await isAdminAccess(ctx, args.authEmail))) return [];
     return ctx.db.query("bugs")
       .withIndex("by_restaurant", q => q.eq("restaurantId", args.restaurantId))
       .order("desc")
@@ -18,13 +14,9 @@ export const listByRestaurant = query({
 });
 
 export const listOpen = query({
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    const user = await ctx.db.query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkUserId", identity.subject))
-      .unique();
-    if (!user || !["super_admin", "admin_support", "viewer"].includes(user.role)) return [];
+  args: { authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx, args.authEmail))) return [];
     return ctx.db.query("bugs")
       .filter(q => q.or(
         q.eq(q.field("status"), "open"),
