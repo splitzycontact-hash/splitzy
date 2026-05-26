@@ -32,7 +32,16 @@ export function Landing() {
     state.convexTableId ? { tableId: state.convexTableId as Id<'tables'> } : 'skip',
   )
 
-  const tableLoading = liveTable === undefined && !!state.convexTableId
+  // Timeout : si Convex ne répond pas en 4s (WS lent iOS), on cache le
+  // spinner et affiche la page sans bandeau plutôt que bloquer.
+  const [tableTimedOut, setTableTimedOut] = useState(false)
+  useEffect(() => {
+    if (liveTable !== undefined) return
+    const t = setTimeout(() => setTableTimedOut(true), 4000)
+    return () => clearTimeout(t)
+  }, [liveTable])
+
+  const tableLoading = liveTable === undefined && !!state.convexTableId && !tableTimedOut
   const billCents = liveTable?.amountCents ?? state.tableTotalCents
   const paidCents = liveTable?.paidCents ?? 0
   const remainingCents = Math.max(0, billCents - paidCents)

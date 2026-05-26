@@ -1,14 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
-import { useQuery } from 'convex/react'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
-import { MENU_ITEMS } from '../data/menu'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
-import { api } from '../../convex/_generated/api'
-import type { Id } from '../../convex/_generated/dataModel'
 import type { MenuItem } from '../context/types'
 
 type Category = 'entrees' | 'plats' | 'desserts' | 'boissons'
@@ -37,21 +33,23 @@ export function Items() {
   const { state, dispatch } = useSession()
   const navigate = useNavigate()
   const { subtotal, billCents, paidCents, remainingCents, isFullyPaid, liveTable } = useSessionCalcs()
-  const [openCat, setOpenCat] = useState<Category | null>('entrees')
+  const [openCat, setOpenCat] = useState<Category | null>('plats')
 
-  const convexItems = useQuery(
-    api.menuItems.listByRestaurant,
-    state.convexRestaurantId
-      ? { restaurantId: state.convexRestaurantId as Id<'restaurants'> }
-      : 'skip',
-  )
+  // Timeout de sécurité : si Convex ne répond pas en 5s (WS lent iOS),
+  // on sort du spinner plutôt que de rester bloqué indéfiniment.
+  const [tableTimedOut, setTableTimedOut] = useState(false)
+  useEffect(() => {
+    if (liveTable !== undefined) return
+    const t = setTimeout(() => setTableTimedOut(true), 5000)
+    return () => clearTimeout(t)
+  }, [liveTable])
 
-  // Guard : liveTable === undefined = Convex en cours de chargement / reconnexion WS
-  if (liveTable === undefined && state.convexTableId) {
+  // Guard : Convex charge → spinner (max 5s)
+  if (liveTable === undefined && state.convexTableId && !tableTimedOut) {
     return (
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        minHeight: '100%', background: '#FAFAFA',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100%', background: '#FAFAFA', gap: 12,
       }}>
         <div style={{
           width: 28, height: 28, borderRadius: '50%',
@@ -59,18 +57,17 @@ export function Items() {
           animation: 'spin 0.8s linear infinite',
         }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+        <div style={{ fontSize: 13, color: '#9CA3AF' }}>Chargement des articles…</div>
       </div>
     )
   }
 
-  // Articles non encore payés de la commande table (orderItems Convex) — filtrés
-  // quand le gérant a défini une commande. Sinon, fallback sur le menu restaurant.
+  // Articles non encore payés de la commande table
   const tableUnpaidItems = (liveTable?.orderItems ?? []).filter(i => !i.paid)
   const hasTableOrder = tableUnpaidItems.length > 0
 
-  // Conversion des orderItems table en objets MenuItem compatibles avec l'UI
-  // (expansion par qty : 2×Pizza → deux entrées séparées sélectionnables)
-  const orderMenuItems: MenuItem[] = hasTableOrder
+  // Conversion orderItems → MenuItem (expansion par qty : 2×Pizza → 2 items séparés)
+  const menuItems: MenuItem[] = hasTableOrder
     ? tableUnpaidItems.flatMap((item, idx) =>
         Array.from({ length: item.qty }, (_, qi) => ({
           id: `order-${idx}-${qi}`,
@@ -83,18 +80,37 @@ export function Items() {
       )
     : []
 
-  const menuItems: MenuItem[] = hasTableOrder
-    ? orderMenuItems
-    : (convexItems && convexItems.length > 0
-        ? convexItems.map(item => ({
-            id: item._id,
-            category: item.category as MenuItem['category'],
-            emoji: item.emoji,
-            name: item.name,
-            description: item.description ?? '',
-            price: item.priceCents,
-          }))
-        : MENU_ITEMS)
+  // Pas d'orderItems → message clair, jamais de menu complet en fallback
+  if (!hasTableOrder) {
+    const allPaid = liveTable != null && (liveTable.orderItems ?? []).length > 0 &&
+      (liveTable.orderItems ?? []).every(i => i.paid === true)
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100%', background: '#FAFAFA', padding: '0 24px', textAlign: 'center', gap: 12,
+      }}>
+        <div style={{ fontSize: 40 }}>{allPaid ? '✅' : '🍽'}</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#0A0A0A' }}>
+          {allPaid ? 'Table entièrement réglée' : 'Aucun article commandé'}
+        </div>
+        <div style={{ fontSize: 13, color: '#9CA3AF' }}>
+          {allPaid
+            ? 'Tous les articles ont été payés.'
+            : 'Le gérant n\'a pas encore enregistré de commande pour cette table.'}
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/welcome')}
+          style={{
+            marginTop: 8, height: 48, padding: '0 24px', borderRadius: 14, border: 0,
+            background: '#E8920A', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          Retour
+        </button>
+      </div>
+    )
+  }
 
   const isSelected = (id: string) => state.selectedItems.some(i => i.menuItemId === id)
   const getSplitFactor = (id: string) => state.selectedItems.find(i => i.menuItemId === id)?.splitFactor ?? 1
