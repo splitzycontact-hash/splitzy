@@ -76,7 +76,18 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
     case 'SET_TABLE_CONTEXT':
       return { ...state, ...action.payload }
     case 'RESET_SESSION':
-      return { ...initialState }
+      // Préserve le contexte de table pour que /welcome reflète l'état Convex
+      // après "Bonne soirée". Seule l'action "Libérer la table" (gérant) doit
+      // purger tout l'état — pas le retour d'un client après son paiement.
+      return {
+        ...initialState,
+        restaurantName: state.restaurantName,
+        tableNumber: state.tableNumber,
+        tableCapacity: state.tableCapacity,
+        convexRestaurantId: state.convexRestaurantId,
+        convexTableId: state.convexTableId,
+        tableTotalCents: state.tableTotalCents,
+      }
     default:
       return state
   }

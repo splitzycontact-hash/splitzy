@@ -24,7 +24,21 @@ export const create = mutation({
     const now = Date.now()
     const d = new Date(now)
     const dateLabel = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
-    return ctx.db.insert("payments", { ...args, status: "Encaissé", createdAt: now, dateLabel })
+    const paymentId = await ctx.db.insert("payments", { ...args, status: "Encaissé", createdAt: now, dateLabel })
+
+    // Réconcilier la table : cumuler le payé sur la sitting courante + ajuster le statut.
+    // Le restant est calculé sur le sous-total (hors pourboire) ; les pourboires
+    // sont agrégés à part pour le dashboard. Jamais de throw : si la table a
+    // disparu on conserve quand même le ledger.
+    const table = await ctx.db.get(args.tableId)
+    if (table) {
+      const paidCents = (table.paidCents ?? 0) + args.subtotalCents
+      const paidTipCents = (table.paidTipCents ?? 0) + args.tipCents
+      const billCents = table.amountCents ?? 0
+      const status = billCents > 0 && paidCents >= billCents ? "paid" as const : "payment" as const
+      await ctx.db.patch(args.tableId, { paidCents, paidTipCents, status })
+    }
+    return paymentId
   },
 })
 

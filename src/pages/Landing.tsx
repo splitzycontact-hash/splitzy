@@ -1,12 +1,28 @@
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
+import { useQuery } from 'convex/react'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
+import { api } from '../../convex/_generated/api'
+import type { Id } from '../../convex/_generated/dataModel'
 
 export function Landing() {
   const { state } = useSession()
   const navigate = useNavigate()
+
+  // Abonnement live à la table : reflète paidCents / amountCents en temps réel.
+  // Fallback sur l'état contextuel (set par TableEntry) tant que Convex charge.
+  const liveTable = useQuery(
+    api.tables.getOne,
+    state.convexTableId ? { tableId: state.convexTableId as Id<'tables'> } : 'skip',
+  )
+
+  const billCents = liveTable?.amountCents ?? state.tableTotalCents
+  const paidCents = liveTable?.paidCents ?? 0
+  const remainingCents = Math.max(0, billCents - paidCents)
+  const hasPaidSomething = paidCents > 0
+  const isFullyPaid = billCents > 0 && remainingCents === 0
 
   const tableLabel = state.tableNumber
     ? `Table ${state.tableNumber}${state.restaurantName ? ` · ${state.restaurantName}` : ''}`
@@ -94,7 +110,7 @@ export function Landing() {
         <div style={{
           background: 'linear-gradient(to right, #fffbf2 0%, #fff 60%)',
           borderRadius: 20, padding: 16,
-          display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20,
+          display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14,
           border: '1px solid rgba(232,146,10,0.2)',
           borderLeft: '4px solid #E8920A',
           boxShadow: '0 2px 16px rgba(232,146,10,0.1)',
@@ -116,13 +132,59 @@ export function Landing() {
               {state.tableCapacity > 0 ? ` · ${state.tableCapacity} couverts` : ''}
               {' · Session ouverte'}
             </div>
-            {state.tableTotalCents > 0 && (
+            {billCents > 0 && (
               <div style={{ fontSize: 12, color: '#E8920A', fontWeight: 700, marginTop: 2 }}>
-                Addition : {formatEur(state.tableTotalCents)}
+                Addition : {formatEur(billCents)}
               </div>
             )}
           </div>
         </div>
+
+        {/* Bandeau état de paiement live — affiché dès qu'au moins un paiement
+            partiel ou total a été enregistré sur la sitting courante. */}
+        {hasPaidSomething && (
+          <m.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: isFullyPaid ? '#ECFDF5' : '#FFF4E5',
+              border: `1px solid ${isFullyPaid ? 'rgba(16,185,129,0.25)' : 'rgba(232,146,10,0.25)'}`,
+              borderRadius: 16,
+              padding: '12px 14px',
+              marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: isFullyPaid ? '#10B981' : '#E8920A',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M3 7L6 10L11 4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: isFullyPaid ? '#047857' : '#92400E' }}>
+                {isFullyPaid
+                  ? `Table entièrement réglée · ${formatEur(paidCents)}`
+                  : `Déjà réglé : ${formatEur(paidCents)}`}
+              </div>
+              {!isFullyPaid && (
+                <div style={{ fontSize: 11.5, color: '#92400E', marginTop: 1 }}>
+                  Reste à payer : <strong>{formatEur(remainingCents)}</strong>
+                </div>
+              )}
+              {isFullyPaid && (
+                <div style={{ fontSize: 11.5, color: '#047857', marginTop: 1 }}>
+                  Merci à vous · La table est libérée par le restaurant
+                </div>
+              )}
+            </div>
+          </m.div>
+        )}
 
         {/* 3 steps */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 24, alignItems: 'stretch' }}>
@@ -158,15 +220,18 @@ export function Landing() {
           <m.button
             type="button"
             whileTap={{ scale: 0.985 }}
-            onClick={() => navigate('/profile')}
+            disabled={isFullyPaid}
+            onClick={() => { if (!isFullyPaid) navigate('/profile') }}
             style={{
               width: '100%', height: 56, borderRadius: 18, border: 0,
-              background: '#E8920A', color: '#fff',
-              fontSize: 16, fontWeight: 800, letterSpacing: '0.01em', cursor: 'pointer',
-              boxShadow: '0 4px 18px rgba(232,146,10,0.32), 0 1px 4px rgba(0,0,0,0.1)',
+              background: isFullyPaid ? '#E4E4E7' : '#E8920A',
+              color: isFullyPaid ? '#A1A1AA' : '#fff',
+              fontSize: 16, fontWeight: 800, letterSpacing: '0.01em',
+              cursor: isFullyPaid ? 'default' : 'pointer',
+              boxShadow: isFullyPaid ? 'none' : '0 4px 18px rgba(232,146,10,0.32), 0 1px 4px rgba(0,0,0,0.1)',
             }}
           >
-            C'est parti →
+            {isFullyPaid ? 'Table déjà réglée ✓' : hasPaidSomething ? 'Payer ma part →' : "C'est parti →"}
           </m.button>
           <div style={{ textAlign: 'center', fontSize: 11, color: '#9CA3AF', paddingBottom: 4 }}>
             ✓ Aucune app · <span style={{ color: '#E8920A', fontWeight: 600 }}>Paiement sécurisé Stripe</span>

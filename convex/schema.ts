@@ -11,6 +11,14 @@ export default defineSchema({
     type: v.string(),
     clerkUserId: v.optional(v.string()),
     suspended: v.optional(v.boolean()),
+    // Champs legacy présents sur d'anciens documents (plus écrits par create/update).
+    // Déclarés en optionnel pour que le schéma valide les docs existants en prod.
+    plan: v.optional(v.string()),
+    status: v.optional(v.string()),
+    kycStatus: v.optional(v.string()),
+    siret: v.optional(v.string()),
+    stripeAccountId: v.optional(v.string()),
+    posProvider: v.optional(v.string()),
   }).index("by_slug", ["slug"])
     .index("by_clerk_user", ["clerkUserId"]),
 
@@ -22,6 +30,15 @@ export default defineSchema({
     guests: v.optional(v.number()),
     durationMinutes: v.optional(v.number()),
     amountCents: v.optional(v.number()),
+    // Paiements partiels cumulés sur la sitting courante (remis à zéro au release
+    // et au démarrage d'une nouvelle sitting). Détail des paiements dans `payments`.
+    paidCents: v.optional(v.number()),
+    paidTipCents: v.optional(v.number()),
+    orderItems: v.optional(v.array(v.object({
+      name: v.string(),
+      qty: v.number(),
+      unitCents: v.number(),
+    }))),
     alert: v.optional(v.boolean()),
   }).index("by_restaurant", ["restaurantId"]),
 
@@ -50,6 +67,8 @@ export default defineSchema({
     isNew: v.boolean(),
     createdAt: v.number(),
     timeLabel: v.string(),
+    deliveredAt: v.optional(v.number()),
+    managerReply: v.optional(v.string()),
   }).index("by_restaurant", ["restaurantId"])
     .index("by_restaurant_new", ["restaurantId", "isNew"]),
 
