@@ -35,17 +35,23 @@ export function Items() {
   const { subtotal, billCents, paidCents, remainingCents, isFullyPaid, liveTable } = useSessionCalcs()
   const [openCat, setOpenCat] = useState<Category | null>('plats')
 
-  // Timeout de sécurité : si Convex ne répond pas en 5s (WS lent iOS),
-  // on sort du spinner plutôt que de rester bloqué indéfiniment.
-  const [tableTimedOut, setTableTimedOut] = useState(false)
+  // convexReady = true uniquement quand Convex a effectivement répondu.
+  // Le timeout NE déclenche PAS l'empty state — il affiche "connexion lente".
+  // L'empty state ne s'affiche que si convexReady && pas d'orderItems.
+  const [convexReady, setConvexReady] = useState(false)
   useEffect(() => {
-    if (liveTable !== undefined) return
-    const t = setTimeout(() => setTableTimedOut(true), 5000)
-    return () => clearTimeout(t)
+    if (liveTable !== undefined) setConvexReady(true)
   }, [liveTable])
 
-  // Guard : Convex charge → spinner (max 5s)
-  if (liveTable === undefined && state.convexTableId && !tableTimedOut) {
+  const [timedOut, setTimedOut] = useState(false)
+  useEffect(() => {
+    if (convexReady) return
+    const t = setTimeout(() => setTimedOut(true), 15000)
+    return () => clearTimeout(t)
+  }, [convexReady])
+
+  // Spinner tant que Convex n'a pas répondu (max 15s)
+  if (!convexReady && !timedOut) {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -62,25 +68,38 @@ export function Items() {
     )
   }
 
+  // Timeout expiré sans réponse Convex → connexion lente (PAS l'empty state)
+  if (timedOut && !convexReady) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100%', background: '#FAFAFA', padding: '0 24px', textAlign: 'center', gap: 12,
+      }}>
+        <div style={{ fontSize: 40 }}>📶</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#0A0A0A' }}>Connexion lente</div>
+        <div style={{ fontSize: 13, color: '#9CA3AF' }}>
+          La connexion au serveur prend trop de temps. Vérifie ta connexion et réessaie.
+        </div>
+        <button
+          type="button"
+          onClick={() => { setConvexReady(false); setTimedOut(false) }}
+          style={{
+            marginTop: 8, height: 48, padding: '0 24px', borderRadius: 14, border: 0,
+            background: '#E8920A', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          Réessayer
+        </button>
+      </div>
+    )
+  }
+
+  // À partir d'ici : convexReady = true (liveTable est soit un objet, soit null)
   // Articles non encore payés de la commande table
   const tableUnpaidItems = (liveTable?.orderItems ?? []).filter(i => !i.paid)
   const hasTableOrder = tableUnpaidItems.length > 0
 
-  // Conversion orderItems → MenuItem (expansion par qty : 2×Pizza → 2 items séparés)
-  const menuItems: MenuItem[] = hasTableOrder
-    ? tableUnpaidItems.flatMap((item, idx) =>
-        Array.from({ length: item.qty }, (_, qi) => ({
-          id: `order-${idx}-${qi}`,
-          category: 'plats' as MenuItem['category'],
-          emoji: '',
-          name: item.name,
-          description: '',
-          price: item.unitCents,
-        }))
-      )
-    : []
-
-  // Pas d'orderItems → message clair, jamais de menu complet en fallback
+  // Données arrivées mais orderItems vide → message gérant (confirmation réelle)
   if (!hasTableOrder) {
     const allPaid = liveTable != null && (liveTable.orderItems ?? []).length > 0 &&
       (liveTable.orderItems ?? []).every(i => i.paid === true)
@@ -96,7 +115,7 @@ export function Items() {
         <div style={{ fontSize: 13, color: '#9CA3AF' }}>
           {allPaid
             ? 'Tous les articles ont été payés.'
-            : 'Le gérant n\'a pas encore enregistré de commande pour cette table.'}
+            : "Le gérant n'a pas encore enregistré de commande pour cette table."}
         </div>
         <button
           type="button"
@@ -111,6 +130,18 @@ export function Items() {
       </div>
     )
   }
+
+  // Conversion orderItems → MenuItem (expansion par qty : 2×Pizza → 2 items séparés)
+  const menuItems: MenuItem[] = tableUnpaidItems.flatMap((item, idx) =>
+    Array.from({ length: item.qty }, (_, qi) => ({
+      id: `order-${idx}-${qi}`,
+      category: 'plats' as MenuItem['category'],
+      emoji: '',
+      name: item.name,
+      description: '',
+      price: item.unitCents,
+    }))
+  )
 
   const isSelected = (id: string) => state.selectedItems.some(i => i.menuItemId === id)
   const getSplitFactor = (id: string) => state.selectedItems.find(i => i.menuItemId === id)?.splitFactor ?? 1
