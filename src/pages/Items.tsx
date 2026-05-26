@@ -35,23 +35,21 @@ export function Items() {
   const { subtotal, billCents, paidCents, remainingCents, isFullyPaid, liveTable } = useSessionCalcs()
   const [openCat, setOpenCat] = useState<Category | null>('plats')
 
-  // convexReady = true uniquement quand Convex a effectivement répondu.
-  // Le timeout NE déclenche PAS l'empty state — il affiche "connexion lente".
-  // L'empty state ne s'affiche que si convexReady && pas d'orderItems.
-  const [convexReady, setConvexReady] = useState(false)
-  useEffect(() => {
-    if (liveTable !== undefined) setConvexReady(true)
-  }, [liveTable])
+  // Spinner seulement si ni Convex ni cache ne sont disponibles.
+  // Sur iOS Safari, liveTable peut rester undefined longtemps (WS lent).
+  // Dans ce cas on utilise cachedOrderItems (stocké dans SessionContext depuis TableEntry).
+  const convexReady = liveTable !== undefined
+  const hasCachedItems = state.cachedOrderItems.length > 0
 
+  // Attente initiale : Convex pas encore répondu ET pas de cache
   const [timedOut, setTimedOut] = useState(false)
   useEffect(() => {
-    if (convexReady) return
-    const t = setTimeout(() => setTimedOut(true), 15000)
+    if (convexReady || hasCachedItems) return
+    const t = setTimeout(() => setTimedOut(true), 20000)
     return () => clearTimeout(t)
-  }, [convexReady])
+  }, [convexReady, hasCachedItems])
 
-  // Spinner tant que Convex n'a pas répondu (max 15s)
-  if (!convexReady && !timedOut) {
+  if (!convexReady && !hasCachedItems && !timedOut) {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -68,38 +66,16 @@ export function Items() {
     )
   }
 
-  // Timeout expiré sans réponse Convex → connexion lente (PAS l'empty state)
-  if (timedOut && !convexReady) {
-    return (
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: '100%', background: '#FAFAFA', padding: '0 24px', textAlign: 'center', gap: 12,
-      }}>
-        <div style={{ fontSize: 40 }}>📶</div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: '#0A0A0A' }}>Connexion lente</div>
-        <div style={{ fontSize: 13, color: '#9CA3AF' }}>
-          La connexion au serveur prend trop de temps. Vérifie ta connexion et réessaie.
-        </div>
-        <button
-          type="button"
-          onClick={() => { setConvexReady(false); setTimedOut(false) }}
-          style={{
-            marginTop: 8, height: 48, padding: '0 24px', borderRadius: 14, border: 0,
-            background: '#E8920A', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-          }}
-        >
-          Réessayer
-        </button>
-      </div>
-    )
-  }
+  // Source de vérité : liveTable si disponible (Convex), sinon cache SessionContext.
+  // cachedOrderItems est rempli par TableEntry au scan du QR — disponible immédiatement,
+  // même si le WebSocket iOS prend du temps.
+  const sourceItems = convexReady
+    ? (liveTable?.orderItems ?? [])
+    : state.cachedOrderItems
 
-  // À partir d'ici : convexReady = true (liveTable est soit un objet, soit null)
-  // Articles non encore payés de la commande table
-  const tableUnpaidItems = (liveTable?.orderItems ?? []).filter(i => !i.paid)
+  const tableUnpaidItems = sourceItems.filter(i => !i.paid)
   const hasTableOrder = tableUnpaidItems.length > 0
 
-  // Données arrivées mais orderItems vide → message gérant (confirmation réelle)
   if (!hasTableOrder) {
     const allPaid = liveTable != null && (liveTable.orderItems ?? []).length > 0 &&
       (liveTable.orderItems ?? []).every(i => i.paid === true)

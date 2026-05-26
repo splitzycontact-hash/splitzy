@@ -9,6 +9,7 @@ const initialState: SessionState = {
   convexRestaurantId: null,
   convexTableId: null,
   tableTotalCents: MOCK_SESSION.tableTotalCents,
+  cachedOrderItems: [],
   userName: '',
   userAvatarIndex: 0,
   convives: MOCK_SESSION.convives,
@@ -87,6 +88,7 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
         convexRestaurantId: state.convexRestaurantId,
         convexTableId: state.convexTableId,
         tableTotalCents: state.tableTotalCents,
+        cachedOrderItems: state.cachedOrderItems,
       }
     default:
       return state
