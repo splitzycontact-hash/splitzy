@@ -38,6 +38,7 @@ export default defineSchema({
       name: v.string(),
       qty: v.number(),
       unitCents: v.number(),
+      paid: v.optional(v.boolean()),
     }))),
     alert: v.optional(v.boolean()),
   }).index("by_restaurant", ["restaurantId"]),

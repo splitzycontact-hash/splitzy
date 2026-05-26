@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { useMutation } from 'convex/react'
@@ -17,18 +17,23 @@ export function Payment() {
   const [loading, setLoading] = useState<string | null>(null)
 
   const createPayment = useMutation(api.payments.create)
+  const [payError, setPayError] = useState<string | null>(null)
 
   const selectedCard = MOCK_CARDS.find(c => c.id === state.selectedCardId) ?? MOCK_CARDS[0]
 
   const totalStr = formatEur(total).replace('€', '')
 
-  const handlePay = (method: string) => {
+  const handlePay = useCallback(async (method: string) => {
+    if (loading) return
     setLoading(method)
-    // Fire-and-forget : payments.create patch la table (paidCents, status) côté
-    // Convex — pas besoin d'un updateTableStatus séparé qui écraserait amountCents
-    // avec le total individuel et effacerait paidCents (race condition iOS).
+    setPayError(null)
+
     if (state.convexRestaurantId && state.convexTableId) {
-      void createPayment({
+      // Attend la mutation Convex avec un timeout de 5s.
+      // Sur iOS Safari, le WS peut être suspendu → timeout déclenché →
+      // on navigue quand même (la mutation est mise en file par Convex
+      // et s'exécute dès la reconnexion du socket).
+      const paymentPromise = createPayment({
         restaurantId: state.convexRestaurantId as Id<'restaurants'>,
         tableId: state.convexTableId as Id<'tables'>,
         tableNumber: state.tableNumber,
@@ -38,11 +43,28 @@ export function Payment() {
         commissionCents: splitzyFee,
         totalCents: total,
         paymentMethod: method,
-      }).catch(() => {})
+      })
+      const timeoutPromise = new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error('timeout')), 5000)
+      )
+
+      try {
+        await Promise.race([paymentPromise, timeoutPromise])
+      } catch (e) {
+        if (e instanceof Error && e.message !== 'timeout') {
+          // Erreur Convex réelle (validation, auth…) — ne pas naviguer
+          setPayError('Erreur de paiement — veuillez réessayer')
+          setLoading(null)
+          return
+        }
+        // Timeout : connexion lente mais paiement en file côté Convex
+        setPayError('Connexion lente — paiement enregistré')
+      }
     }
+
     dispatch({ type: 'CONFIRM_PAYMENT' })
     navigate('/confirmation')
-  }
+  }, [loading, state, createPayment, subtotal, tipAmount, splitzyFee, total, dispatch, navigate])
 
   return (
     <m.div
@@ -52,6 +74,23 @@ export function Payment() {
       exit="exit"
       style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#FAFAFA' }}
     >
+      {/* Toast erreur réseau */}
+      {payError && (
+        <div style={{
+          position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 999, maxWidth: 320, width: 'calc(100% - 32px)',
+          background: payError.startsWith('Erreur') ? '#FEF2F2' : '#FFF4E5',
+          border: `1px solid ${payError.startsWith('Erreur') ? '#FECACA' : 'rgba(232,146,10,0.3)'}`,
+          borderRadius: 12, padding: '10px 14px',
+          display: 'flex', alignItems: 'center', gap: 8,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+        }}>
+          <span style={{ fontSize: 14 }}>{payError.startsWith('Erreur') ? '⚠️' : '⏳'}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: payError.startsWith('Erreur') ? '#DC2626' : '#92400E' }}>
+            {payError}
+          </span>
+        </div>
+      )}
       {/* Dark hero */}
       <div style={{
         position: 'relative', overflow: 'hidden',

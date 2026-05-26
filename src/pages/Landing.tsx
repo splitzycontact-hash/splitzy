@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { useQuery } from 'convex/react'
@@ -11,6 +12,19 @@ export function Landing() {
   const { state } = useSession()
   const navigate = useNavigate()
 
+  // iOS Safari suspend le WS quand l'app est en arrière-plan. À la reprise,
+  // Convex reconnecte automatiquement mais peut prendre 1-2s. Ce compteur
+  // force un re-rendu immédiat au retour au premier plan pour réévaluer
+  // l'état des useQuery dès que le WS est rétabli.
+  const [, setVisibilityTick] = useState(0)
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') setVisibilityTick(t => t + 1)
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
+
   // Abonnement live à la table : reflète paidCents / amountCents en temps réel.
   // Fallback sur l'état contextuel (set par TableEntry) tant que Convex charge.
   const liveTable = useQuery(
@@ -18,6 +32,7 @@ export function Landing() {
     state.convexTableId ? { tableId: state.convexTableId as Id<'tables'> } : 'skip',
   )
 
+  const tableLoading = liveTable === undefined && !!state.convexTableId
   const billCents = liveTable?.amountCents ?? state.tableTotalCents
   const paidCents = liveTable?.paidCents ?? 0
   const remainingCents = Math.max(0, billCents - paidCents)
@@ -140,9 +155,25 @@ export function Landing() {
           </div>
         </div>
 
+        {/* Bandeau état de paiement — loading pendant reconnexion WS iOS */}
+        {tableLoading && (
+          <div style={{
+            background: '#F4F4F5', border: '1px solid #E5E7EB',
+            borderRadius: 16, padding: '12px 14px', marginBottom: 16,
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <div style={{
+              width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+              border: '2px solid #E5E7EB', borderTopColor: '#E8920A',
+              animation: 'landingSpinBanner 0.8s linear infinite',
+            }} />
+            <style>{`@keyframes landingSpinBanner { to { transform: rotate(360deg) } }`}</style>
+            <div style={{ fontSize: 12, color: '#9CA3AF' }}>Vérification état de la table…</div>
+          </div>
+        )}
         {/* Bandeau état de paiement live — affiché dès qu'au moins un paiement
             partiel ou total a été enregistré sur la sitting courante. */}
-        {hasPaidSomething && (
+        {!tableLoading && hasPaidSomething && (
           <m.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}

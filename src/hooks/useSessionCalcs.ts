@@ -50,5 +50,6 @@ export function useSessionCalcs() {
     paidCents,
     remainingCents,
     isFullyPaid,
+    liveTable,
   }
 }

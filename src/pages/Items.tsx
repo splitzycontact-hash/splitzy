@@ -36,7 +36,7 @@ function StepBar({ current }: { current: number }) {
 export function Items() {
   const { state, dispatch } = useSession()
   const navigate = useNavigate()
-  const { subtotal, billCents, paidCents, remainingCents, isFullyPaid } = useSessionCalcs()
+  const { subtotal, billCents, paidCents, remainingCents, isFullyPaid, liveTable } = useSessionCalcs()
   const [openCat, setOpenCat] = useState<Category | null>('entrees')
 
   const convexItems = useQuery(
@@ -46,16 +46,55 @@ export function Items() {
       : 'skip',
   )
 
-  const menuItems: MenuItem[] = convexItems && convexItems.length > 0
-    ? convexItems.map(item => ({
-        id: item._id,
-        category: item.category as MenuItem['category'],
-        emoji: item.emoji,
-        name: item.name,
-        description: item.description ?? '',
-        price: item.priceCents,
-      }))
-    : MENU_ITEMS
+  // Guard : liveTable === undefined = Convex en cours de chargement / reconnexion WS
+  if (liveTable === undefined && state.convexTableId) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100%', background: '#FAFAFA',
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%',
+          border: '3px solid #FFF4E5', borderTopColor: '#E8920A',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    )
+  }
+
+  // Articles non encore payés de la commande table (orderItems Convex) — filtrés
+  // quand le gérant a défini une commande. Sinon, fallback sur le menu restaurant.
+  const tableUnpaidItems = (liveTable?.orderItems ?? []).filter(i => !i.paid)
+  const hasTableOrder = tableUnpaidItems.length > 0
+
+  // Conversion des orderItems table en objets MenuItem compatibles avec l'UI
+  // (expansion par qty : 2×Pizza → deux entrées séparées sélectionnables)
+  const orderMenuItems: MenuItem[] = hasTableOrder
+    ? tableUnpaidItems.flatMap((item, idx) =>
+        Array.from({ length: item.qty }, (_, qi) => ({
+          id: `order-${idx}-${qi}`,
+          category: 'plats' as MenuItem['category'],
+          emoji: '',
+          name: item.name,
+          description: '',
+          price: item.unitCents,
+        }))
+      )
+    : []
+
+  const menuItems: MenuItem[] = hasTableOrder
+    ? orderMenuItems
+    : (convexItems && convexItems.length > 0
+        ? convexItems.map(item => ({
+            id: item._id,
+            category: item.category as MenuItem['category'],
+            emoji: item.emoji,
+            name: item.name,
+            description: item.description ?? '',
+            price: item.priceCents,
+          }))
+        : MENU_ITEMS)
 
   const isSelected = (id: string) => state.selectedItems.some(i => i.menuItemId === id)
   const getSplitFactor = (id: string) => state.selectedItems.find(i => i.menuItemId === id)?.splitFactor ?? 1
