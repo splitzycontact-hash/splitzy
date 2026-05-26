@@ -15,6 +15,7 @@ export function Payment() {
   const navigate = useNavigate()
   const { subtotal, tipAmount, splitzyFee, total } = useSessionCalcs()
   const [loading, setLoading] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const createPayment = useMutation(api.payments.create)
 
@@ -22,27 +23,47 @@ export function Payment() {
 
   const totalStr = formatEur(total).replace('€', '')
 
+  // Garde-fou critique : sans les IDs Convex, le ledger n'est pas écrit et le
+  // dashboard du gérant ne verra jamais le paiement. C'est arrivé en prod le
+  // 2026-05-24 (session perdue après refresh sur /payment) — on bloque
+  // explicitement plutôt que de laisser passer un paiement fantôme.
+  const sessionReady = !!state.convexRestaurantId && !!state.convexTableId
+
   const handlePay = (method: string) => {
+    if (!sessionReady) {
+      setError('Session expirée. Rescannez le QR code de votre table pour reprendre.')
+      return
+    }
+    if (subtotal <= 0) {
+      setError('Aucun montant à régler. Retournez à l\'étape précédente.')
+      return
+    }
+
+    setError(null)
     setLoading(method)
+
     // Fire-and-forget : la navigation ne doit pas attendre la WS Convex.
     // Safari iOS peut suspendre la WS — un `await` ici resterait pending
     // indéfiniment (le .catch ne se déclenche que sur rejet, pas sur pending).
     // `createPayment` enregistre le paiement (ledger) ET réconcilie la table
     // (cumul payé + statut payment/paid). On ne touche plus à amountCents : le
     // montant total de la table doit rester intact pour le calcul du restant.
-    if (state.convexRestaurantId && state.convexTableId) {
-      void createPayment({
-        restaurantId: state.convexRestaurantId as Id<'restaurants'>,
-        tableId: state.convexTableId as Id<'tables'>,
-        tableNumber: state.tableNumber,
-        guests: state.equalSplitCount ?? 1,
-        subtotalCents: subtotal,
-        tipCents: tipAmount,
-        commissionCents: splitzyFee,
-        totalCents: total,
-        paymentMethod: method,
-      }).catch(() => {})
-    }
+    void createPayment({
+      restaurantId: state.convexRestaurantId as Id<'restaurants'>,
+      tableId: state.convexTableId as Id<'tables'>,
+      tableNumber: state.tableNumber,
+      guests: state.equalSplitCount ?? 1,
+      subtotalCents: subtotal,
+      tipCents: tipAmount,
+      commissionCents: splitzyFee,
+      totalCents: total,
+      paymentMethod: method,
+    }).catch((e) => {
+      // Le user est déjà navigué vers /confirmation. On log pour pouvoir
+      // diagnostiquer un échec côté serveur (network, restaurant suspendu, etc.).
+      console.error('[Payment] ledger write failed', e)
+    })
+
     dispatch({ type: 'CONFIRM_PAYMENT' })
     navigate('/confirmation')
   }
@@ -232,6 +253,25 @@ export function Payment() {
           </m.button>
         </div>
       </div>
+
+      {error && (
+        <div style={{
+          margin: '16px 20px 0',
+          padding: '12px 14px',
+          borderRadius: 12,
+          background: '#FEF2F2',
+          border: '1px solid #FECACA',
+          color: '#B91C1C',
+          fontSize: 13,
+          fontWeight: 500,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 8,
+        }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>⚠️</span>
+          <span>{error}</span>
+        </div>
+      )}
 
       <div style={{ flex: 1, minHeight: 16 }} />
 

@@ -41,14 +41,26 @@ export const updateStatus = mutation({
   // Patch conditionnel : on ne touche qu'aux champs fournis. Sinon Convex
   // supprime les champs passés à `undefined` — le scan QR (status only) effacerait
   // le montant + les articles posés par la simulation côté dashboard.
+  //
+  // Reset paidCents/paidTipCents UNIQUEMENT si la table était libre ou déjà
+  // entièrement payée (= nouvelle sitting démarre). Pour les sittings en cours
+  // (dining/payment) on préserve les paiements déjà encaissés — sinon un
+  // re-sim d'order côté gérant efface le paiement que le client vient de faire
+  // et donne l'impression que rien ne s'est enregistré.
   handler: async (ctx, { tableId, status, guests, amountCents, orderItems }) => {
+    const existing = await ctx.db.get(tableId)
     const patch: Record<string, unknown> = { status }
     if (guests !== undefined) patch.guests = guests
     if (amountCents !== undefined) {
       patch.amountCents = amountCents
-      // Nouveau montant = nouvelle sitting → on repart d'un payé vierge.
-      patch.paidCents = undefined
-      patch.paidTipCents = undefined
+      const wasFreshSitting = !existing
+        || existing.status === "free"
+        || existing.status === "paid"
+        || (existing.paidCents ?? 0) === 0
+      if (wasFreshSitting) {
+        patch.paidCents = undefined
+        patch.paidTipCents = undefined
+      }
     }
     if (orderItems !== undefined) patch.orderItems = orderItems
     await ctx.db.patch(tableId, patch)

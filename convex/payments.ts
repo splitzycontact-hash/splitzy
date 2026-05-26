@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server"
 import { v } from "convex/values"
+import { isAdminAccess } from "./lib"
 
 export const list = query({
   args: { restaurantId: v.id("restaurants") },
@@ -38,6 +39,25 @@ export const create = mutation({
       await ctx.db.patch(args.tableId, { paidCents, paidTipCents, status })
     }
     return paymentId
+  },
+})
+
+// Admin-only : purge les paiements de test (paymentMethod commençant par "test_"
+// ou "e2e_"). Utile pour nettoyer le ledger après des diagnostics en prod.
+export const purgeTestPayments = mutation({
+  args: { authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx, args.authEmail))) {
+      return { deleted: 0, reason: "unauthorized" }
+    }
+    const all = await ctx.db.query("payments").collect()
+    const targets = all.filter(p =>
+      p.paymentMethod.startsWith("test_") || p.paymentMethod.startsWith("e2e_")
+    )
+    for (const p of targets) {
+      await ctx.db.delete(p._id)
+    }
+    return { deleted: targets.length, restaurants: [...new Set(targets.map(p => p.restaurantId))].length }
   },
 })
 

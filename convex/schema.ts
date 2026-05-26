@@ -29,6 +29,11 @@ export default defineSchema({
     // Déclarés en optionnel pour que le schéma valide les docs existants.
     plan: v.optional(v.string()),
     status: v.optional(v.string()),
+    // Champs admin (optionnels — affichés dans l'admin uniquement)
+    kycStatus: v.optional(v.string()),
+    siret: v.optional(v.string()),
+    stripeAccountId: v.optional(v.string()),
+    posProvider: v.optional(v.string()),
   }).index("by_slug", ["slug"])
     .index("by_clerk_user", ["clerkUserId"]),
 
@@ -79,6 +84,8 @@ export default defineSchema({
     deliveredAt: v.optional(v.number()),
     createdAt: v.number(),
     timeLabel: v.string(),
+    // Réponse du gérant (optionnel — affiché dans l'admin uniquement)
+    managerReply: v.optional(v.string()),
   }).index("by_restaurant", ["restaurantId"])
     .index("by_restaurant_new", ["restaurantId", "isNew"]),
 
