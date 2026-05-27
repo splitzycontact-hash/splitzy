@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useMutation } from 'convex/react'
-import { api } from '../../convex/_generated/api'
 import { useSession } from '../context/SessionContext'
 import { TABLE_TOTAL_CENTS } from '../data/session'
-import type { Id } from '../../convex/_generated/dataModel'
+import { httpMutation } from '../utils/convexHttp'
 
 // Shape renvoyée par restaurants:getTableContext via HTTP Convex
 type HttpCtx = {
@@ -31,7 +29,6 @@ export function TableEntry() {
   const { slug, tableNumber } = useParams<{ slug: string; tableNumber: string }>()
   const navigate = useNavigate()
   const { dispatch } = useSession()
-  const updateStatus = useMutation(api.tables.updateStatus)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [timedOut, setTimedOut] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
@@ -93,8 +90,8 @@ export function TableEntry() {
           })
         })
 
-        void updateStatus({
-          tableId: ctx.table!._id as Id<'tables'>,
+        void httpMutation('tables:updateStatus', {
+          tableId: ctx.table!._id,
           status: 'dining',
           guests: ctx.table!.capacity ?? 4,
         }).catch(() => {})

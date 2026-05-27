@@ -1,22 +1,18 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
-import { useMutation } from 'convex/react'
-import { api } from '../../convex/_generated/api'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
 import { MOCK_CARDS } from '../data/session'
-import type { Id } from '../../convex/_generated/dataModel'
+import { httpMutation } from '../utils/convexHttp'
 
 export function Payment() {
   const { state, dispatch } = useSession()
   const navigate = useNavigate()
   const { subtotal, tipAmount, splitzyFee, total, remainingCents } = useSessionCalcs()
   const [loading, setLoading] = useState<string | null>(null)
-
-  const createPayment = useMutation(api.payments.create)
 
   const selectedCard = MOCK_CARDS.find(c => c.id === state.selectedCardId) ?? MOCK_CARDS[0]
 
@@ -29,18 +25,18 @@ export function Payment() {
     ? state.selectedItems.filter(i => i.splitFactor === 1).map(i => i.name)
     : undefined
 
-  // Fire-and-forget : on ne await pas la mutation Convex.
-  // Sur iOS Safari, le WS peut être suspendu (background, écran verrouillé) et
-  // setTimeout est throttlé → Promise.race hang indéfiniment → boutons bloqués.
-  // Convex queue la mutation et l'envoie dès la reconnexion du socket.
+  // Mutation Convex en HTTP direct (pas WebSocket). Sur iOS, useMutation()
+  // peut perdre la requête si le WS ne s'établit pas avant fermeture de l'onglet.
+  // httpMutation utilise fetch({ keepalive: true }) → garanti d'atteindre le serveur,
+  // donc le gérant voit le paiement en temps réel.
   const handlePay = useCallback((method: string) => {
     if (loading) return
     setLoading(method)
 
     if (state.convexRestaurantId && state.convexTableId) {
-      void createPayment({
-        restaurantId: state.convexRestaurantId as Id<'restaurants'>,
-        tableId: state.convexTableId as Id<'tables'>,
+      void httpMutation('payments:create', {
+        restaurantId: state.convexRestaurantId,
+        tableId: state.convexTableId,
         tableNumber: state.tableNumber,
         guests: state.equalSplitCount ?? 1,
         subtotalCents: subtotal,
@@ -60,7 +56,7 @@ export function Payment() {
       dispatch({ type: 'MARK_SPECIFIC_ITEMS_PAID', payload: paidItemNames })
     }
     navigate('/confirmation')
-  }, [loading, state, createPayment, subtotal, tipAmount, splitzyFee, total, dispatch, navigate, remainingCents, paidItemNames])
+  }, [loading, state, subtotal, tipAmount, splitzyFee, total, dispatch, navigate, remainingCents, paidItemNames])
 
   return (
     <m.div

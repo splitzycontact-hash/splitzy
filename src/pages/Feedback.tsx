@@ -1,11 +1,9 @@
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
-import { useMutation } from 'convex/react'
-import { api } from '../../convex/_generated/api'
 import { useSession } from '../context/SessionContext'
 import { StarRating } from '../components/features/StarRating'
 import { pageVariants } from '../utils/animations'
-import type { Id } from '../../convex/_generated/dataModel'
+import { httpMutation } from '../utils/convexHttp'
 import { FEEDBACK_TAGS } from '../data/session'
 
 const FEEDBACK_CHIP_DOTS: Record<string, string> = {
@@ -23,15 +21,13 @@ export function Feedback() {
   const { state, dispatch } = useSession()
   const navigate = useNavigate()
 
-  const createFeedback = useMutation(api.feedbacks.create)
-
   const canSend = state.feedbackStars > 0
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (state.convexRestaurantId && state.convexTableId) {
-      createFeedback({
-        restaurantId: state.convexRestaurantId as Id<'restaurants'>,
-        tableId: state.convexTableId as Id<'tables'>,
+      void httpMutation('feedbacks:create', {
+        restaurantId: state.convexRestaurantId,
+        tableId: state.convexTableId,
         tableNumber: state.tableNumber,
         stars: state.feedbackStars,
         tags: state.feedbackTags,
