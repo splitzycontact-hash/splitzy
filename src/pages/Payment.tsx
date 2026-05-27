@@ -17,7 +17,6 @@ export function Payment() {
   const [loading, setLoading] = useState<string | null>(null)
 
   const createPayment = useMutation(api.payments.create)
-  const [payError, setPayError] = useState<string | null>(null)
 
   const selectedCard = MOCK_CARDS.find(c => c.id === state.selectedCardId) ?? MOCK_CARDS[0]
 
@@ -30,17 +29,16 @@ export function Payment() {
     ? state.selectedItems.filter(i => i.splitFactor === 1).map(i => i.name)
     : undefined
 
-  const handlePay = useCallback(async (method: string) => {
+  // Fire-and-forget : on ne await pas la mutation Convex.
+  // Sur iOS Safari, le WS peut être suspendu (background, écran verrouillé) et
+  // setTimeout est throttlé → Promise.race hang indéfiniment → boutons bloqués.
+  // Convex queue la mutation et l'envoie dès la reconnexion du socket.
+  const handlePay = useCallback((method: string) => {
     if (loading) return
     setLoading(method)
-    setPayError(null)
 
     if (state.convexRestaurantId && state.convexTableId) {
-      // Attend la mutation Convex avec un timeout de 5s.
-      // Sur iOS Safari, le WS peut être suspendu → timeout déclenché →
-      // on navigue quand même (la mutation est mise en file par Convex
-      // et s'exécute dès la reconnexion du socket).
-      const paymentPromise = createPayment({
+      void createPayment({
         restaurantId: state.convexRestaurantId as Id<'restaurants'>,
         tableId: state.convexTableId as Id<'tables'>,
         tableNumber: state.tableNumber,
@@ -51,32 +49,14 @@ export function Payment() {
         totalCents: total,
         paymentMethod: method,
         paidItemNames: paidItemNames && paidItemNames.length > 0 ? paidItemNames : undefined,
-      })
-      const timeoutPromise = new Promise<never>((_, rej) =>
-        setTimeout(() => rej(new Error('timeout')), 5000)
-      )
-
-      try {
-        await Promise.race([paymentPromise, timeoutPromise])
-      } catch (e) {
-        if (e instanceof Error && e.message !== 'timeout') {
-          // Erreur Convex réelle (validation, auth…) — ne pas naviguer
-          setPayError('Erreur de paiement — veuillez réessayer')
-          setLoading(null)
-          return
-        }
-        // Timeout : connexion lente mais paiement en file côté Convex
-        setPayError('Connexion lente — paiement enregistré')
-      }
+      }).catch(() => {})
     }
 
     dispatch({ type: 'CONFIRM_PAYMENT' })
     dispatch({ type: 'ADD_CACHED_PAID_CENTS', payload: subtotal })
     if (subtotal >= remainingCents && remainingCents > 0) {
-      // Table entièrement réglée — marquer tous les articles comme payés dans le cache.
       dispatch({ type: 'MARK_CACHED_ITEMS_PAID' })
     } else if (paidItemNames && paidItemNames.length > 0) {
-      // Paiement partiel "par article" — marquer uniquement les articles sélectionnés.
       dispatch({ type: 'MARK_SPECIFIC_ITEMS_PAID', payload: paidItemNames })
     }
     navigate('/confirmation')
@@ -90,23 +70,6 @@ export function Payment() {
       exit="exit"
       style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#FAFAFA' }}
     >
-      {/* Toast erreur réseau */}
-      {payError && (
-        <div style={{
-          position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 999, maxWidth: 320, width: 'calc(100% - 32px)',
-          background: payError.startsWith('Erreur') ? '#FEF2F2' : '#FFF4E5',
-          border: `1px solid ${payError.startsWith('Erreur') ? '#FECACA' : 'rgba(232,146,10,0.3)'}`,
-          borderRadius: 12, padding: '10px 14px',
-          display: 'flex', alignItems: 'center', gap: 8,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-        }}>
-          <span style={{ fontSize: 14 }}>{payError.startsWith('Erreur') ? '⚠️' : '⏳'}</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: payError.startsWith('Erreur') ? '#DC2626' : '#92400E' }}>
-            {payError}
-          </span>
-        </div>
-      )}
       {/* Dark hero */}
       <div style={{
         position: 'relative', overflow: 'hidden',
