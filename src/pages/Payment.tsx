@@ -63,6 +63,7 @@ export function Payment() {
     }
 
     dispatch({ type: 'CONFIRM_PAYMENT' })
+    dispatch({ type: 'ADD_CACHED_PAID_CENTS', payload: subtotal })
     navigate('/confirmation')
   }, [loading, state, createPayment, subtotal, tipAmount, splitzyFee, total, dispatch, navigate])
 

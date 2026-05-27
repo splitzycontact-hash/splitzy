@@ -19,7 +19,9 @@ export function useSessionCalcs() {
   )
 
   const billCents = liveTable?.amountCents ?? state.tableTotalCents
-  const paidCents = liveTable?.paidCents ?? 0
+  // Fallback sur cachedPaidCents si Convex WebSocket pas encore établi (iOS Safari).
+  // cachedPaidCents est mis à jour : au scan QR (depuis TableEntry) + après chaque paiement.
+  const paidCents = liveTable?.paidCents ?? state.cachedPaidCents
   const remainingCents = Math.max(0, billCents - paidCents)
   const isFullyPaid = billCents > 0 && remainingCents === 0
 

@@ -10,6 +10,7 @@ const initialState: SessionState = {
   convexTableId: null,
   tableTotalCents: MOCK_SESSION.tableTotalCents,
   cachedOrderItems: [],
+  cachedPaidCents: 0,
   userName: '',
   userAvatarIndex: 0,
   convives: MOCK_SESSION.convives,
@@ -74,6 +75,8 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
       return { ...state, feedbackText: action.payload }
     case 'SEND_FEEDBACK':
       return { ...state, feedbackSent: true }
+    case 'ADD_CACHED_PAID_CENTS':
+      return { ...state, cachedPaidCents: state.cachedPaidCents + action.payload }
     case 'SET_TABLE_CONTEXT':
       return { ...state, ...action.payload }
     case 'RESET_SESSION':
@@ -89,6 +92,7 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
         convexTableId: state.convexTableId,
         tableTotalCents: state.tableTotalCents,
         cachedOrderItems: state.cachedOrderItems,
+        cachedPaidCents: state.cachedPaidCents,
       }
     default:
       return state

@@ -39,6 +39,7 @@ export interface SessionState {
   convexTableId: string | null
   tableTotalCents: number
   cachedOrderItems: CachedOrderItem[]
+  cachedPaidCents: number
   userName: string
   userAvatarIndex: number
   convives: Convive[]
@@ -70,5 +71,6 @@ export type SessionAction =
   | { type: 'TOGGLE_FEEDBACK_TAG'; payload: string }
   | { type: 'SET_FEEDBACK_TEXT'; payload: string }
   | { type: 'SEND_FEEDBACK' }
-  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number; cachedOrderItems?: CachedOrderItem[] } }
+  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number; cachedOrderItems?: CachedOrderItem[]; cachedPaidCents?: number } }
+  | { type: 'ADD_CACHED_PAID_CENTS'; payload: number }
   | { type: 'RESET_SESSION' }
