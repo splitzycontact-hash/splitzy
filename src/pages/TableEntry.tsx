@@ -1,127 +1,174 @@
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation } from 'convex/react'
+import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { useSession } from '../context/SessionContext'
 import { TABLE_TOTAL_CENTS } from '../data/session'
+import type { Id } from '../../convex/_generated/dataModel'
 
-declare global {
-  interface Window {
-    __tableBootstrap?: Promise<unknown>
+// Shape renvoyée par restaurants:getTableContext via HTTP Convex
+type HttpCtx = {
+  restaurant: {
+    _id: string
+    name: string
+    slug: string
+    suspended?: boolean
   }
-}
+  table: {
+    _id: string
+    number: number
+    capacity?: number
+    amountCents?: number
+    orderItems?: { name: string; qty: number; unitCents: number; paid?: boolean }[]
+    paidCents?: number
+  } | null
+} | null
 
-type LiveContext = ReturnType<typeof useQuery<typeof api.restaurants.getTableContext>>
-type Bootstrap = NonNullable<LiveContext> | null
-
-function isBootstrap(v: unknown): v is NonNullable<Bootstrap> {
-  return !!v && typeof v === 'object' && 'restaurant' in (v as object) && 'table' in (v as object)
-}
+type LoadState = 'loading' | 'not_found' | 'suspended' | 'no_table' | 'navigating'
 
 export function TableEntry() {
   const { slug, tableNumber } = useParams<{ slug: string; tableNumber: string }>()
   const navigate = useNavigate()
   const { dispatch } = useSession()
   const updateStatus = useMutation(api.tables.updateStatus)
+  const [loadState, setLoadState] = useState<LoadState>('loading')
   const [timedOut, setTimedOut] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
-  const [bootstrap, setBootstrap] = useState<NonNullable<Bootstrap> | null | undefined>(undefined)
 
-  // Ref utilisé comme verrou : empêche le double-fire de l'effet en StrictMode
-  // et sur les re-renders entre le dispatch et la navigation.
+  // Verrou : empêche le double-dispatch en StrictMode ou sur re-renders rapides.
   const navigated = useRef(false)
 
-  // Lit la pré-requête HTTP lancée depuis index.html avant même que le bundle
-  // ne soit parsé. Court-circuite le cold start WebSocket Safari iOS.
   useEffect(() => {
-    const promise = typeof window !== 'undefined' ? window.__tableBootstrap : undefined
-    if (!promise) {
-      setBootstrap(null)
-      return
-    }
-    let cancelled = false
-    promise.then(value => {
-      if (cancelled) return
-      setBootstrap(isBootstrap(value) ? (value as NonNullable<Bootstrap>) : null)
-    })
-    return () => { cancelled = true }
-  }, [retryKey])
-
-  const liveContext = useQuery(api.restaurants.getTableContext, {
-    slug: slug ?? '',
-    tableNumber: Number(tableNumber ?? 0),
-  })
-
-  // Priorité au résultat WebSocket (source de vérité, réactive).
-  // Sinon, utilise le bootstrap HTTP s'il a renvoyé une donnée exploitable.
-  // Si le bootstrap a fini sans donnée (null) ou échoué, on attend la WS comme avant.
-  const context: LiveContext =
-    liveContext !== undefined
-      ? liveContext
-      : (bootstrap && isBootstrap(bootstrap) ? bootstrap : undefined)
-
-  // Countdown 20s. retryKey redémarre le timer sans reload complet.
-  // Toutes les UI d'attente/erreur restent sur /t/:slug/:tableNumber.
-  useEffect(() => {
-    if (context !== undefined) return
+    if (!slug || !tableNumber) return
+    navigated.current = false
+    setLoadState('loading')
     setTimedOut(false)
-    const id = setTimeout(() => setTimedOut(true), 20_000)
-    return () => clearTimeout(id)
-  }, [context, retryKey])
 
-  // Navigation vers /welcome — point unique de sortie de ce composant.
-  // Conditions nécessaires avant de naviguer :
-  //   1. context est défini (Convex a répondu)
-  //   2. context n'est pas null (restaurant existe)
-  //   3. restaurant.slug correspond à l'URL (pas de donnée cachée périmée)
-  //   4. table existe dans Convex (sinon le flow de paiement n'a pas de convexTableId)
-  //   5. restaurant non suspendu
-  useEffect(() => {
-    if (context === undefined) return
-    if (!context) return
-    if (context.restaurant.slug !== slug) return
-    if (!context.table) return
-    if (context.restaurant.suspended) return
-    if (navigated.current) return
+    const timeoutId = setTimeout(() => setTimedOut(true), 20_000)
+    let cancelled = false
 
-    navigated.current = true
+    // Fetch HTTP direct vers l'API Convex — pas de WebSocket.
+    // Sur iOS Safari le WebSocket prend 15-30s à s'établir ; le HTTP répond en < 1s.
+    const convexUrl = (import.meta.env.VITE_CONVEX_URL as string)
+      .replace(/^wss?:\/\//, 'https://')
 
-    // flushSync garantit que le SessionContext est à jour avant que
-    // react-router démonte ce composant et monte Landing.
-    flushSync(() => {
-      dispatch({
-        type: 'SET_TABLE_CONTEXT',
-        payload: {
-          restaurantName: context.restaurant.name,
-          tableNumber: context.table!.number,
-          tableCapacity: context.table!.capacity ?? 4,
-          convexRestaurantId: context.restaurant._id,
-          convexTableId: context.table!._id,
-          tableTotalCents: context.table!.amountCents ?? TABLE_TOTAL_CENTS,
-          cachedOrderItems: (context.table!.orderItems ?? []) as { name: string; qty: number; unitCents: number; paid?: boolean }[],
-          cachedPaidCents: (context.table! as { paidCents?: number }).paidCents ?? 0,
-        },
-      })
+    fetch(`${convexUrl}/api/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: 'restaurants:getTableContext',
+        format: 'json',
+        args: [{ slug, tableNumber: Number(tableNumber) }],
+      }),
     })
+      .then(r => r.json())
+      .then((res: { value?: HttpCtx }) => {
+        if (cancelled || navigated.current) return
+        clearTimeout(timeoutId)
 
-    updateStatus({
-      tableId: context.table!._id,
-      status: 'dining',
-      guests: context.table!.capacity,
-    }).catch(() => {})
+        const ctx = res?.value
 
-    navigate('/welcome', { replace: true })
-  }, [context])
+        if (!ctx) { setLoadState('not_found'); return }
+        if (ctx.restaurant.slug !== slug) { setLoadState('not_found'); return }
+        if (ctx.restaurant.suspended) { setLoadState('suspended'); return }
+        if (!ctx.table) { setLoadState('no_table'); return }
+
+        navigated.current = true
+        setLoadState('navigating')
+
+        flushSync(() => {
+          dispatch({
+            type: 'SET_TABLE_CONTEXT',
+            payload: {
+              restaurantName: ctx.restaurant.name,
+              tableNumber: ctx.table!.number,
+              tableCapacity: ctx.table!.capacity ?? 4,
+              convexRestaurantId: ctx.restaurant._id,
+              convexTableId: ctx.table!._id,
+              tableTotalCents: ctx.table!.amountCents ?? TABLE_TOTAL_CENTS,
+              cachedOrderItems: ctx.table!.orderItems ?? [],
+              cachedPaidCents: ctx.table!.paidCents ?? 0,
+            },
+          })
+        })
+
+        void updateStatus({
+          tableId: ctx.table!._id as Id<'tables'>,
+          status: 'dining',
+          guests: ctx.table!.capacity ?? 4,
+        }).catch(() => {})
+
+        navigate('/items', { replace: true })
+      })
+      .catch(() => {
+        if (cancelled) return
+        clearTimeout(timeoutId)
+        setTimedOut(true)
+      })
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
+    }
+  }, [retryKey, slug, tableNumber])
 
   function handleRetry() {
-    setTimedOut(false)
     setRetryKey(k => k + 1)
   }
 
-  // ─── Erreur après 20s ────────────────────────────────────────────────────
-  // L'URL reste /t/:slug/:tableNumber — un refresh relance le chargement.
-  if (context === undefined && timedOut) {
+  // ─── Restaurant introuvable ───────────────────────────────────────────────
+  if (loadState === 'not_found') {
+    return (
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="text-2xl font-black tracking-tight" style={{ color: '#18181B' }}>
+          Split<span style={{ color: '#E8920A' }}>zy</span>
+        </div>
+        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center text-2xl">🔍</div>
+        <div>
+          <div className="text-base font-bold text-dark">Restaurant introuvable</div>
+          <div className="text-sm text-muted mt-1">Ce QR code n'est pas associé à un établissement actif.</div>
+          <div className="text-xs text-muted mt-1">Vérifiez que vous scannez le bon QR code.</div>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── Restaurant suspendu ──────────────────────────────────────────────────
+  if (loadState === 'suspended') {
+    return (
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="text-2xl font-black tracking-tight" style={{ color: '#18181B' }}>
+          Split<span style={{ color: '#E8920A' }}>zy</span>
+        </div>
+        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center text-2xl">🔒</div>
+        <div>
+          <div className="text-base font-bold text-dark">Restaurant temporairement fermé</div>
+          <div className="text-sm text-muted mt-1">Revenez plus tard ou contactez l'établissement.</div>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── Table non configurée ─────────────────────────────────────────────────
+  if (loadState === 'no_table') {
+    return (
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="text-2xl font-black tracking-tight" style={{ color: '#18181B' }}>
+          Split<span style={{ color: '#E8920A' }}>zy</span>
+        </div>
+        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center text-2xl">🪑</div>
+        <div>
+          <div className="text-base font-bold text-dark">Table introuvable</div>
+          <div className="text-sm text-muted mt-1">Cette table n'est pas encore configurée.</div>
+          <div className="text-xs text-muted mt-1">Demandez au serveur de scanner le QR code.</div>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── Erreur réseau après 20s ──────────────────────────────────────────────
+  if (timedOut) {
     return (
       <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4 px-6 text-center">
         <div className="text-2xl font-black tracking-tight" style={{ color: '#18181B' }}>
@@ -147,71 +194,7 @@ export function TableEntry() {
     )
   }
 
-  // ─── Spinner — affiché pendant les 20s sur /t/:slug/:tableNumber ─────────
-  if (context === undefined) {
-    return (
-      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-3">
-        <div className="text-2xl font-black tracking-tight" style={{ color: '#18181B' }}>
-          Split<span style={{ color: '#E8920A' }}>zy</span>
-        </div>
-        <div className="w-6 h-6 border-2 border-[#E8920A] border-t-transparent rounded-full animate-spin" />
-        <span className="text-sm text-gray-400">Chargement de votre table…</span>
-      </div>
-    )
-  }
-
-  // ─── Restaurant introuvable ───────────────────────────────────────────────
-  if (!context) {
-    return (
-      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4 px-6 text-center">
-        <div className="text-2xl font-black tracking-tight" style={{ color: '#18181B' }}>
-          Split<span style={{ color: '#E8920A' }}>zy</span>
-        </div>
-        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center text-2xl">🔍</div>
-        <div>
-          <div className="text-base font-bold text-dark">Restaurant introuvable</div>
-          <div className="text-sm text-muted mt-1">Ce QR code n'est pas associé à un établissement actif.</div>
-          <div className="text-xs text-muted mt-1">Vérifiez que vous scannez le bon QR code.</div>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Restaurant suspendu ──────────────────────────────────────────────────
-  if (context.restaurant.suspended) {
-    return (
-      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4 px-6 text-center">
-        <div className="text-2xl font-black tracking-tight" style={{ color: '#18181B' }}>
-          Split<span style={{ color: '#E8920A' }}>zy</span>
-        </div>
-        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center text-2xl">🔒</div>
-        <div>
-          <div className="text-base font-bold text-dark">{context.restaurant.name}</div>
-          <div className="text-sm text-muted mt-1">Ce restaurant est temporairement fermé.</div>
-          <div className="text-xs text-muted mt-1">Revenez plus tard ou contactez l'établissement.</div>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Table non configurée ─────────────────────────────────────────────────
-  if (!context.table) {
-    return (
-      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-4 px-6 text-center">
-        <div className="text-2xl font-black tracking-tight" style={{ color: '#18181B' }}>
-          Split<span style={{ color: '#E8920A' }}>zy</span>
-        </div>
-        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center text-2xl">🪑</div>
-        <div>
-          <div className="text-base font-bold text-dark">Table introuvable</div>
-          <div className="text-sm text-muted mt-1">Cette table n'est pas encore configurée.</div>
-          <div className="text-xs text-muted mt-1">Demandez au serveur de scanner le QR code.</div>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Navigation en cours (données prêtes, transition vers /welcome) ───────
+  // ─── Spinner — loading ou navigating ────────────────────────────────────
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-3">
       <div className="text-2xl font-black tracking-tight" style={{ color: '#18181B' }}>
