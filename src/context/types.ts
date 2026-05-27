@@ -24,6 +24,13 @@ export interface SelectedItem {
 
 export type TipChoice = number | null // 0-30 as percentage, or null
 
+export interface CachedOrderItem {
+  name: string
+  qty: number
+  unitCents: number
+  paid?: boolean
+}
+
 export interface SessionState {
   restaurantName: string
   tableNumber: number
@@ -31,6 +38,8 @@ export interface SessionState {
   convexRestaurantId: string | null
   convexTableId: string | null
   tableTotalCents: number
+  cachedOrderItems: CachedOrderItem[]
+  cachedPaidCents: number
   userName: string
   userAvatarIndex: number
   convives: Convive[]
@@ -62,5 +71,7 @@ export type SessionAction =
   | { type: 'TOGGLE_FEEDBACK_TAG'; payload: string }
   | { type: 'SET_FEEDBACK_TEXT'; payload: string }
   | { type: 'SEND_FEEDBACK' }
-  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number } }
+  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number; cachedOrderItems?: CachedOrderItem[]; cachedPaidCents?: number } }
+  | { type: 'ADD_CACHED_PAID_CENTS'; payload: number }
+  | { type: 'MARK_CACHED_ITEMS_PAID' }
   | { type: 'RESET_SESSION' }

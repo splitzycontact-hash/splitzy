@@ -8,7 +8,13 @@ export const createBulk = mutation({
     capacity: v.number(),
   },
   handler: async (ctx, { restaurantId, count, capacity }) => {
+    const existing = await ctx.db
+      .query("tables")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
+      .collect()
+    const existingNumbers = new Set(existing.map(t => t.number))
     for (let i = 1; i <= count; i++) {
+      if (existingNumbers.has(i)) continue
       await ctx.db.insert("tables", {
         restaurantId,
         number: i,
@@ -26,22 +32,67 @@ export const list = query({
   },
 })
 
+// Lit une table par son _id. Utilisé par le flow client (Landing, Items) pour
+// suivre en temps réel l'état de paiement (paidCents, amountCents).
+// Retourne null si la table n'existe plus — jamais de throw côté query.
+export const getOne = query({
+  args: { tableId: v.id("tables") },
+  handler: async (ctx, { tableId }) => {
+    return (await ctx.db.get(tableId)) ?? null
+  },
+})
+
+// Patch conditionnel : on ne touche qu'aux champs explicitement fournis. Sinon
+// Convex efface les champs passés à `undefined` — un scan QR (status only)
+// effacerait sinon amountCents/orderItems posés par la simulation du gérant.
+//
+// Reset paidCents/paidTipCents UNIQUEMENT si la table était libre ou déjà
+// entièrement payée (= nouvelle sitting démarre). Pour les sittings en cours
+// (dining/payment) on préserve les paiements déjà encaissés.
 export const updateStatus = mutation({
   args: {
     tableId: v.id("tables"),
     status: v.union(v.literal("free"), v.literal("dining"), v.literal("payment"), v.literal("paid")),
     guests: v.optional(v.number()),
     amountCents: v.optional(v.number()),
+    orderItems: v.optional(v.array(v.object({
+      name: v.string(),
+      qty: v.number(),
+      unitCents: v.number(),
+    }))),
   },
-  handler: async (ctx, { tableId, status, guests, amountCents }) => {
-    await ctx.db.patch(tableId, { status, guests, amountCents })
+  handler: async (ctx, { tableId, status, guests, amountCents, orderItems }) => {
+    const existing = await ctx.db.get(tableId)
+    const patch: Record<string, unknown> = { status }
+    if (guests !== undefined) patch.guests = guests
+    if (amountCents !== undefined) {
+      patch.amountCents = amountCents
+      const wasFreshSitting = !existing
+        || existing.status === "free"
+        || existing.status === "paid"
+        || (existing.paidCents ?? 0) === 0
+      if (wasFreshSitting) {
+        patch.paidCents = undefined
+        patch.paidTipCents = undefined
+      }
+    }
+    if (orderItems !== undefined) patch.orderItems = orderItems
+    await ctx.db.patch(tableId, patch)
   },
 })
 
 export const resetToFree = mutation({
   args: { tableId: v.id("tables") },
   handler: async (ctx, { tableId }) => {
-    await ctx.db.patch(tableId, { status: 'free', guests: undefined, amountCents: undefined, alert: undefined })
+    await ctx.db.patch(tableId, {
+      status: 'free',
+      guests: undefined,
+      amountCents: undefined,
+      orderItems: undefined,
+      alert: undefined,
+      paidCents: undefined,
+      paidTipCents: undefined,
+    })
   },
 })
 
@@ -51,7 +102,38 @@ export const importAmounts = mutation({
   },
   handler: async (ctx, { rows }) => {
     for (const { tableId, amountCents } of rows) {
-      await ctx.db.patch(tableId, { amountCents, status: 'dining' })
+      await ctx.db.patch(tableId, {
+        amountCents,
+        status: 'dining',
+        paidCents: undefined,
+        paidTipCents: undefined,
+      })
     }
+  },
+})
+
+// Auto-création paresseuse d'une table manquante. Utilisé par TableEntry quand
+// un client scanne un QR de table qui n'a pas encore de document Convex
+// (ex: setup partiel, ou ajout d'une table sans re-run createBulk).
+// Retourne l'_id de la table existante ou nouvellement créée.
+export const ensureForRestaurant = mutation({
+  args: {
+    restaurantId: v.id("restaurants"),
+    number: v.number(),
+    capacity: v.optional(v.number()),
+  },
+  handler: async (ctx, { restaurantId, number, capacity }) => {
+    const all = await ctx.db
+      .query("tables")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
+      .collect()
+    const existing = all.find(t => t.number === number)
+    if (existing) return existing._id
+    return ctx.db.insert("tables", {
+      restaurantId,
+      number,
+      capacity: capacity ?? 4,
+      status: "free",
+    })
   },
 })

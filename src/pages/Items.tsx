@@ -1,14 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
-import { useQuery } from 'convex/react'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
-import { MENU_ITEMS } from '../data/menu'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
-import { api } from '../../convex/_generated/api'
-import type { Id } from '../../convex/_generated/dataModel'
 import type { MenuItem } from '../context/types'
 
 type Category = 'entrees' | 'plats' | 'desserts' | 'boissons'
@@ -36,26 +32,117 @@ function StepBar({ current }: { current: number }) {
 export function Items() {
   const { state, dispatch } = useSession()
   const navigate = useNavigate()
-  const { subtotal } = useSessionCalcs()
-  const [openCat, setOpenCat] = useState<Category | null>('entrees')
+  const { subtotal, billCents, paidCents, remainingCents, isFullyPaid, liveTable } = useSessionCalcs()
+  const [openCat, setOpenCat] = useState<Category | null>('plats')
 
-  const convexItems = useQuery(
-    api.menuItems.listByRestaurant,
-    state.convexRestaurantId
-      ? { restaurantId: state.convexRestaurantId as Id<'restaurants'> }
-      : 'skip',
+  // Spinner seulement si ni Convex ni cache ne sont disponibles.
+  // Sur iOS Safari, liveTable peut rester undefined longtemps (WS lent).
+  // Dans ce cas on utilise cachedOrderItems (stocké dans SessionContext depuis TableEntry).
+  const convexReady = liveTable !== undefined
+  const hasCachedItems = state.cachedOrderItems.length > 0
+
+  // Attente initiale : Convex pas encore répondu ET pas de cache
+  const [timedOut, setTimedOut] = useState(false)
+  useEffect(() => {
+    if (convexReady || hasCachedItems) return
+    const t = setTimeout(() => setTimedOut(true), 20000)
+    return () => clearTimeout(t)
+  }, [convexReady, hasCachedItems])
+
+  if (!convexReady && !hasCachedItems && !timedOut) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100%', background: '#FAFAFA', gap: 12,
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%',
+          border: '3px solid #FFF4E5', borderTopColor: '#E8920A',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+        <div style={{ fontSize: 13, color: '#9CA3AF' }}>Chargement des articles…</div>
+      </div>
+    )
+  }
+
+  // Table entièrement réglée (Convex OU cache) — bloquer tout nouveau paiement.
+  // isFullyPaid est vrai dès que cachedPaidCents === billCents, même sans WebSocket.
+  if (isFullyPaid) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100%', background: '#FAFAFA', padding: '0 24px', textAlign: 'center', gap: 12,
+      }}>
+        <div style={{ fontSize: 40 }}>✅</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#0A0A0A' }}>Table entièrement réglée</div>
+        <div style={{ fontSize: 13, color: '#9CA3AF' }}>Tous les articles ont été payés.</div>
+        <button
+          type="button"
+          onClick={() => navigate('/welcome')}
+          style={{
+            marginTop: 8, height: 48, padding: '0 24px', borderRadius: 14, border: 0,
+            background: '#E8920A', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          Retour
+        </button>
+      </div>
+    )
+  }
+
+  // Source de vérité : liveTable si disponible (Convex), sinon cache SessionContext.
+  // cachedOrderItems est rempli par TableEntry au scan du QR — disponible immédiatement,
+  // même si le WebSocket iOS prend du temps.
+  const sourceItems = convexReady
+    ? (liveTable?.orderItems ?? [])
+    : state.cachedOrderItems
+
+  const tableUnpaidItems = sourceItems.filter(i => !i.paid)
+  const hasTableOrder = tableUnpaidItems.length > 0
+
+  if (!hasTableOrder) {
+    const allPaid = liveTable != null && (liveTable.orderItems ?? []).length > 0 &&
+      (liveTable.orderItems ?? []).every(i => i.paid === true)
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100%', background: '#FAFAFA', padding: '0 24px', textAlign: 'center', gap: 12,
+      }}>
+        <div style={{ fontSize: 40 }}>{allPaid ? '✅' : '🍽'}</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#0A0A0A' }}>
+          {allPaid ? 'Table entièrement réglée' : 'Aucun article commandé'}
+        </div>
+        <div style={{ fontSize: 13, color: '#9CA3AF' }}>
+          {allPaid
+            ? 'Tous les articles ont été payés.'
+            : "Le gérant n'a pas encore enregistré de commande pour cette table."}
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/welcome')}
+          style={{
+            marginTop: 8, height: 48, padding: '0 24px', borderRadius: 14, border: 0,
+            background: '#E8920A', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          Retour
+        </button>
+      </div>
+    )
+  }
+
+  // Conversion orderItems → MenuItem (expansion par qty : 2×Pizza → 2 items séparés)
+  const menuItems: MenuItem[] = tableUnpaidItems.flatMap((item, idx) =>
+    Array.from({ length: item.qty }, (_, qi) => ({
+      id: `order-${idx}-${qi}`,
+      category: 'plats' as MenuItem['category'],
+      emoji: '',
+      name: item.name,
+      description: '',
+      price: item.unitCents,
+    }))
   )
-
-  const menuItems: MenuItem[] = convexItems && convexItems.length > 0
-    ? convexItems.map(item => ({
-        id: item._id,
-        category: item.category as MenuItem['category'],
-        emoji: item.emoji,
-        name: item.name,
-        description: item.description ?? '',
-        price: item.priceCents,
-      }))
-    : MENU_ITEMS
 
   const isSelected = (id: string) => state.selectedItems.some(i => i.menuItemId === id)
   const getSplitFactor = (id: string) => state.selectedItems.find(i => i.menuItemId === id)?.splitFactor ?? 1
@@ -66,8 +153,11 @@ export function Items() {
     items: menuItems.filter(m => m.category === cat),
   })).filter(g => g.items.length > 0)
 
-  const perPerson = state.tableTotalCents > 0
-    ? Math.round(state.tableTotalCents / state.equalSplitCount)
+  // En mode "parts égales", on divise le RESTANT à payer (et non le total)
+  // pour que les paiements multiples sur une même table ne fassent pas
+  // re-payer la part déjà encaissée des autres convives.
+  const perPerson = remainingCents > 0 && state.equalSplitCount > 0
+    ? Math.round(remainingCents / state.equalSplitCount)
     : 0
 
   return (
@@ -103,6 +193,25 @@ export function Items() {
       <div style={{ padding: '0 20px 4px' }}>
         <StepBar current={3} />
       </div>
+
+      {/* Bandeau état paiement live (visible si déjà partiellement réglé) */}
+      {paidCents > 0 && (
+        <div style={{ padding: '8px 20px 0' }}>
+          <div style={{
+            background: isFullyPaid ? '#ECFDF5' : '#FFF4E5',
+            border: `1px solid ${isFullyPaid ? 'rgba(16,185,129,0.25)' : 'rgba(232,146,10,0.25)'}`,
+            borderRadius: 12, padding: '10px 12px',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 16 }}>{isFullyPaid ? '✓' : '💶'}</span>
+            <div style={{ flex: 1, fontSize: 12, color: isFullyPaid ? '#047857' : '#92400E', fontWeight: 600 }}>
+              {isFullyPaid
+                ? `Table entièrement réglée (${formatEur(paidCents)})`
+                : <>Déjà payé : <strong>{formatEur(paidCents)}</strong> · Reste : <strong>{formatEur(remainingCents)}</strong></>}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mode tabs */}
       <div style={{ padding: '8px 20px 0' }}>
@@ -253,11 +362,16 @@ export function Items() {
             padding: 22, textAlign: 'center',
           }}>
             <div style={{ fontSize: 12, color: '#52525B', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Total de la table
+              {paidCents > 0 ? 'Reste à régler' : 'Total de la table'}
             </div>
             <div style={{ fontSize: 32, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.03em', marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
-              {state.tableTotalCents > 0 ? formatEur(state.tableTotalCents) : '—'}
+              {billCents > 0 ? formatEur(paidCents > 0 ? remainingCents : billCents) : '—'}
             </div>
+            {paidCents > 0 && billCents > 0 && (
+              <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
+                Addition totale {formatEur(billCents)} · déjà réglé {formatEur(paidCents)}
+              </div>
+            )}
             <div style={{ marginTop: 24, padding: 16, borderRadius: 14, background: '#FAFAFA' }}>
               <div style={{ fontSize: 11.5, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Nombre de personnes
@@ -300,7 +414,7 @@ export function Items() {
       )}
 
       {state.splitMode === 'custom' && (
-        <CustomAmountMode totalCents={state.tableTotalCents} />
+        <CustomAmountMode totalCents={remainingCents > 0 ? remainingCents : billCents} />
       )}
 
       <div style={{ minHeight: 24 }} />

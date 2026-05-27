@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { useMutation } from 'convex/react'
@@ -13,43 +13,64 @@ import type { Id } from '../../convex/_generated/dataModel'
 export function Payment() {
   const { state, dispatch } = useSession()
   const navigate = useNavigate()
-  const { subtotal, tipAmount, splitzyFee, total } = useSessionCalcs()
+  const { subtotal, tipAmount, splitzyFee, total, remainingCents } = useSessionCalcs()
   const [loading, setLoading] = useState<string | null>(null)
 
   const createPayment = useMutation(api.payments.create)
-  const updateTableStatus = useMutation(api.tables.updateStatus)
+  const [payError, setPayError] = useState<string | null>(null)
 
   const selectedCard = MOCK_CARDS.find(c => c.id === state.selectedCardId) ?? MOCK_CARDS[0]
 
   const totalStr = formatEur(total).replace('€', '')
 
-  const handlePay = async (method: string) => {
+  const handlePay = useCallback(async (method: string) => {
+    if (loading) return
     setLoading(method)
-    try {
-      if (state.convexRestaurantId && state.convexTableId) {
-        await createPayment({
-          restaurantId: state.convexRestaurantId as Id<'restaurants'>,
-          tableId: state.convexTableId as Id<'tables'>,
-          tableNumber: state.tableNumber,
-          guests: state.equalSplitCount ?? 1,
-          subtotalCents: subtotal,
-          tipCents: tipAmount,
-          commissionCents: splitzyFee,
-          totalCents: total,
-          paymentMethod: method,
-        }).catch(() => {})
+    setPayError(null)
+
+    if (state.convexRestaurantId && state.convexTableId) {
+      // Attend la mutation Convex avec un timeout de 5s.
+      // Sur iOS Safari, le WS peut être suspendu → timeout déclenché →
+      // on navigue quand même (la mutation est mise en file par Convex
+      // et s'exécute dès la reconnexion du socket).
+      const paymentPromise = createPayment({
+        restaurantId: state.convexRestaurantId as Id<'restaurants'>,
+        tableId: state.convexTableId as Id<'tables'>,
+        tableNumber: state.tableNumber,
+        guests: state.equalSplitCount ?? 1,
+        subtotalCents: subtotal,
+        tipCents: tipAmount,
+        commissionCents: splitzyFee,
+        totalCents: total,
+        paymentMethod: method,
+      })
+      const timeoutPromise = new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error('timeout')), 5000)
+      )
+
+      try {
+        await Promise.race([paymentPromise, timeoutPromise])
+      } catch (e) {
+        if (e instanceof Error && e.message !== 'timeout') {
+          // Erreur Convex réelle (validation, auth…) — ne pas naviguer
+          setPayError('Erreur de paiement — veuillez réessayer')
+          setLoading(null)
+          return
+        }
+        // Timeout : connexion lente mais paiement en file côté Convex
+        setPayError('Connexion lente — paiement enregistré')
       }
-      if (state.convexTableId) {
-        await updateTableStatus({
-          tableId: state.convexTableId as Id<'tables'>,
-          status: 'paid',
-          amountCents: total,
-        }).catch(() => {})
-      }
-    } catch {}
+    }
+
     dispatch({ type: 'CONFIRM_PAYMENT' })
+    dispatch({ type: 'ADD_CACHED_PAID_CENTS', payload: subtotal })
+    // Si on règle l'intégralité du restant, marquer tous les articles comme payés
+    // dans le cache — empêche un deuxième tour de paiement sur les mêmes articles.
+    if (subtotal >= remainingCents && remainingCents > 0) {
+      dispatch({ type: 'MARK_CACHED_ITEMS_PAID' })
+    }
     navigate('/confirmation')
-  }
+  }, [loading, state, createPayment, subtotal, tipAmount, splitzyFee, total, dispatch, navigate])
 
   return (
     <m.div
@@ -59,6 +80,23 @@ export function Payment() {
       exit="exit"
       style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#FAFAFA' }}
     >
+      {/* Toast erreur réseau */}
+      {payError && (
+        <div style={{
+          position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 999, maxWidth: 320, width: 'calc(100% - 32px)',
+          background: payError.startsWith('Erreur') ? '#FEF2F2' : '#FFF4E5',
+          border: `1px solid ${payError.startsWith('Erreur') ? '#FECACA' : 'rgba(232,146,10,0.3)'}`,
+          borderRadius: 12, padding: '10px 14px',
+          display: 'flex', alignItems: 'center', gap: 8,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+        }}>
+          <span style={{ fontSize: 14 }}>{payError.startsWith('Erreur') ? '⚠️' : '⏳'}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: payError.startsWith('Erreur') ? '#DC2626' : '#92400E' }}>
+            {payError}
+          </span>
+        </div>
+      )}
       {/* Dark hero */}
       <div style={{
         position: 'relative', overflow: 'hidden',
@@ -188,6 +226,8 @@ export function Payment() {
               flex: 1, height: 50, borderRadius: 12, border: 0, background: '#000', color: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               fontSize: 17, fontWeight: 500, cursor: 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
               opacity: loading && loading !== 'apple_pay' ? 0.5 : 1,
             }}
           >
@@ -211,6 +251,8 @@ export function Payment() {
               flex: 1, height: 50, borderRadius: 12, border: '1px solid #E4E4E7', background: '#fff', color: '#3C4043',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
               opacity: loading && loading !== 'google_pay' ? 0.5 : 1,
             }}
           >
@@ -256,6 +298,8 @@ export function Payment() {
             fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             boxShadow: '0 10px 28px -8px rgba(232,146,10,0.55), inset 0 0 0 1px rgba(255,255,255,0.12)',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
             opacity: loading && loading !== selectedCard.brand.toLowerCase() ? 0.5 : 1,
           }}
         >

@@ -9,6 +9,8 @@ const initialState: SessionState = {
   convexRestaurantId: null,
   convexTableId: null,
   tableTotalCents: MOCK_SESSION.tableTotalCents,
+  cachedOrderItems: [],
+  cachedPaidCents: 0,
   userName: '',
   userAvatarIndex: 0,
   convives: MOCK_SESSION.convives,
@@ -16,7 +18,7 @@ const initialState: SessionState = {
   equalSplitCount: 2,
   customAmount: 0,
   selectedItems: [],
-  tipPercent: 0,
+  tipPercent: 10,
   selectedCardId: 'visa',
   paymentConfirmed: false,
   feedbackStars: 0,
@@ -73,10 +75,27 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
       return { ...state, feedbackText: action.payload }
     case 'SEND_FEEDBACK':
       return { ...state, feedbackSent: true }
+    case 'ADD_CACHED_PAID_CENTS':
+      return { ...state, cachedPaidCents: state.cachedPaidCents + action.payload }
+    case 'MARK_CACHED_ITEMS_PAID':
+      return { ...state, cachedOrderItems: state.cachedOrderItems.map(i => ({ ...i, paid: true })) }
     case 'SET_TABLE_CONTEXT':
       return { ...state, ...action.payload }
     case 'RESET_SESSION':
-      return { ...initialState }
+      // Préserve le contexte de table pour que /welcome reflète l'état Convex
+      // après "Bonne soirée". Seule l'action "Libérer la table" (gérant) doit
+      // purger tout l'état — pas le retour d'un client après son paiement.
+      return {
+        ...initialState,
+        restaurantName: state.restaurantName,
+        tableNumber: state.tableNumber,
+        tableCapacity: state.tableCapacity,
+        convexRestaurantId: state.convexRestaurantId,
+        convexTableId: state.convexTableId,
+        tableTotalCents: state.tableTotalCents,
+        cachedOrderItems: state.cachedOrderItems,
+        cachedPaidCents: state.cachedPaidCents,
+      }
     default:
       return state
   }

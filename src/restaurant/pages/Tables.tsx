@@ -17,6 +17,7 @@ type TableData = {
   guests?: number
   duration?: string
   amountCents?: number
+  paidCents?: number
   alert?: boolean
   convexId: Id<'tables'> | null
 }
@@ -53,6 +54,10 @@ function generateOrder(menu: { name: string; priceCents: number }[]): SimItem[] 
 
 function TableCard({ table, onClick, onSimulate }: { table: TableData; onClick: () => void; onSimulate: () => void }) {
   const s = STATUS_STYLE[table.status]
+  const paidCents = table.paidCents ?? 0
+  const billCents = table.amountCents ?? 0
+  const remainingCents = Math.max(0, billCents - paidCents)
+  const hasPartialPayment = paidCents > 0 && paidCents < billCents
   return (
     <div
       className={`relative rounded-xl border p-4 text-left transition-all hover:shadow-card cursor-pointer ${s.card}`}
@@ -68,9 +73,18 @@ function TableCard({ table, onClick, onSimulate }: { table: TableData; onClick: 
       {table.guests && (
         <div className="text-xs text-muted">{table.guests} conv.{table.duration ? ` · ${table.duration}` : ''}</div>
       )}
-      {table.amountCents ? (
-        <div className="text-base font-bold text-dark mt-1">{formatEur(table.amountCents)}</div>
-      ) : null}
+      {billCents > 0 && !hasPartialPayment && (
+        <div className="text-base font-bold text-dark mt-1">{formatEur(billCents)}</div>
+      )}
+      {hasPartialPayment && (
+        <div className="mt-1">
+          <div className="text-xs text-muted tabular-nums">Payé {formatEur(paidCents)} / {formatEur(billCents)}</div>
+          <div className="text-sm font-bold text-orange-600 tabular-nums">Reste {formatEur(remainingCents)}</div>
+        </div>
+      )}
+      {table.status === 'paid' && billCents > 0 && paidCents >= billCents && (
+        <div className="text-xs text-green-600 font-semibold mt-1 tabular-nums">{formatEur(paidCents)} réglé ✓</div>
+      )}
       <button
         onClick={e => { e.stopPropagation(); onSimulate() }}
         className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-amber-400 bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
@@ -116,6 +130,7 @@ export function Tables() {
         status: 'dining',
         guests: simItems.reduce((s, i) => s + i.qty, 0),
         amountCents: totalCents,
+        orderItems: simItems,
       })
     } finally {
       setSimLoading(false)
@@ -124,7 +139,7 @@ export function Tables() {
     }
   }
 
-  type ConvexTable = { _id: Id<'tables'>; number: number; status: TableStatus; guests?: number; durationMinutes?: number; amountCents?: number; alert?: boolean }
+  type ConvexTable = { _id: Id<'tables'>; number: number; status: TableStatus; guests?: number; durationMinutes?: number; amountCents?: number; paidCents?: number; alert?: boolean }
 
   const tables: TableData[] = rawTables
     ? (rawTables as ConvexTable[]).map(t => ({
@@ -133,6 +148,7 @@ export function Tables() {
         guests: t.guests,
         duration: durationLabel(t.durationMinutes),
         amountCents: t.amountCents,
+        paidCents: t.paidCents,
         alert: t.alert,
         convexId: t._id,
       }))
@@ -153,6 +169,11 @@ export function Tables() {
 
   const visible = filter === 'all' ? tables : tables.filter(t => t.status === filter)
   const isLoading = rawTables === undefined
+
+  // Live lookup : le modal utilise la donnée fraîche (pas le snapshot du clic)
+  const liveSelected = selectedTable
+    ? (tables.find(t => t.convexId === selectedTable.convexId) ?? selectedTable)
+    : null
 
   const simTotal = simItems.reduce((s, i) => s + i.qty * i.unitCents, 0)
 
@@ -212,9 +233,9 @@ export function Tables() {
         )}
       </main>
 
-      {/* Table detail modal */}
+      {/* Table detail modal — utilise liveSelected (données fraîches du useQuery) */}
       <AnimatePresence>
-        {selectedTable && (
+        {liveSelected && (
           <m.div
             className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
             initial={{ opacity: 0 }}
@@ -230,15 +251,15 @@ export function Tables() {
               transition={{ type: 'spring', stiffness: 300, damping: 28 }}
             >
               <div className="flex items-center justify-between px-6 py-4" style={{ background: '#2a2724' }}>
-                <div className="text-lg font-bold text-white">Table {selectedTable.id}</div>
+                <div className="text-lg font-bold text-white">Table {liveSelected.id}</div>
                 <div className="flex items-center gap-3">
                   <span className={`text-xs font-semibold rounded-full px-3 py-1 ${
-                    selectedTable.status === 'free'    ? 'bg-gray-500/20 text-gray-300' :
-                    selectedTable.status === 'dining'  ? 'bg-purple-500/20 text-purple-300' :
-                    selectedTable.status === 'payment' ? 'bg-orange-500/20 text-orange-300' :
+                    liveSelected.status === 'free'    ? 'bg-gray-500/20 text-gray-300' :
+                    liveSelected.status === 'dining'  ? 'bg-purple-500/20 text-purple-300' :
+                    liveSelected.status === 'payment' ? 'bg-orange-500/20 text-orange-300' :
                                                          'bg-green-500/20 text-green-300'
                   }`}>
-                    {STATUS_STYLE[selectedTable.status].label}
+                    {STATUS_STYLE[liveSelected.status].label}
                   </span>
                   <button onClick={() => setSelectedTable(null)} className="text-white/60 hover:text-white transition-colors">
                     <X size={18} />
@@ -246,7 +267,7 @@ export function Tables() {
                 </div>
               </div>
               <div className="px-6 py-6">
-                {selectedTable.status === 'free' ? (
+                {liveSelected.status === 'free' ? (
                   <div className="flex flex-col items-center py-6 gap-2 text-center">
                     <span className="text-3xl">🪑</span>
                     <div className="text-sm font-semibold text-dark">Table libre</div>
@@ -254,22 +275,38 @@ export function Tables() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {selectedTable.guests && (
+                    {liveSelected.guests && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted">Convives</span>
-                        <span className="font-semibold text-dark">{selectedTable.guests}</span>
+                        <span className="font-semibold text-dark">{liveSelected.guests}</span>
                       </div>
                     )}
-                    {selectedTable.duration && (
+                    {liveSelected.duration && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted">Durée</span>
-                        <span className="font-semibold text-dark">{selectedTable.duration}</span>
+                        <span className="font-semibold text-dark">{liveSelected.duration}</span>
                       </div>
                     )}
-                    {selectedTable.amountCents ? (
-                      <div className="flex justify-between text-sm border-t border-border pt-4">
-                        <span className="text-muted">Montant</span>
-                        <span className="text-lg font-bold text-dark">{formatEur(selectedTable.amountCents)}</span>
+                    {liveSelected.amountCents ? (
+                      <div className="border-t border-border pt-4 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted">Addition totale</span>
+                          <span className="text-lg font-bold text-dark tabular-nums">{formatEur(liveSelected.amountCents)}</span>
+                        </div>
+                        {(liveSelected.paidCents ?? 0) > 0 && (
+                          <>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted">Déjà réglé</span>
+                              <span className="font-semibold text-green-600 tabular-nums">{formatEur(liveSelected.paidCents ?? 0)}</span>
+                            </div>
+                            {(liveSelected.paidCents ?? 0) < liveSelected.amountCents && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted">Reste à payer</span>
+                                <span className="font-bold text-orange-600 tabular-nums">{formatEur(liveSelected.amountCents - (liveSelected.paidCents ?? 0))}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-4 text-sm text-muted">Montant non encore défini</div>
@@ -278,15 +315,15 @@ export function Tables() {
                 )}
               </div>
               <div className="flex items-center gap-3 px-6 pb-5">
-                {selectedTable.status === 'payment' && (
+                {liveSelected.status === 'payment' && (
                   <button className="flex-1 bg-brand text-white font-semibold text-sm rounded-xl py-2.5 hover:bg-brand-dark transition-colors">
                     Envoyer rappel 📲
                   </button>
                 )}
-                {selectedTable.status !== 'free' && selectedTable.convexId && (
+                {liveSelected.status !== 'free' && liveSelected.convexId && (
                   <button
                     onClick={() => {
-                      resetToFree({ tableId: selectedTable.convexId as Id<'tables'> }).catch(() => {})
+                      resetToFree({ tableId: liveSelected.convexId as Id<'tables'> }).catch(() => {})
                       setSelectedTable(null)
                     }}
                     className="flex-1 bg-gray-100 text-gray-700 font-semibold text-sm rounded-xl py-2.5 hover:bg-gray-200 transition-colors border border-gray-200"

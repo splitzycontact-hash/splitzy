@@ -97,7 +97,20 @@ These must also be set on the prod deployment.
 ```
 /restaurant/*         → RestaurantApp (Clerk-protected dashboard)
 /t/:slug/:tableNumber → TableEntry (public — customer QR entry point)
-/                     → Landing (marketing homepage)
+
+/                     → Homepage (marketing landing page)
+/fonctionnalites      → Fonctionnalites (features + FonctionnalitesHero)
+/pricing              → PricingPage
+/blog                 → BlogPage
+/blog/:slug           → BlogArticlePage
+/changelog            → ChangelogPage
+/aide                 → AidePage (FAQ accordion)
+/securite             → SecuritePage
+/presse               → PressePage
+/a-propos             → AboutPage
+/contact              → ContactPage
+/carrieres            → CarriersPage
+
 /welcome              → Landing (consumer — après scan QR)
 /profile              → Profile (avatar + prénom)
 /items → /tip → /payment → /confirmation → /feedback → /feedback/sent
@@ -282,12 +295,79 @@ Located in `Tables.tsx`. Each table card has a dashed amber `[TEST] Simuler comm
 
 ```
 brand / brand-dark / brand-light / brand-bg / brand-glow  — orange palette (#E8920A = --splitzy-orange)
-dark-hero (#18181B)   — dark section backgrounds
+ink-900 (#18181B)     — dark section backgrounds (replaces dark-hero)
 muted (#9CA3AF)       — secondary text
 shadow-glow           — orange ring for selected states
 ```
 
-Never hardcode `#E8920A` — always use `var(--splitzy-orange)` or the `brand` Tailwind alias.
+**Marketing pages** : utiliser `bg-ink-900`, `text-brand`, `border-brand` etc. (Tailwind aliases). Ne jamais hardcoder `#E8920A` dans les pages marketing.  
+**Consumer pages** (flow client) : `#E8920A` hardcodé en inline style est **intentionnel** — pas de Tailwind dans le flow client.
+
+---
+
+## Marketing site
+
+Le site marketing (`src/pages/marketing/`) est un ensemble de pages React avec Framer Motion. Toutes sont des named exports (pas default) pour correspondre aux lazy imports dans `App.tsx`.
+
+### Règles Framer Motion marketing
+
+- Toujours `m.*` (jamais `motion.*`) — `LazyMotion` est dans `App.tsx`
+- Hero animations : `initial` + `animate` (au mount)
+- Sections sous la fold : `whileInView` + `viewport={{ once: true }}`
+- `useMotionValue` / `useSpring` importables directement depuis `framer-motion` indépendamment de `LazyMotion`
+- `AnimatePresence` pour accordion open/close
+
+### Règles TypeScript marketing
+
+- Les strings contenant des apostrophes françaises (`l'`, `d'`, `qu'`) doivent utiliser des guillemets doubles comme délimiteurs : `"avant qu'elle arrive"`
+- Toutes les dépendances utilisées doivent être dans `package.json` — le build local peut passer si elles sont en `node_modules` orpheline, mais le build Vercel (fresh install) échouera avec TS2307
+
+### Pattern TextReveal (word-by-word animation)
+
+L'espace entre mots doit être un **nœud texte frère** du `m.span`, pas à l'intérieur :
+
+```tsx
+// ❌ Bug — trailing space strippé par le browser dans un inline-block
+<m.span style={{ display: 'inline-block' }}>{word}{' '}</m.span>
+
+// ✅ Fix — espace HORS du span animé
+<span key={i}>
+  <m.span style={{ display: 'inline-block' }}>{word}</m.span>
+  {i < words.length - 1 ? ' ' : ''}
+</span>
+```
+
+### Pattern Marquee (défilement infini)
+
+```tsx
+// ✅ Marquee correct — width:max-content + shrink-0 obligatoires
+<div style={{ overflow: 'hidden' }}>
+  <m.div
+    style={{ display: 'flex', gap: '3rem', width: 'max-content' }}  // width:max-content critique
+    animate={{ x: ['0%', '-50%'] }}
+    transition={{ duration: 28, ease: 'linear', repeat: Infinity }}
+  >
+    {[...ITEMS, ...ITEMS].map((item, i) => (
+      <div key={i} className="shrink-0">{/* shrink-0 critique */}
+        {item}
+      </div>
+    ))}
+  </m.div>
+</div>
+```
+
+Sans `width: max-content`, le `m.div` prend la largeur du parent `overflow-hidden` et les flex items se compressent (`flex-shrink: 1` par défaut).
+
+### Composants marketing clés
+
+| Fichier | Rôle |
+|---|---|
+| `Navbar.tsx` | Navbar fixe, fond transparent → opaque au scroll |
+| `Footer.tsx` | Footer avec `<Link to>` (jamais `<a href>`) + scroll-to-top |
+| `shared.tsx` | `fadeInUp`, `useFadeInView` (Intersection Observer) |
+| `Logos.tsx` | Bande logos desktop grid + mobile marquee |
+| `blogData.ts` | 10 articles, système block-based, `getArticleBySlug` |
+| `src/components/Fonctionnalites/FonctionnalitesHero.tsx` | Hero /fonctionnalites avec MagneticButton |
 
 ---
 
@@ -368,16 +448,20 @@ NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentio
 
 ## Known issues fixed (context for future sessions)
 
-- **Duplicate restaurant slugs**: `restaurants.create` now checks for existing slug before inserting. `getTableContext` uses `.first()` not `.unique()`. If `.unique()` errors appear, there are duplicate restaurant documents — merge them by keeping the one with `clerkUserId`.
-- **Refresh redirect on /t/ routes**: Fixed with `window.location.pathname` check in `ConsumerAppGuard` + `flushSync` in `TableEntry` before `navigate('/')`.
-- **Square prices 0€**: Sandbox items use `VARIABLE_PRICING`. Production URL + token required. Fixed.
-- **Dashboard/client out of sync**: Were pointing to different restaurant documents. Fixed by merging duplicate restaurants so both use the same `_id`.
-- **Infinite spinner sur /t/ routes** : `TableEntry` a un timeout de 20 s → écran "Problème de connexion" avec bouton Réessayer (sans `window.location.reload()` — utilise `retryKey` state).
-- **VITE_CONVEX_URL prod** : Vercel prod pointe explicitement sur `https://mellow-chinchilla-481.eu-west-1.convex.cloud` (défini via `vercel env add`).
-- **QR Codes flash "Aucune table configurée"** (sauvegarde v4) : `rawTables ?? []` passait `[]` à `QRCodesSection` pendant le chargement Convex → état vide affiché par erreur. Corrigé avec un spinner si `rawTables === undefined`, cohérent avec le pattern de `MenuSection`. Règle générale : ne jamais passer `undefined ?? []` à un composant qui affiche un état vide — toujours garder le `undefined` pour afficher un spinner.
-- **Clerk chargeait sur /t/ routes** (sauvegarde v5) : `ClerkProvider` était dans `main.tsx` → inclus dans le bundle initial chargé par tous les utilisateurs. Corrigé en créant `src/restaurant/RestaurantRoot.tsx` (lazy-importé depuis `App.tsx`) qui contient l'unique `import { ClerkProvider }`. Le bundle `index-*.js` ne contient plus aucune référence Clerk.
-- **TableEntry naviguait avant que les données soient prêtes** (sauvegarde v5) : navigation vers `/welcome` déclenchée avant que Convex ait répondu. Ajout de 4 guards dans l'effet de navigation : `context === undefined`, `!context`, `context.restaurant.slug !== slug` (cache périmé), `!context.table` (table inexistante dans Convex), `navigated.current` (double-fire StrictMode).
-- **Footer liens internes en `<a href>`** (sauvegarde v5) : causaient un rechargement complet de la page. Tous remplacés par `<Link to>` (react-router-dom).
-- **LazyMotion** (sauvegarde v5) : framer-motion `motion.*` → `m.*` dans tous les composants animés + `<LazyMotion features={domAnimation}>` dans `App.tsx`. Réduit le bundle initial (~150 kB évités sur le chemin critique).
-- **Vercel ne déployait pas depuis sauvegarde-v4** (sauvegarde v5) : Vercel déploie depuis `main` uniquement. Les pushes sur `sauvegarde-*` ne créent que des previews. Corrigé en mergant `sauvegarde-v4 → main` + `vercel --prod`.
-- **Cold start WebSocket Safari iOS sur /t/ routes** (sauvegarde v6) : Le scan QR sur iPhone montrait un spinner 5-10 s puis "Problème de connexion" au premier chargement, alors que Chrome desktop chargeait instantanément. Cause : `ConvexProvider` n'ouvrait la WebSocket qu'au mount React, et l'établissement WSS (DNS + TLS + upgrade) prenait 5-10 s sur Safari iOS cellulaire — `useQuery` attendait la WS bufférisée. Corrigé en trois temps : (1) `<link rel="preconnect">` vers `%VITE_CONVEX_URL%` dans `index.html`, (2) `<script>` inline qui `POST /api/query` (`restaurants:getTableContext`) dès que la route matche `/t/:slug/:n`, AVANT le download du bundle, résultat stocké dans `window.__tableBootstrap` (abort 8 s), (3) `TableEntry` passé de `lazy()` à import statique dans `App.tsx`. La WS continue d'établir en parallèle pour conserver la réactivité. Si le bootstrap échoue/null, fallback transparent sur le chemin WS comme avant. Format Convex HTTP API : `POST {VITE_CONVEX_URL}/api/query` avec body `{ path: "module:fn", format: "json", args: [{...}] }` (args dans un array, pas un objet).
+- **Bugs texte landing page + marquee logos** (sauvegarde v10) : (1) `TextReveal` dans `CtaFinal.tsx`, `Testimonials.tsx`, `Solution.tsx` : le trailing `' '` à l'intérieur d'un `span` `display:inline-block` est strippé par le browser. Fix documenté dans la section "Marketing site" ci-dessus. (2) Marquee logos mobile (`Logos.tsx`) : le `m.div` flex prenait la largeur du parent `overflow-hidden` (= viewport), les items se compressaient → gaps invisibles. Fix : `style={{ width: 'max-content' }}` + `shrink-0` sur chaque item.
+- **Marketing pages redesign + FonctionnalitesHero** (sauvegarde v9) : Refonte complète des pages secondaires (Changelog, Presse, Aide, Sécurité) + `FonctionnalitesHero.tsx` dans `src/components/Fonctionnalites/`. `package.json` : ajout `"sonner": "^2.0.7"` — manquait (existait en node_modules orphelin → build Vercel échouait avec TS2307). Règle : toujours vérifier que les dépendances sont dans `package.json`, le build local peut passer si elles sont en node_modules orphelin.
+- **Homepage sections 1.5-1.9 + blog routing** (sauvegarde v8) : `Stats.tsx`, `Solution.tsx`, `Testimonials.tsx`, `PricingPreview.tsx`, `CtaFinal.tsx` réécrits. `blogData.ts` + `BlogArticlePage.tsx` créés (route `/blog/:slug`). `Footer.tsx` : liens internes convertis en `<Link to>` + scroll-to-top.
+- **Bouton "Payer" sans réponse sur Safari iOS** (sauvegarde v7) : `handlePay` était `async await` sur mutation Convex — quand la WS est suspendue par Safari iOS, la Promise reste pending indéfiniment. Corrigé en synchrone fire-and-forget : `void createPayment({...}).catch(() => {})` + navigate immédiat. `touchAction: 'manipulation'` + `WebkitTapHighlightColor: 'transparent'` sur les boutons.
+- **Cold start WebSocket Safari iOS sur /t/ routes** (sauvegarde v6) : Scan QR → spinner 5-10 s → "Problème de connexion". Corrigé : (1) `<link rel="preconnect">` vers Convex URL dans `index.html`, (2) `<script>` inline HTTP bootstrap (`POST /api/query`) avant le bundle JS → résultat dans `window.__tableBootstrap`, (3) `TableEntry` import statique (plus `lazy()`). Format Convex HTTP API : `{ path: "module:fn", format: "json", args: [{...}] }` (args dans array).
+- **Bouton "Payer" sans réponse sur Safari iOS** (sauvegarde v7) : `handlePay` était `async await` sur mutation Convex — quand la WS est suspendue par Safari iOS, la Promise reste pending. Fix : fire-and-forget synchrone.
+- **LazyMotion + m.*** (sauvegarde v5) : `motion.*` → `m.*` dans tous les composants + `<LazyMotion features={domAnimation}>` dans `App.tsx`. ~150 kB évités sur le chemin critique.
+- **Clerk chargeait sur /t/ routes** (sauvegarde v5) : `ClerkProvider` déplacé dans `src/restaurant/RestaurantRoot.tsx` (lazy-importé). Le bundle initial ne contient plus de référence Clerk.
+- **TableEntry naviguait avant données prêtes** (sauvegarde v5) : 4 guards dans l'effet de navigation : `context === undefined`, `!context`, `context.restaurant.slug !== slug`, `!context.table`, `navigated.current`.
+- **Footer liens en `<a href>`** (sauvegarde v5) : rechargement complet. Tous remplacés par `<Link to>`.
+- **Vercel déployait pas depuis sauvegarde-v4** (sauvegarde v5) : Vercel déploie depuis `main` uniquement. Fix : merger dans `main` + `vercel --prod`.
+- **QR Codes flash "Aucune table configurée"** (sauvegarde v4) : `rawTables ?? []` → `[]` pendant le chargement. Règle : ne jamais passer `undefined ?? []` à un composant qui affiche un état vide — garder `undefined` pour afficher un spinner.
+- **VITE_CONVEX_URL prod** : Vercel prod pointe sur `https://mellow-chinchilla-481.eu-west-1.convex.cloud` (défini via `vercel env add`).
+- **Infinite spinner sur /t/ routes** : `TableEntry` timeout 20 s → écran "Problème de connexion" avec bouton Réessayer (`retryKey` state, pas `window.location.reload()`).
+- **Dashboard/client out of sync** : pointaient vers des documents restaurant différents. Fix : merger les doublons de restaurants pour utiliser le même `_id`.
+- **Square prices 0€** : items sandbox utilisent `VARIABLE_PRICING`. URL production + token requis.
+- **Duplicate restaurant slugs** : `restaurants.create` vérifie slug existant avant insert. `getTableContext` utilise `.first()` pas `.unique()`.
