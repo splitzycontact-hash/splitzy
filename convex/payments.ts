@@ -22,10 +22,12 @@ export const create = mutation({
     paidItemNames: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    // paidItemNames n'existe pas dans le schema payments — l'extraire avant l'insert.
+    const { paidItemNames, ...paymentData } = args
     const now = Date.now()
     const d = new Date(now)
     const dateLabel = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
-    const paymentId = await ctx.db.insert("payments", { ...args, status: "Encaissé", createdAt: now, dateLabel })
+    const paymentId = await ctx.db.insert("payments", { ...paymentData, status: "Encaissé", createdAt: now, dateLabel })
 
     // Réconcilier la table : cumuler le payé sur la sitting courante + ajuster le statut.
     // Le restant est calculé sur le sous-total (hors pourboire) ; les pourboires
@@ -38,10 +40,23 @@ export const create = mutation({
       const billCents = table.amountCents ?? 0
       const status = billCents > 0 && paidCents >= billCents ? "paid" as const : "payment" as const
       const patch: Record<string, unknown> = { paidCents, paidTipCents, status }
-      // Quand la table est entièrement soldée, marquer tous les articles comme payés
-      // pour que /items n'affiche plus rien et que le bandeau /welcome soit correct.
       if (status === "paid" && table.orderItems?.length) {
+        // Table entièrement soldée → tout marquer paid.
         patch.orderItems = table.orderItems.map(item => ({ ...item, paid: true }))
+      } else if (paidItemNames && paidItemNames.length > 0 && table.orderItems?.length) {
+        // Paiement partiel "par article" → marquer uniquement les articles sélectionnés.
+        // remaining consommé en sens inverse pour gérer correctement les doublons (qty > 1).
+        const remaining = [...paidItemNames]
+        patch.orderItems = table.orderItems.map(item => {
+          if (item.paid) return item
+          let count = 0
+          for (let i = remaining.length - 1; i >= 0 && count < item.qty; i--) {
+            if (remaining[i] === item.name) { remaining.splice(i, 1); count++ }
+          }
+          if (count === 0) return item
+          if (count >= item.qty) return { ...item, paid: true }
+          return { ...item, qty: item.qty - count }
+        })
       }
       await ctx.db.patch(args.tableId, patch)
     }

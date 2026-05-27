@@ -23,6 +23,13 @@ export function Payment() {
 
   const totalStr = formatEur(total).replace('€', '')
 
+  // En mode "par article", liste des noms d'articles à marquer paid dans Convex.
+  // Seuls les articles payés à 100% (splitFactor === 1) sont marqués paid —
+  // les articles partagés restent visibles pour les autres convives.
+  const paidItemNames: string[] | undefined = state.splitMode === 'item'
+    ? state.selectedItems.filter(i => i.splitFactor === 1).map(i => i.name)
+    : undefined
+
   const handlePay = useCallback(async (method: string) => {
     if (loading) return
     setLoading(method)
@@ -43,6 +50,7 @@ export function Payment() {
         commissionCents: splitzyFee,
         totalCents: total,
         paymentMethod: method,
+        paidItemNames: paidItemNames && paidItemNames.length > 0 ? paidItemNames : undefined,
       })
       const timeoutPromise = new Promise<never>((_, rej) =>
         setTimeout(() => rej(new Error('timeout')), 5000)
@@ -64,13 +72,15 @@ export function Payment() {
 
     dispatch({ type: 'CONFIRM_PAYMENT' })
     dispatch({ type: 'ADD_CACHED_PAID_CENTS', payload: subtotal })
-    // Si on règle l'intégralité du restant, marquer tous les articles comme payés
-    // dans le cache — empêche un deuxième tour de paiement sur les mêmes articles.
     if (subtotal >= remainingCents && remainingCents > 0) {
+      // Table entièrement réglée — marquer tous les articles comme payés dans le cache.
       dispatch({ type: 'MARK_CACHED_ITEMS_PAID' })
+    } else if (paidItemNames && paidItemNames.length > 0) {
+      // Paiement partiel "par article" — marquer uniquement les articles sélectionnés.
+      dispatch({ type: 'MARK_SPECIFIC_ITEMS_PAID', payload: paidItemNames })
     }
     navigate('/confirmation')
-  }, [loading, state, createPayment, subtotal, tipAmount, splitzyFee, total, dispatch, navigate])
+  }, [loading, state, createPayment, subtotal, tipAmount, splitzyFee, total, dispatch, navigate, remainingCents, paidItemNames])
 
   return (
     <m.div

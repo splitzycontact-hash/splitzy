@@ -20,6 +20,7 @@ export interface SelectedItem {
   menuItemId: string
   splitFactor: 1 | 2 | 3 | 4
   priceCents: number
+  name: string
 }
 
 export type TipChoice = number | null // 0-30 as percentage, or null
@@ -62,7 +63,7 @@ export type SessionAction =
   | { type: 'SET_SPLIT_MODE'; payload: 'item' | 'equal' | 'custom' }
   | { type: 'SET_EQUAL_SPLIT_COUNT'; payload: number }
   | { type: 'SET_CUSTOM_AMOUNT'; payload: number }
-  | { type: 'TOGGLE_ITEM'; payload: { itemId: string; priceCents: number } }
+  | { type: 'TOGGLE_ITEM'; payload: { itemId: string; priceCents: number; name: string } }
   | { type: 'SET_ITEM_SPLIT'; payload: { itemId: string; factor: 1 | 2 | 3 | 4 } }
   | { type: 'SET_TIP_PERCENT'; payload: number }
   | { type: 'SET_SELECTED_CARD'; payload: string }
@@ -74,4 +75,5 @@ export type SessionAction =
   | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number; cachedOrderItems?: CachedOrderItem[]; cachedPaidCents?: number } }
   | { type: 'ADD_CACHED_PAID_CENTS'; payload: number }
   | { type: 'MARK_CACHED_ITEMS_PAID' }
+  | { type: 'MARK_SPECIFIC_ITEMS_PAID'; payload: string[] }
   | { type: 'RESET_SESSION' }

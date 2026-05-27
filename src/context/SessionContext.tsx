@@ -40,12 +40,12 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
     case 'SET_CUSTOM_AMOUNT':
       return { ...state, customAmount: action.payload }
     case 'TOGGLE_ITEM': {
-      const { itemId, priceCents } = action.payload
+      const { itemId, priceCents, name } = action.payload
       const exists = state.selectedItems.find(i => i.menuItemId === itemId)
       if (exists) {
         return { ...state, selectedItems: state.selectedItems.filter(i => i.menuItemId !== itemId) }
       }
-      return { ...state, selectedItems: [...state.selectedItems, { menuItemId: itemId, splitFactor: 1, priceCents }] }
+      return { ...state, selectedItems: [...state.selectedItems, { menuItemId: itemId, splitFactor: 1, priceCents, name }] }
     }
     case 'SET_ITEM_SPLIT': {
       return {
@@ -79,6 +79,30 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
       return { ...state, cachedPaidCents: state.cachedPaidCents + action.payload }
     case 'MARK_CACHED_ITEMS_PAID':
       return { ...state, cachedOrderItems: state.cachedOrderItems.map(i => ({ ...i, paid: true })) }
+    case 'MARK_SPECIFIC_ITEMS_PAID': {
+      // Marque dans le cache les articles spécifiques payés (mode "par article").
+      // payload = tableau de noms d'articles (doublons possibles si qty > 1).
+      // Pour chaque cachedOrderItem, on consomme les noms correspondants et on
+      // réduit la qty (ou on marque paid: true si toute la qty est couverte).
+      const remaining = [...action.payload]
+      return {
+        ...state,
+        cachedOrderItems: state.cachedOrderItems.map(item => {
+          if (item.paid) return item
+          let count = 0
+          for (let i = remaining.length - 1; i >= 0 && count < item.qty; i--) {
+            if (remaining[i] === item.name) {
+              remaining.splice(i, 1)
+              count++
+            }
+          }
+          if (count === 0) return item
+          if (count >= item.qty) return { ...item, paid: true }
+          // Qty partiellement payée : on réduit la qty restante
+          return { ...item, qty: item.qty - count }
+        }),
+      }
+    }
     case 'SET_TABLE_CONTEXT':
       return { ...state, ...action.payload }
     case 'RESET_SESSION':

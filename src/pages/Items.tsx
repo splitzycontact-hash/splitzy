@@ -282,7 +282,7 @@ export function Items() {
                         }}>
                           <button
                             type="button"
-                            onClick={() => dispatch({ type: 'TOGGLE_ITEM', payload: { itemId: it.id, priceCents: it.price } })}
+                            onClick={() => dispatch({ type: 'TOGGLE_ITEM', payload: { itemId: it.id, priceCents: it.price, name: it.name } })}
                             style={{
                               width: '100%', padding: '12px 16px', border: 0, background: 'transparent',
                               display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
