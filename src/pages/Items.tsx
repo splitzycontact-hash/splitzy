@@ -91,19 +91,15 @@ export function Items() {
     )
   }
 
-  // Source de vérité : liveTable si disponible (Convex), sinon cache SessionContext.
-  // cachedOrderItems est rempli par TableEntry au scan du QR — disponible immédiatement,
-  // même si le WebSocket iOS prend du temps.
-  const sourceItems = convexReady
-    ? (liveTable?.orderItems ?? [])
-    : state.cachedOrderItems
+  // Source de vérité : liveTable.orderItems si Convex a répondu, sinon cache SessionContext.
+  // Fallback sur le cache aussi si liveTable est défini mais orderItems absent.
+  const sourceItems = liveTable?.orderItems ?? state.cachedOrderItems
 
   const tableUnpaidItems = sourceItems.filter(i => !i.paid)
   const hasTableOrder = tableUnpaidItems.length > 0
 
   if (!hasTableOrder) {
-    const allPaid = liveTable != null && (liveTable.orderItems ?? []).length > 0 &&
-      (liveTable.orderItems ?? []).every(i => i.paid === true)
+    const allPaid = sourceItems.length > 0 && sourceItems.every(i => i.paid === true)
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
