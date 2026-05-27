@@ -19,6 +19,7 @@ export const create = mutation({
     commissionCents: v.number(),
     totalCents: v.number(),
     paymentMethod: v.string(),
+    paidItemNames: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const now = Date.now()
