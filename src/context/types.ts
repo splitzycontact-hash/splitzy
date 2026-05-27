@@ -73,4 +73,5 @@ export type SessionAction =
   | { type: 'SEND_FEEDBACK' }
   | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number; cachedOrderItems?: CachedOrderItem[]; cachedPaidCents?: number } }
   | { type: 'ADD_CACHED_PAID_CENTS'; payload: number }
+  | { type: 'MARK_CACHED_ITEMS_PAID' }
   | { type: 'RESET_SESSION' }

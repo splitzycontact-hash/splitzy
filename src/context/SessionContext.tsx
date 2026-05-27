@@ -77,6 +77,8 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
       return { ...state, feedbackSent: true }
     case 'ADD_CACHED_PAID_CENTS':
       return { ...state, cachedPaidCents: state.cachedPaidCents + action.payload }
+    case 'MARK_CACHED_ITEMS_PAID':
+      return { ...state, cachedOrderItems: state.cachedOrderItems.map(i => ({ ...i, paid: true })) }
     case 'SET_TABLE_CONTEXT':
       return { ...state, ...action.payload }
     case 'RESET_SESSION':

@@ -13,7 +13,7 @@ import type { Id } from '../../convex/_generated/dataModel'
 export function Payment() {
   const { state, dispatch } = useSession()
   const navigate = useNavigate()
-  const { subtotal, tipAmount, splitzyFee, total } = useSessionCalcs()
+  const { subtotal, tipAmount, splitzyFee, total, remainingCents } = useSessionCalcs()
   const [loading, setLoading] = useState<string | null>(null)
 
   const createPayment = useMutation(api.payments.create)
@@ -64,6 +64,11 @@ export function Payment() {
 
     dispatch({ type: 'CONFIRM_PAYMENT' })
     dispatch({ type: 'ADD_CACHED_PAID_CENTS', payload: subtotal })
+    // Si on règle l'intégralité du restant, marquer tous les articles comme payés
+    // dans le cache — empêche un deuxième tour de paiement sur les mêmes articles.
+    if (subtotal >= remainingCents && remainingCents > 0) {
+      dispatch({ type: 'MARK_CACHED_ITEMS_PAID' })
+    }
     navigate('/confirmation')
   }, [loading, state, createPayment, subtotal, tipAmount, splitzyFee, total, dispatch, navigate])
 

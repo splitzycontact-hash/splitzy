@@ -66,6 +66,31 @@ export function Items() {
     )
   }
 
+  // Table entièrement réglée (Convex OU cache) — bloquer tout nouveau paiement.
+  // isFullyPaid est vrai dès que cachedPaidCents === billCents, même sans WebSocket.
+  if (isFullyPaid) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100%', background: '#FAFAFA', padding: '0 24px', textAlign: 'center', gap: 12,
+      }}>
+        <div style={{ fontSize: 40 }}>✅</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#0A0A0A' }}>Table entièrement réglée</div>
+        <div style={{ fontSize: 13, color: '#9CA3AF' }}>Tous les articles ont été payés.</div>
+        <button
+          type="button"
+          onClick={() => navigate('/welcome')}
+          style={{
+            marginTop: 8, height: 48, padding: '0 24px', borderRadius: 14, border: 0,
+            background: '#E8920A', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          Retour
+        </button>
+      </div>
+    )
+  }
+
   // Source de vérité : liveTable si disponible (Convex), sinon cache SessionContext.
   // cachedOrderItems est rempli par TableEntry au scan du QR — disponible immédiatement,
   // même si le WebSocket iOS prend du temps.
