@@ -32,18 +32,13 @@ export function Landing() {
     state.convexTableId ? { tableId: state.convexTableId as Id<'tables'> } : 'skip',
   )
 
-  // Timeout : si Convex ne répond pas en 4s (WS lent iOS), on cache le
-  // spinner et affiche la page sans bandeau plutôt que bloquer.
-  const [tableTimedOut, setTableTimedOut] = useState(false)
-  useEffect(() => {
-    if (liveTable !== undefined) return
-    const t = setTimeout(() => setTableTimedOut(true), 4000)
-    return () => clearTimeout(t)
-  }, [liveTable])
-
-  const tableLoading = liveTable === undefined && !!state.convexTableId && !tableTimedOut
+  // TableEntry dispatch toujours le cache (HTTP fetch) avant de naviguer ici —
+  // liveTable n'est plus nécessaire pour l'affichage initial. On ne montre
+  // jamais le spinner "Vérification" : iOS throttle les setTimeout en background,
+  // ce qui faisait mouiller 15-30s.
+  const tableLoading = false
   const billCents = liveTable?.amountCents ?? state.tableTotalCents
-  const paidCents = liveTable?.paidCents ?? 0
+  const paidCents = liveTable?.paidCents ?? state.cachedPaidCents
   const remainingCents = Math.max(0, billCents - paidCents)
   const hasPaidSomething = paidCents > 0
   const isFullyPaid = billCents > 0 && remainingCents === 0
