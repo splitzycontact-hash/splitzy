@@ -217,7 +217,7 @@ export function Features() {
           <LargeCard
             Icon={IconBolt}
             title="Paiements sans friction"
-            desc="Apple Pay, Google Pay, carte bancaire. Vos clients paient en 15 secondes depuis leur téléphone."
+            desc="Apple Pay, Google Pay, carte bancaire. Vos clients paient en moins de 30 secondes depuis leur téléphone."
             Visual={PaymentVisual}
           />
         </m.div>

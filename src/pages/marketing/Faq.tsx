@@ -10,7 +10,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Comment intégrer Splitzy à ma caisse ?",
-    a: "Splitzy est compatible avec Lightspeed, Tiller, Sumup et la plupart des caisses françaises. Pour les autres, l'addition peut être saisie manuellement en 30 secondes ou importée via QR de votre TPE.",
+    a: "Splitzy s'intègre nativement avec Square (synchronisation du menu et des prix en temps réel). Les intégrations Lightspeed et Tiller sont en cours de développement. Sans intégration caisse, l'addition peut être saisie manuellement en 30 secondes.",
   },
   {
     q: "Quels moyens de paiement sont acceptés ?",
@@ -34,7 +34,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Quel support proposez-vous ?",
-    a: "Support par email pour tous, sous 24h. Plan Pro : chat live 7j/7 et hotline téléphonique de 9h à minuit. Plan Entreprise : ligne directe avec un account manager dédié.",
+    a: "Support par email pour tous les plans, réponse sous 24h. Plan Pro : support prioritaire avec réponse garantie sous 4h.",
   },
 ]
 

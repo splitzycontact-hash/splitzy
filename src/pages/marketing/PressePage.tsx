@@ -10,10 +10,10 @@ const PITCH_TEXT =
   "Splitzy est une solution française de paiement à table par QR code pour restaurants, bars et cafés. Sa différence : avant qu'un client mécontent ne poste un avis 1 étoile sur Google, Splitzy intercepte son insatisfaction via un feedback privé envoyé directement au gérant."
 
 const STATS = [
-  { number: '220', unit: '000', label: 'Restaurants en France', source: 'INSEE 2025' },
+  { number: '179', unit: '000', label: 'Restaurants en France', source: 'INSEE 2025' },
   { number: '15',  unit: 'Md€', label: 'Marché QR à table EU',  source: 'MRFR 2025' },
   { number: '+15', unit: '%',   label: 'Croissance annuelle (CAGR)', source: 'Marché EU' },
-  { number: '3',   unit: 'avis', label: 'Suffisent à perdre −0,4★', source: 'Étude Splitzy 2025' },
+  { number: '3',   unit: 'avis', label: 'Suffisent à dissuader 59% des clients', source: 'Trustt, 2025' },
 ]
 
 const RESOURCES = [
@@ -407,19 +407,18 @@ function RessourcesSection() {
                 paddingTop: 16, borderTop: '1px solid #F4F4F5',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
-                <button
-                  onClick={() => toast.info('Disponible bientôt')}
+                <a
+                  href="mailto:presse@splitzy.fr"
                   style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
                     color: '#52525B', fontSize: 13, fontWeight: 600,
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: 0, transition: 'color 0.15s ease',
+                    textDecoration: 'none', transition: 'color 0.15s ease',
                   }}
                   onMouseEnter={e => (e.currentTarget.style.color = '#E8920A')}
                   onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
                 >
-                  ↓ Télécharger →
-                </button>
+                  Demander par email →
+                </a>
                 <span style={{
                   background: '#F4F4F5', color: '#A1A1AA',
                   fontSize: 10, fontWeight: 700, padding: '3px 8px',

@@ -166,7 +166,7 @@ export function Hero() {
               <IconSparkles size={11} stroke={2.2} />
               Nouveau
             </span>
-            <span>Dashboard gérant disponible</span>
+            <span>Insights IA sur vos feedbacks — v1.1</span>
             <IconArrowRight size={13} className="text-white/40" />
           </a>
         </m.div>

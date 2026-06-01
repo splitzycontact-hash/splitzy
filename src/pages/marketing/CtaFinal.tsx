@@ -97,7 +97,8 @@ export function CtaFinal() {
           className="mt-6 text-[17px] md:text-[18px] leading-[1.7] max-w-[480px] mx-auto"
           style={{ color: '#A1A1AA' }}
         >
-          Rejoignez les restaurants parisiens qui protègent leur réputation avec Splitzy.
+          93% de vos futurs clients liront vos avis avant de venir.
+          Protégez votre réputation avant le prochain avis négatif.
           Installation en 15 minutes. Sans engagement.
         </m.p>
 

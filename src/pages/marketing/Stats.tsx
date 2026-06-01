@@ -75,9 +75,28 @@ interface StatData {
 }
 
 const STATS: StatData[] = [
-  { value: 3, label: 'avis négatifs', sublabel: 'suffisent à détruire une réputation', delay: 0 },
-  { value: 0.4, decimals: 1, prefix: '−', suffix: ' ★', label: 'de note en moyenne', sublabel: 'avec seulement 3 mauvais avis', delay: 0.15 },
-  { value: 30, prefix: '−', suffix: '%', label: 'de réservations perdues', sublabel: "après une baisse de 0,4 point", delay: 0.3 },
+  {
+    value: 93,
+    suffix: '%',
+    label: 'consultent les avis',
+    sublabel: "de vos futurs clients lisent Google avant de franchir votre porte",
+    delay: 0,
+  },
+  {
+    value: 59,
+    suffix: '%',
+    label: 'de clients perdus',
+    sublabel: "dissuadés dès que 3 avis négatifs apparaissent en ligne",
+    delay: 0.15,
+  },
+  {
+    value: 9,
+    prefix: '+',
+    suffix: '%',
+    label: 'de CA en plus',
+    sublabel: "par étoile gagnée sur votre note Google — Harvard Business School",
+    delay: 0.3,
+  },
 ]
 
 export function Stats() {
@@ -115,7 +134,9 @@ export function Stats() {
           className="mt-6 text-[16px] leading-[1.65] max-w-[480px] mx-auto"
           style={{ color: '#52525B' }}
         >
-          4,2 → 3,8 étoiles. Une baisse invisible qui coûte 30% de réservations en moins chaque mois.
+          93% de vos futurs clients lisent vos avis avant de venir.
+          3 mauvais suffit à en faire fuir 59%. La bonne nouvelle :
+          chaque étoile gagnée, c'est jusqu'à 9% de CA en plus.
         </m.p>
       </div>
 

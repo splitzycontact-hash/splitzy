@@ -151,7 +151,7 @@ export function AboutPage() {
               <span style={{ color: '#E8920A' }}>QR code</span> sur table.
             </h2>
             <p className="mt-5 max-w-[560px] mx-auto text-[16px] text-zinc-600">
-              Un parcours de 9 mois entre la discussion en terrasse et la première addition réglée par un client.
+              Un parcours de 9 mois entre la discussion en terrasse et les premiers tests terrain.
             </p>
           </div>
 
@@ -215,15 +215,13 @@ export function AboutPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Yann */}
             <article className="bg-white border border-zinc-200 rounded-3xl overflow-hidden" style={{ transition: 'transform .25s ease, border-color .25s ease, box-shadow .25s ease' }}>
-              <div className="relative h-[280px]" style={{ background: 'linear-gradient(135deg, #FFE7C2 0 8px, #FFF4E5 8px 16px)' }}>
-                <div className="absolute inset-0 flex items-end p-7">
-                  <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-[28px] font-extrabold shadow-lg" style={{ background: '#E8920A', letterSpacing: '-0.05em', lineHeight: 1, boxShadow: '0 8px 20px rgba(232,146,10,0.2)' }}>
-                    YG
-                  </div>
-                </div>
-                <div className="absolute top-5 right-5 text-[10px] tracking-[0.16em] uppercase font-semibold px-2.5 py-1 rounded-full" style={{ color: '#7A4D05', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(8px)' }}>
-                  photo · à venir
-                </div>
+              <div className="relative h-[320px] overflow-hidden">
+                <img
+                  src="/photo-yann.jpg"
+                  alt="Yann Grigoriev"
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: '50% 42%', transform: 'scale(1.05)', transformOrigin: '50% 42%' }}
+                />
               </div>
               <div className="p-7">
                 <div className="flex items-baseline justify-between gap-3">
@@ -249,15 +247,13 @@ export function AboutPage() {
 
             {/* Théo */}
             <article className="bg-white border border-zinc-200 rounded-3xl overflow-hidden">
-              <div className="relative h-[280px]" style={{ background: 'linear-gradient(135deg, #1F1F23 0 8px, #18181B 8px 16px)' }}>
-                <div className="absolute inset-0 flex items-end p-7">
-                  <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-[28px] font-extrabold" style={{ background: '#0A0A0A', letterSpacing: '-0.05em', lineHeight: 1, boxShadow: '0 8px 20px rgba(0,0,0,0.3)' }}>
-                    TJ
-                  </div>
-                </div>
-                <div className="absolute top-5 right-5 text-[10px] tracking-[0.16em] uppercase text-zinc-300 font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)' }}>
-                  photo · à venir
-                </div>
+              <div className="relative h-[320px] overflow-hidden">
+                <img
+                  src="/photo-theo.jpg"
+                  alt="Théo Jamous"
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: '50% 32%', transform: 'scale(1.25)', transformOrigin: '50% 32%' }}
+                />
               </div>
               <div className="p-7">
                 <div className="flex items-baseline justify-between gap-3">

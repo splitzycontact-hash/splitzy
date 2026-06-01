@@ -417,7 +417,7 @@ function ContactSection() {
             <span style={{ color: '#3F3F46' }}>·</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#52525B', fontSize: 12 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
-              Chat disponible 9h–19h
+              Réponse par email sous 24h ouvrées
             </span>
           </div>
         </m.div>

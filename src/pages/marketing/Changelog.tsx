@@ -15,7 +15,9 @@ interface ChangelogEntry {
 }
 
 const CATEGORY_CONFIG: Record<string, { color: string; bg: string; textColor: string }> = {
-  Performance: { color: '#E8920A', bg: '#FFF4E5', textColor: '#B8730A' },
+  IA:          { color: '#A855F7', bg: '#FAF5FF', textColor: '#7E22CE' },
+  Interface:   { color: '#E8920A', bg: '#FFF4E5', textColor: '#B8730A' },
+  Performance: { color: '#64748B', bg: '#F8FAFC', textColor: '#475569' },
   Dashboard:   { color: '#3B82F6', bg: '#EFF6FF', textColor: '#1D4ED8' },
   Mobile:      { color: '#8B5CF6', bg: '#F5F3FF', textColor: '#6D28D9' },
   Payments:    { color: '#22C55E', bg: '#F0FDF4', textColor: '#15803D' },
@@ -23,6 +25,34 @@ const CATEGORY_CONFIG: Record<string, { color: string; bg: string; textColor: st
 }
 
 const ENTRIES: ChangelogEntry[] = [
+  {
+    version: 'v1.1',
+    category: 'IA',
+    date: 'Juin 2026',
+    title: 'Insights IA sur vos feedbacks',
+    description: "L'IA analyse vos feedbacks privés et détecte automatiquement les problèmes récurrents — avant qu'ils ne deviennent des avis Google.",
+    items: [
+      { icon: '🤖', text: "Détection automatique des thèmes récurrents (service, attente, cuisine…)" },
+      { icon: '📊', text: 'Score de satisfaction calculé par service et par heure' },
+      { icon: '💡', text: 'Suggestions d\'action concrètes basées sur les feedbacks' },
+      { icon: '📬', text: 'Résumé IA hebdomadaire envoyé par email chaque lundi matin' },
+    ],
+    isLatest: true,
+  },
+  {
+    version: 'v1.0',
+    category: 'Interface',
+    date: 'Juin 2026',
+    title: 'Interface gérant V2',
+    description: 'Refonte complète du dashboard : CRM clients, page Réputation, Analytics avancés, gestion du menu et intégrations POS.',
+    items: [
+      { icon: '👥', text: 'CRM Clients — historique des visites, email, statut VIP/Régulier/Insatisfait' },
+      { icon: '⭐', text: 'Page Réputation — suivi de note Google, feedbacks privés, interceptions' },
+      { icon: '📈', text: 'Analytics — heatmap horaire, rotation des tables, satisfaction par service' },
+      { icon: '🍽', text: 'Gestion du menu — ajout, modification, sync Square en un clic' },
+      { icon: '🔌', text: 'Intégrations — Square connecté, Lightspeed et Tiller en cours' },
+    ],
+  },
   {
     version: 'v0.9',
     category: 'Performance',
@@ -35,7 +65,6 @@ const ENTRIES: ChangelogEntry[] = [
       { icon: '⚡', text: 'Framer Motion optimisé via LazyMotion' },
       { icon: '⚡', text: 'Clerk isolé du flow client (ne se charge plus pour les clients QR)' },
     ],
-    isLatest: true,
   },
   {
     version: 'v0.8',
@@ -162,7 +191,7 @@ function HeroSection() {
                 style={{ display: 'block', width: 7, height: 7, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }}
               />
               <span style={{ color: '#D4D4D8', fontSize: 13, fontWeight: 500 }}>
-                Dernière mise à jour : Mai 2026
+                Dernière mise à jour : Juin 2026
               </span>
             </m.div>
           </div>
@@ -185,56 +214,39 @@ function HeroSection() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ background: '#FFF4E5', color: '#B8730A', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99 }}>
-                  v0.9
+                <span style={{ background: '#FAF5FF', color: '#7E22CE', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99 }}>
+                  v1.1
                 </span>
-                <span style={{ color: '#71717A', fontSize: 13 }}>· Performance</span>
+                <span style={{ color: '#71717A', fontSize: 13 }}>· IA</span>
               </div>
-              <span style={{ color: '#52525B', fontSize: 12 }}>Mai 2026</span>
+              <span style={{ color: '#52525B', fontSize: 12 }}>Juin 2026</span>
             </div>
 
-            <p style={{ color: '#F4F4F5', fontSize: 18, fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.02em', marginBottom: 22 }}>
-              Chargement mobile<br />3× plus rapide
+            <p style={{ color: '#F4F4F5', fontSize: 18, fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.02em', marginBottom: 8 }}>
+              Insights IA<br />sur vos feedbacks
             </p>
 
-            <div style={{ marginBottom: 22 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ color: '#71717A', fontSize: 12 }}>Bundle size (gzip)</span>
-                <span style={{ color: '#22C55E', fontSize: 12, fontWeight: 700 }}>–66%</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 7 }}>
-                <span style={{ color: '#52525B', fontSize: 11, width: 34, flexShrink: 0 }}>Avant</span>
-                <div style={{ flex: 1, height: 6, background: '#3F3F46', borderRadius: 3 }}>
-                  <div style={{ width: '100%', height: '100%', background: '#52525B', borderRadius: 3 }} />
-                </div>
-                <span style={{ color: '#71717A', fontSize: 11, width: 38, textAlign: 'right' as const, flexShrink: 0 }}>400 kB</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ color: '#52525B', fontSize: 11, width: 34, flexShrink: 0 }}>Après</span>
-                <div style={{ flex: 1, height: 6, background: '#3F3F46', borderRadius: 3, overflow: 'hidden' }}>
-                  <m.div
-                    initial={{ width: '100%' }}
-                    animate={{ width: '33.5%' }}
-                    transition={{ duration: 1, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                    style={{ height: '100%', background: '#E8920A', borderRadius: 3 }}
-                  />
-                </div>
-                <span style={{ color: '#E8920A', fontSize: 11, fontWeight: 700, width: 38, textAlign: 'right' as const, flexShrink: 0 }}>134 kB</span>
-              </div>
-            </div>
+            <p style={{ color: '#71717A', fontSize: 13, lineHeight: 1.6, marginBottom: 20 }}>
+              {"L'IA détecte les problèmes récurrents dans vos feedbacks privés — avant qu'ils n'arrivent sur Google."}
+            </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
-              {['Lazy loading de toutes les routes', 'Framer Motion via LazyMotion', 'Clerk isolé du flow QR'].map((item, i) => (
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+              {[
+                { icon: '🤖', text: 'Détection automatique des thèmes (service, attente, cuisine…)' },
+                { icon: '📊', text: 'Score de satisfaction par service et par heure' },
+                { icon: '💡', text: "Suggestions d'action concrètes" },
+                { icon: '📬', text: 'Résumé IA chaque lundi matin par email' },
+              ].map((item, i) => (
                 <div key={i} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
-                  <span style={{ color: '#E8920A', fontSize: 12, flexShrink: 0, marginTop: 1 }}>⚡</span>
-                  <span style={{ color: '#71717A', fontSize: 13, lineHeight: 1.5 }}>{item}</span>
+                  <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
+                  <span style={{ color: '#71717A', fontSize: 13, lineHeight: 1.5 }}>{item.text}</span>
                 </div>
               ))}
             </div>
 
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #27272A', display: 'flex', alignItems: 'center', gap: 7 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
-              <span style={{ color: '#52525B', fontSize: 12 }}>En production depuis Mai 2026</span>
+              <span style={{ color: '#52525B', fontSize: 12 }}>En production depuis Juin 2026</span>
             </div>
           </m.div>
         </div>

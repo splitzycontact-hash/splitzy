@@ -49,7 +49,7 @@ const PAYMENT_STEPS = [
   { n: 2, title: 'Il entre ses coordonnées de carte', sub: 'Jamais stockées sur nos serveurs' },
   { n: 3, title: 'Stripe traite la transaction', sub: 'PCI DSS Level 1' },
   { n: 4, title: 'Le paiement est confirmé', sub: 'En moins de 3 secondes' },
-  { n: 5, title: "Les fonds arrivent sur votre IBAN", sub: 'Le lendemain ouvré' },
+  { n: 5, title: "Les fonds arrivent sur votre IBAN", sub: 'Sous 2 jours ouvrés' },
 ]
 
 const COLLECTED = [

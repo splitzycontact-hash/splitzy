@@ -44,7 +44,7 @@ const PLANS: Plan[] = [
       'Feedbacks illimités',
       'Notifications temps réel',
       'Analytics avancés',
-      'Export données clients',
+      'Emails clients capturés à chaque paiement',
       'Frais bancaires inclus',
     ],
     cta: "Démarrer l'essai →",
@@ -61,10 +61,10 @@ const PLANS: Plan[] = [
     desc: 'Pour les établissements ambitieux',
     features: [
       'Tout le plan Essentiel',
-      'Intégrations POS',
-      'White-label',
+      'Intégrations POS (Square, Lightspeed…)',
+      'CRM Clients — email, téléphone, historique des visites',
       'Multi-établissements',
-      'Support téléphonique',
+      'Support prioritaire (réponse < 4h)',
     ],
     cta: 'Nous contacter →',
     href: '/contact?sujet=Pro',
@@ -217,7 +217,7 @@ export function PricingPreview() {
             className="underline underline-offset-4 font-medium hover:opacity-80 transition-opacity"
             style={{ color: '#E8920A' }}
           >
-            Voir tous les détails, la FAQ et le comparatif concurrents →
+            Voir tous les détails et la FAQ →
           </a>
         </m.p>
       </div>

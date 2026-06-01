@@ -17,12 +17,12 @@ const STEPS: Record<string, StepData[]> = {
   restaurant: [
     { Icon: IconMenuBook, title: 'Configurez votre menu',    desc: 'Ajoutez vos plats et activez Splitzy en 5 minutes.', chip: 'Onboarding' },
     { Icon: IconQr,       title: 'Générez un QR code',      desc: 'Un QR unique par table, imprimé ou affiché sur écran.', chip: 'Sans contact' },
-    { Icon: IconWallet,   title: 'Encaissez automatiquement', desc: 'Chaque convive paie sa part, vous recevez le total.', chip: 'Virement J+1' },
+    { Icon: IconWallet,   title: 'Encaissez automatiquement', desc: 'Chaque convive paie sa part, vous recevez le total.', chip: 'Virement J+2' },
   ],
   client: [
     { Icon: IconPhoneScan, title: 'Scannez le QR code',          desc: "Avec l'appareil photo, aucune app à télécharger.", chip: '2 secondes' },
     { Icon: IconTap,       title: 'Sélectionnez vos plats',       desc: 'Choisissez ce que vous avez commandé.', chip: 'Sans erreur' },
-    { Icon: IconBolt,      title: 'Payez en quelques secondes',   desc: 'CB, Apple Pay, Google Pay. C\'est réglé.', chip: '15 sec' },
+    { Icon: IconBolt,      title: 'Payez en quelques secondes',   desc: 'CB, Apple Pay, Google Pay. C\'est réglé.', chip: '30 sec' },
   ],
 }
 

@@ -56,17 +56,17 @@ function MagneticCta({ children, href }: { children: React.ReactNode; href: stri
 // ── Spring counter stat ──────────────────────────────────────────────────
 function ReservationStat() {
   const { ref, inView } = useFadeInView()
-  const val = useCountUp(30, { duration: 2200, inView })
+  const val = useCountUp(59, { duration: 2200, inView })
   return (
     <div ref={ref}>
       <div
         className="font-black tabular-nums leading-none"
         style={{ fontSize: 'clamp(56px, 8vw, 80px)', letterSpacing: '-0.05em', color: '#E8920A' }}
       >
-        −{val}%
+        {val}%
       </div>
-      <p className="mt-3 text-zinc-400 text-[15px]">de réservations perdues</p>
-      <p className="mt-1 text-zinc-500 text-[13px]">3 avis 1 étoile = −0,4 point de note</p>
+      <p className="mt-3 text-zinc-400 text-[15px]">de clients potentiels dissuadés</p>
+      <p className="mt-1 text-zinc-500 text-[13px]">dès que 3 avis négatifs apparaissent en ligne</p>
     </div>
   )
 }
@@ -462,7 +462,7 @@ export function FonctionnalitesPage() {
                 className="text-balance"
                 style={{ fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.05, fontSize: 'clamp(32px, 4.5vw, 48px)', color: '#0A0A0A' }}
               >
-                <TextReveal>Paiement en 10 secondes.</TextReveal>
+                <TextReveal>Paiement en moins de 30 secondes.</TextReveal>
               </h2>
               <p className="mt-5 text-[16px] leading-relaxed" style={{ color: '#52525B' }}>
                 Zéro application à télécharger. Zéro friction. Le client scanne, voit son addition, paie et reçoit son reçu en moins de 30 secondes.

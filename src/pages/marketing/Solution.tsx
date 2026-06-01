@@ -360,12 +360,12 @@ export function Solution() {
 
           <FeatureBlock
             number="03"
-            titleLine1="Payez en 10 secondes."
+            titleLine1="Payez en moins de 30 secondes."
             titleLine2="Zéro appli, zéro friction."
             body="Le client scanne le QR code sur sa table. Il voit son addition, paie avec Apple Pay ou carte, et peut diviser l'addition automatiquement. Tout ça en moins de 30 secondes."
             cta="Voir le parcours client →"
             ctaHref="/fonctionnalites"
-            stat="⚡ Gagnez 12 min par table par service."
+            stat="⚡ 74% des clients préfèrent payer sans appeler le serveur."
             Visual={QrVisual}
           />
         </div>

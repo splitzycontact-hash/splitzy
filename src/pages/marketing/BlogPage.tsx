@@ -17,6 +17,7 @@ const COVERS: Record<string, React.CSSProperties> = {
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 const ARTICLES = [
+  /* HIDDEN — comparatif Sunday/Pleez/Obypay (données fictives, 6 mois d'usage non réels)
   {
     id: 1, slug: 'comparatif-sunday-pleez-obypay', cover: 'stripes-warm',
     category: 'Comparatif', catStyle: { color: '#7A4D05', background: 'rgba(255,255,255,0.8)' } as React.CSSProperties,
@@ -27,6 +28,8 @@ const ARTICLES = [
     dark: false,
     bigLabel: null as string | null,
   },
+  */
+  /* HIDDEN — 38 000 avis / 21h43 (données fictives non vérifiées)
   {
     id: 2, slug: 'quelle-heure-avis-google-ecrits', cover: 'stripes-dark',
     category: 'Data', catStyle: { color: 'white', background: 'rgba(255,255,255,0.15)' } as React.CSSProperties,
@@ -37,6 +40,8 @@ const ARTICLES = [
     dark: false,
     bigLabel: '21:43',
   },
+  */
+  /* HIDDEN — 3 patrons parisiens / avis 1 étoile (témoignages fictifs)
   {
     id: 3, slug: 'repondre-avis-1-etoile', cover: 'grid-cream',
     category: 'Opinion', catStyle: { color: '#0A0A0A', background: 'white' } as React.CSSProperties,
@@ -47,6 +52,7 @@ const ARTICLES = [
     dark: false,
     bigLabel: null,
   },
+  */
   {
     id: 4, slug: 'guide-pourboire-france-2026', cover: 'cream-block',
     category: 'Guide', catStyle: { color: '#7A4D05', background: 'rgba(255,255,255,0.8)' } as React.CSSProperties,
@@ -67,6 +73,7 @@ const ARTICLES = [
     dark: false,
     bigLabel: null,
   },
+  /* HIDDEN — installation 100 restos (chiffre fictif, pas encore atteint)
   {
     id: 6, slug: 'installation-100-restaurants', cover: 'dot-dark',
     category: 'Backstage', catStyle: { color: 'white', background: 'rgba(255,255,255,0.15)' } as React.CSSProperties,
@@ -77,6 +84,7 @@ const ARTICLES = [
     dark: false,
     bigLabel: null,
   },
+  */
   {
     id: 7, slug: 'premium-qui-veut-dire-cher', cover: 'dark-editorial',
     category: 'Opinion', catStyle: {} as React.CSSProperties,
@@ -97,6 +105,7 @@ const ARTICLES = [
     dark: false,
     bigLabel: null,
   },
+  /* HIDDEN — L'Ardoise +0,3 étoiles (cas client fictif)
   {
     id: 9, slug: 'lardoise-plus-03-etoiles-3-mois', cover: 'stars-grad',
     category: 'Étude de cas', catStyle: { color: '#7A4D05', background: 'rgba(255,255,255,0.85)' } as React.CSSProperties,
@@ -107,6 +116,7 @@ const ARTICLES = [
     dark: false,
     bigLabel: null,
   },
+  */
 ]
 
 const SERIES = [
@@ -314,7 +324,7 @@ export function BlogPage() {
             <div className="md:col-span-4">
               <p className="text-[16px] text-zinc-400 leading-relaxed">
                 Études, données et opinions sur le métier de restaurateur en France.{' '}
-                <span className="text-white">Écrit par notre équipe</span>, lu par 12&nbsp;000 gérants chaque mois.
+                <span className="text-white">Écrit par notre équipe</span>.
               </p>
               <div className="mt-6 flex items-center gap-4">
                 <a
@@ -557,7 +567,8 @@ export function BlogPage() {
         </div>
       </section>}
 
-      {/* ── TRENDING MARQUEE ── */}
+      {/* HIDDEN — marquee "Lus en ce moment chez nos abonnés" (0 abonnés réels) — passer false à true pour remettre */}
+      {false && (
       <section className="py-14 border-t" style={{ background: '#0A0A0A', borderColor: 'rgba(255,255,255,0.05)' }}>
         <div className="max-w-[1100px] mx-auto px-6 mb-6 flex items-center gap-3 text-[11px] tracking-[0.16em] uppercase text-zinc-500 font-semibold">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-dot" />
@@ -573,6 +584,7 @@ export function BlogPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ── NEWSLETTER (orange) ── */}
       <section id="newsletter" className="relative overflow-hidden text-white" style={{ background: '#E8920A' }}>

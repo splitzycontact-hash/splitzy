@@ -70,10 +70,8 @@ export const HIDDEN_BLOG_ARTICLES: Article[] = [
       { t: 'p', v: "50 000 €. Pour 3 avis. Qui auraient pu ne jamais exister." },
     ],
   },
-]
 
-export const BLOG_ARTICLES: Article[] = [
-  // ─── COMPARATIF ───────────────────────────────────────────────────────────────
+  // HIDDEN — comparatif Sunday/Pleez/Obypay (données fictives, 6 mois d'usage non réels)
   {
     slug: 'comparatif-sunday-pleez-obypay',
     id: 1,
@@ -127,7 +125,7 @@ export const BLOG_ARTICLES: Article[] = [
     ],
   },
 
-  // ─── DATA ────────────────────────────────────────────────────────────────────
+  // HIDDEN — 38 000 avis / 21h43 (données fictives non vérifiées)
   {
     slug: 'quelle-heure-avis-google-ecrits',
     id: 2,
@@ -158,7 +156,7 @@ export const BLOG_ARTICLES: Article[] = [
     ],
   },
 
-  // ─── OPINION ────────────────────────────────────────────────────────────────
+  // HIDDEN — 3 patrons parisiens / avis 1 étoile (témoignages fictifs)
   {
     slug: 'repondre-avis-1-etoile',
     id: 3,
@@ -195,6 +193,44 @@ export const BLOG_ARTICLES: Article[] = [
     ],
   },
 
+  // HIDDEN — installation 100 restos (chiffre fictif, pas encore atteint)
+  {
+    slug: 'installation-100-restaurants',
+    id: 6,
+    category: 'Backstage',
+    date: '2 avril 2026',
+    readTime: '9 min',
+    title: "On a installé Splitzy chez 100 restos. Voici ce qu'on a appris.",
+    excerpt: "L'imprimante qui ne marche pas, le wifi en sous-sol, le serveur qui refuse de scanner. Le terrain bat les slides.",
+    cover: 'dot-dark',
+    author: { initials: 'YG', name: 'Yann Grigoriev', role: 'CEO, Splitzy', bg: '#E8920A' },
+    blocks: [
+      { t: 'p', v: "Théo et moi, on a personnellement installé Splitzy dans les 47 premiers restaurants. Pas via un call de formation, pas via un PDF. On s'est assis avec chaque gérant, on a configuré le menu, on a briefé l'équipe, et on est restés pour le premier service. Voici ce qu'on a appris." },
+      { t: 'h2', v: "Ce qui marche vraiment" },
+      { t: 'p', v: "Le gérant présent au premier service. C'est le facteur numéro un de succès. Quand le patron est là et qu'il utilise le dashboard lui-même dès les premières tables, l'équipe suit naturellement. Quand il délègue l'installation et n'est pas là ce soir-là, on voit une résistance passive." },
+      { t: 'p', v: "Les restaurants avec un menu digitalisé. Si votre carte est déjà sur Lightspeed ou Square, l'import prend 10 minutes. Si elle est sur un fichier Word de 2019, comptez 2 heures." },
+      { t: 'p', v: "Les équipes jeunes ou mixtes. Un serveur de 24 ans qui voit le QR code comme un outil cool va le vendre naturellement aux clients. Un serveur de 52 ans qui a appris à faire les additions avec une calculatrice... ça prend plus de temps. Ce n'est pas un jugement, c'est un fait." },
+      { t: 'h2', v: "Ce qui ne marche pas" },
+      { t: 'p', v: "Le wifi en sous-sol. On a trois restaurants avec des caves voûtées magnifiques et un signal 4G qui descend à 0. Solution : on a aidé à installer un répéteur wifi. Prix : 80 €. Résultat : ça marche." },
+      { t: 'p', v: "Les plats du jour à prix variable. Si votre ardoise change tous les matins et que le serveur oublie de mettre à jour le menu sur Splitzy, les clients voient des prix incorrects. On a créé une fonction 'prix à définir' pour ces cas. Ce n'est pas parfait, mais c'est mieux que rien." },
+      { t: 'p', v: "Le restaurant qui veut tout faire en une heure. L'installation prend entre 45 minutes et 3 heures selon le contexte. Les clients qui nous disent « on a 30 minutes » n'ont jamais de bon premier service." },
+      { t: 'h2', v: "Les anecdotes du terrain" },
+      { t: 'p', v: "Le restaurant qui a imprimé ses QR codes à l'envers. Tous les QR codes étaient retournés à 180 degrés sur les présentoirs. Les clients scannaient le dessous de la table. On l'a découvert après 3 jours et un taux de scan de 2 %." },
+      { t: 'p', v: "Le client qui a payé pour la mauvaise table. Notre interface montrait 'Table 5' — lui a cru être à la table 5 mais était en réalité à la table 6. On a corrigé la logique d'attribution automatique. Aujourd'hui ça n'arrive plus." },
+      { t: 'p', v: "Le chef convaincu que le QR code servait à filmer les clients. Ça a pris 20 minutes pour lui expliquer que le QR code était juste une URL raccourcie. Sa femme a dû confirmer. Il utilise Splitzy maintenant et nous a envoyé un message de félicitations quand sa note Google a passé 4,5." },
+      { t: 'h2', v: "Ce qu'on a changé suite au terrain" },
+      { t: 'ul', v: [
+        "Le mode hors-ligne : si le réseau coupe, Splitzy continue de fonctionner en local et synchronise quand la connexion revient.",
+        "Le guide de taille des QR codes : minimum 8 cm × 8 cm pour être lisible à 40 cm de distance sur un présentoir.",
+        "La fiche de formation d'une page : 6 points, pas un mot de plus. Les gérants l'impriment et la donnent à leur équipe.",
+        "La mise à jour rapide du menu : 30 secondes pour modifier un prix depuis le dashboard, sans recharger la page.",
+      ]},
+      { t: 'quote', v: "Le terrain bat les slides. Chaque fois. Nos meilleures fonctionnalités viennent d'un restaurateur qui nous a dit 'mais pourquoi ça ne fait pas ça ?'.", author: "Yann Grigoriev, CEO Splitzy" },
+    ],
+  },
+]
+
+export const BLOG_ARTICLES: Article[] = [
   // ─── GUIDE ───────────────────────────────────────────────────────────────────
   {
     slug: 'guide-pourboire-france-2026',
@@ -273,42 +309,6 @@ export const BLOG_ARTICLES: Article[] = [
       { t: 'h2', v: "Notre score sur les 14 critères" },
       { t: 'p', v: "Splitzy : 1 friction inévitable sur 14. La seule qu'on ne peut pas éliminer : vous avez besoin d'un téléphone pour scanner. Pour le reste, on a conçu le produit autour de zéro friction : pas d'app, pas de connexion, Apple Pay natif, 2 écrans maximum, confirmation visuelle immédiate." },
       { t: 'p', v: "Sunday : 3 frictions. Pleez : 5. Les outils les plus anciens du marché : entre 7 et 9. Ce n'est pas un classement — c'est une invitation à ouvrir Google Analytics et regarder vos propres taux d'abandon." },
-    ],
-  },
-
-  // ─── BACKSTAGE ───────────────────────────────────────────────────────────────
-  {
-    slug: 'installation-100-restaurants',
-    id: 6,
-    category: 'Backstage',
-    date: '2 avril 2026',
-    readTime: '9 min',
-    title: "On a installé Splitzy chez 100 restos. Voici ce qu'on a appris.",
-    excerpt: "L'imprimante qui ne marche pas, le wifi en sous-sol, le serveur qui refuse de scanner. Le terrain bat les slides.",
-    cover: 'dot-dark',
-    author: { initials: 'YG', name: 'Yann Grigoriev', role: 'CEO, Splitzy', bg: '#E8920A' },
-    blocks: [
-      { t: 'p', v: "Théo et moi, on a personnellement installé Splitzy dans les 47 premiers restaurants. Pas via un call de formation, pas via un PDF. On s'est assis avec chaque gérant, on a configuré le menu, on a briefé l'équipe, et on est restés pour le premier service. Voici ce qu'on a appris." },
-      { t: 'h2', v: "Ce qui marche vraiment" },
-      { t: 'p', v: "Le gérant présent au premier service. C'est le facteur numéro un de succès. Quand le patron est là et qu'il utilise le dashboard lui-même dès les premières tables, l'équipe suit naturellement. Quand il délègue l'installation et n'est pas là ce soir-là, on voit une résistance passive." },
-      { t: 'p', v: "Les restaurants avec un menu digitalisé. Si votre carte est déjà sur Lightspeed ou Square, l'import prend 10 minutes. Si elle est sur un fichier Word de 2019, comptez 2 heures." },
-      { t: 'p', v: "Les équipes jeunes ou mixtes. Un serveur de 24 ans qui voit le QR code comme un outil cool va le vendre naturellement aux clients. Un serveur de 52 ans qui a appris à faire les additions avec une calculatrice... ça prend plus de temps. Ce n'est pas un jugement, c'est un fait." },
-      { t: 'h2', v: "Ce qui ne marche pas" },
-      { t: 'p', v: "Le wifi en sous-sol. On a trois restaurants avec des caves voûtées magnifiques et un signal 4G qui descend à 0. Solution : on a aidé à installer un répéteur wifi. Prix : 80 €. Résultat : ça marche." },
-      { t: 'p', v: "Les plats du jour à prix variable. Si votre ardoise change tous les matins et que le serveur oublie de mettre à jour le menu sur Splitzy, les clients voient des prix incorrects. On a créé une fonction 'prix à définir' pour ces cas. Ce n'est pas parfait, mais c'est mieux que rien." },
-      { t: 'p', v: "Le restaurant qui veut tout faire en une heure. L'installation prend entre 45 minutes et 3 heures selon le contexte. Les clients qui nous disent « on a 30 minutes » n'ont jamais de bon premier service." },
-      { t: 'h2', v: "Les anecdotes du terrain" },
-      { t: 'p', v: "Le restaurant qui a imprimé ses QR codes à l'envers. Tous les QR codes étaient retournés à 180 degrés sur les présentoirs. Les clients scannaient le dessous de la table. On l'a découvert après 3 jours et un taux de scan de 2 %." },
-      { t: 'p', v: "Le client qui a payé pour la mauvaise table. Notre interface montrait 'Table 5' — lui a cru être à la table 5 mais était en réalité à la table 6. On a corrigé la logique d'attribution automatique. Aujourd'hui ça n'arrive plus." },
-      { t: 'p', v: "Le chef convaincu que le QR code servait à filmer les clients. Ça a pris 20 minutes pour lui expliquer que le QR code était juste une URL raccourcie. Sa femme a dû confirmer. Il utilise Splitzy maintenant et nous a envoyé un message de félicitations quand sa note Google a passé 4,5." },
-      { t: 'h2', v: "Ce qu'on a changé suite au terrain" },
-      { t: 'ul', v: [
-        "Le mode hors-ligne : si le réseau coupe, Splitzy continue de fonctionner en local et synchronise quand la connexion revient.",
-        "Le guide de taille des QR codes : minimum 8 cm × 8 cm pour être lisible à 40 cm de distance sur un présentoir.",
-        "La fiche de formation d'une page : 6 points, pas un mot de plus. Les gérants l'impriment et la donnent à leur équipe.",
-        "La mise à jour rapide du menu : 30 secondes pour modifier un prix depuis le dashboard, sans recharger la page.",
-      ]},
-      { t: 'quote', v: "Le terrain bat les slides. Chaque fois. Nos meilleures fonctionnalités viennent d'un restaurateur qui nous a dit 'mais pourquoi ça ne fait pas ça ?'.", author: "Yann Grigoriev, CEO Splitzy" },
     ],
   },
 
