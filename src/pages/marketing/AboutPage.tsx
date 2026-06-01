@@ -14,6 +14,7 @@ const TIMELINE = [
     label: 'Identification du problème',
     title: "L'idée",
     desc: "Discussion sur une terrasse parisienne. Un ami restaurateur raconte sa note Google qui dégringole. La conversation devient un Notion, puis un cahier des charges.",
+    featured: false,
   },
   {
     icon: (
@@ -25,21 +26,11 @@ const TIMELINE = [
     step: '02',
     label: 'Validation marché',
     title: 'NEOMA Incubator',
-    desc: "Splitzy est sélectionné parmi 200+ projets. Trois mois de mentorat, de tests terrain avec une dizaine de restaurants pilotes dans le 6e et le 11e.",
-  },
-  {
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="20 6 9 17 4 12"/>
-      </svg>
-    ),
-    date: "Aujourd'hui",
-    step: '03',
-    label: 'En production',
-    title: '240+ restaurants',
-    desc: "Splitzy traite plus d'1,2 M€ d'additions cette année. Le produit grandit chaque semaine avec les retours des gérants.",
+    desc: "Splitzy est sélectionné par NEOMA Incubator. Trois mois de mentorat et de tests terrain avec des restaurants pilotes à Paris.",
     featured: true,
   },
+  // HIDDEN — carte "240+ restaurants" fictive
+  // { date: "Aujourd'hui", step: '03', label: 'En production', title: '240+ restaurants',
 ]
 
 const VALUES = [
@@ -245,11 +236,11 @@ export function AboutPage() {
                   Je voulais que les restaurateurs puissent se concentrer sur leur cuisine, pas sur leur réputation en ligne.
                 </p>
                 <div className="mt-6 flex items-center gap-4 pt-5 border-t border-zinc-150">
-                  <a href="https://linkedin.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] font-semibold hover:text-orange-600 transition-colors" style={{ color: '#0A0A0A' }}>
+                  <a href="https://www.linkedin.com/in/yann-grigoriev" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] font-semibold hover:text-orange-600 transition-colors" style={{ color: '#0A0A0A' }}>
                     LinkedIn <ArrowIcon />
                   </a>
                   <span className="text-zinc-300">·</span>
-                  <a href="mailto:yann@splitzy.fr" className="inline-flex items-center gap-1 text-[13px] font-semibold hover:text-orange-600 transition-colors" style={{ color: '#0A0A0A' }}>
+                  <a href="mailto:ygrigoriev@splitzy.fr" className="inline-flex items-center gap-1 text-[13px] font-semibold hover:text-orange-600 transition-colors" style={{ color: '#0A0A0A' }}>
                     Email <ArrowIcon />
                   </a>
                 </div>
@@ -279,20 +270,20 @@ export function AboutPage() {
                   On a construit quelque chose de simple à installer mais difficile à copier. C'est ça qui compte.
                 </p>
                 <div className="mt-6 flex items-center gap-4 pt-5 border-t border-zinc-150">
-                  <a href="https://linkedin.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] font-semibold hover:text-orange-600 transition-colors" style={{ color: '#0A0A0A' }}>
+                  <a href="https://www.linkedin.com/in/theo-jamous/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] font-semibold hover:text-orange-600 transition-colors" style={{ color: '#0A0A0A' }}>
                     LinkedIn <ArrowIcon />
                   </a>
                   <span className="text-zinc-300">·</span>
-                  <a href="https://github.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] font-semibold hover:text-orange-600 transition-colors" style={{ color: '#0A0A0A' }}>
-                    GitHub <ArrowIcon />
+                  <a href="mailto:tjamous@splitzy.fr" className="inline-flex items-center gap-1 text-[13px] font-semibold hover:text-orange-600 transition-colors" style={{ color: '#0A0A0A' }}>
+                    Email <ArrowIcon />
                   </a>
                 </div>
               </div>
             </article>
           </div>
 
-          {/* Hiring strip */}
-          <div className="mt-8 bg-white border border-dashed border-zinc-300 rounded-2xl p-6 flex items-center justify-between gap-6 flex-wrap">
+          {/* HIDDEN hiring strip — 0 postes ouverts */}
+          {false && <div className="mt-8 bg-white border border-dashed border-zinc-300 rounded-2xl p-6 flex items-center justify-between gap-6 flex-wrap">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -309,7 +300,7 @@ export function AboutPage() {
             <a href="/careers" className="inline-flex items-center gap-1 text-[13px] font-semibold hover:text-orange-600 transition-colors" style={{ color: '#0A0A0A' }}>
               Voir l'offre <ArrowIcon />
             </a>
-          </div>
+          </div>}
         </div>
       </section>
 
@@ -346,6 +337,7 @@ export function AboutPage() {
                 qu'elle n'atteigne Google. Pour qu'un client mécontent puisse être entendu — et qu'un service raté ne devienne pas une cicatrice publique.
               </p>
 
+              {/* HIDDEN — stats fictives (0 clients réels) — remettre quand on a de vrais chiffres
               <div className="mt-10 grid grid-cols-3 gap-px rounded-xl overflow-hidden border" style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.05)' }}>
                 {[
                   { num: '240+', label: 'restaurants\néquipés' },
@@ -358,6 +350,7 @@ export function AboutPage() {
                   </div>
                 ))}
               </div>
+              */ }
             </div>
           </div>
         </div>
@@ -401,11 +394,11 @@ export function AboutPage() {
               <div>
                 <p className="text-[11px] tracking-[0.16em] uppercase text-zinc-500 font-semibold">Incubé chez</p>
                 <p className="mt-1 text-[24px] font-bold tracking-tight" style={{ color: '#0A0A0A' }}>NEOMA Incubator · Paris</p>
-                <p className="text-[14px] text-zinc-500">Promotion 2025 · 200+ projets, 12 sélectionnés.</p>
+                <p className="text-[14px] text-zinc-500">Promotion 2025</p>
               </div>
             </div>
             <div className="flex flex-col md:flex-row items-stretch gap-3">
-              <a href="https://www.neoma-bs.fr" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 text-white text-[14px] font-semibold px-5 py-3 rounded-xl transition-colors hover:bg-ink-800" style={{ background: '#0A0A0A' }}>
+              <a href="https://startuplab.neoma-bs.fr/en/neoma-bs-incubators/" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 text-white text-[14px] font-semibold px-5 py-3 rounded-xl transition-colors hover:bg-ink-800" style={{ background: '#0A0A0A' }}>
                 Voir l'incubateur <ArrowIcon />
               </a>
               <a href="mailto:contact@splitzy.fr" className="inline-flex items-center justify-center gap-2 bg-white border border-zinc-200 text-[14px] font-semibold px-5 py-3 rounded-xl hover:border-zinc-400 transition-colors" style={{ color: '#0A0A0A' }}>

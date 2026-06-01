@@ -120,12 +120,14 @@ Les routes `/table` et `/recap` ont été supprimées (sauvegarde v3). Le flow e
 
 All client routes after `/profile` are protected by `ProtectedRoute` (redirects to `/welcome` if `userName` is empty). Session resets on `/feedback/sent`.
 
+`TableEntry` résout la table en **HTTP direct** (pas de `useQuery` WS) et navigue toujours vers `/welcome` — voir « iOS Safari — résilience réseau » ci-dessous.
+
 ### Auth guard logic (`src/App.tsx`)
 
 `ConsumerAppGuard` wraps the client app. Key rules:
 - `window.location.pathname.startsWith('/t/')` is checked **first** (before Clerk state) to prevent auth redirects on hard refresh — `useLocation()` can lag during Clerk re-initialization.
 - If Clerk is loaded + user is signed in + `state.restaurantName` is empty → redirect to `/restaurant/onboarding` (restaurant owner flow).
-- `flushSync` wraps `dispatch(SET_TABLE_CONTEXT)` in `TableEntry` before `navigate('/')` to prevent a race where the guard sees `restaurantName = ''` at the new path.
+- `flushSync` wraps `dispatch(SET_TABLE_CONTEXT)` in `TableEntry` before `navigate('/welcome')` to prevent a race where the guard sees `restaurantName = ''` at the new path.
 
 ### Auth — Clerk roles
 
@@ -152,7 +154,7 @@ Every sensitive Convex mutation checks `ctx.auth.getUserIdentity()` → looks up
 | `restaurants.ts` | `getTableContext`, `getByClerkId`, `getBySlug`, `create`, `update`, `setSuspended`, `deleteAll` |
 | `tables.ts` | `list`, `createBulk`, `updateStatus`, `resetToFree`, `importAmounts` |
 | `menuItems.ts` | `listByRestaurant`, `addItem`, `updateItem`, `deleteItem`, `replaceAll`, `syncFromSquare` |
-| `payments.ts` | `list`, `create`, `getOverviewStats` |
+| `payments.ts` | `list`, `create` (accepte `paidItemNames?`), `getOverviewStats` |
 | `feedbacks.ts` | `list`, `create`, `markRead` |
 | `posIntegrations.ts` | `getByProvider`, `upsert`, `syncLive` |
 
@@ -229,6 +231,42 @@ posIntegrations  restaurantId*, restaurantId+provider*, provider, apiKey, status
 **There are no channels to manage.** `useQuery` hooks re-render automatically when underlying data changes. A `payments.create` mutation triggers all active `useQuery(api.payments.list, ...)` calls across all connected clients instantly.
 
 Dashboard tables live, admin feed, client diner list — all reactive with zero subscription code.
+
+> **Exception iOS (flow client `/t/`) — voir section dédiée ci-dessous.** Le WebSocket Convex peut prendre 15-30 s à s'établir sur Safari iOS (et être suspendu en arrière-plan). Le flow client ne dépend donc **pas** du WS pour son chemin critique : lectures d'entrée et mutations passent par HTTP direct.
+
+---
+
+## iOS Safari — résilience réseau (flow client `/t/`)
+
+Sur Safari iOS, le WebSocket Convex est peu fiable : 15-30 s de cold start, suspension quand l'app passe en arrière-plan, `setTimeout` throttlés. Le flow client (`TableEntry → /welcome → … → /feedback/sent`) est conçu pour fonctionner **sans dépendre du WS**.
+
+### Mutations critiques en HTTP direct — `src/utils/convexHttp.ts`
+
+`httpMutation(path, args)` fait un `POST /api/mutation` avec `fetch({ keepalive: true })`. `keepalive` garantit que la requête part **même si l'utilisateur ferme l'onglet juste après** (limite navigateur : 64 KB/requête).
+
+Pourquoi : `useMutation()` queue la mutation côté client en attendant le WS. Si le WS ne s'établit jamais avant fermeture de la page, la mutation est **perdue** → le gérant ne voit ni paiement, ni table en `dining`, ni feedback.
+
+Mutations basculées en HTTP (ne **pas** revenir à `useMutation` pour celles-ci) :
+- `payments:create` — `Payment.tsx`
+- `tables:updateStatus` — `TableEntry.tsx`
+- `feedbacks:create` — `Feedback.tsx`
+
+Format réponse Convex HTTP : `{ status: "success", value }` ou `{ status: "error", errorMessage }` — **toujours vérifier `status === 'success'`** avant de lire `value` (sinon une erreur Convex est interprétée comme `value: undefined`).
+
+### Lecture d'entrée en HTTP direct — `TableEntry.tsx`
+
+`TableEntry` ne fait **plus** de `useQuery` WebSocket. Il :
+1. consomme `window.__tableBootstrap` (fetch HTTP lancé dans `index.html` **avant** le mount React) si disponible (1ʳᵉ ouverture = instantané) ;
+2. fallback sur un `fetch` direct `POST /api/query` (`restaurants:getTableContext`), avec **une 2ᵉ tentative après 1 s** en cas de cold start ;
+3. dispatch `SET_TABLE_CONTEXT` (avec `cachedOrderItems` / `cachedPaidCents`) via `flushSync`, puis `navigate('/welcome', { replace: true })`.
+
+**Naviguer vers `/welcome`, jamais `/items`** : `/items` est derrière `ProtectedRoute` (redirige vers `/welcome` si `userName` vide) → naviguer dessus directement chaîne un `Navigate` replace qui peut freezer dans `AnimatePresence mode="wait"`.
+
+États d'erreur explicites (`LoadState`) avec bouton Réessayer (`retryKey`) : `invalid_url`, `not_found`, `no_table`, `fetch_error`. Tous les échecs loggent un `console.error('[TableEntry] …')` (debuggable via Safari Web Inspector) — jamais d'échec silencieux / page blanche.
+
+### Cache local — `SessionContext`
+
+`cachedOrderItems` / `cachedPaidCents` (remplis par `TableEntry` à l'entrée) sont la source de vérité du flow tant que le WS n'a pas répondu. `useSessionCalcs` et `Items.tsx` font `liveTable?.… ?? state.cached…`. `Landing.tsx` n'affiche **aucun** spinner d'attente WS (`tableLoading = false`). `RESET_SESSION` préserve `cachedOrderItems` / `cachedPaidCents`.
 
 ---
 
@@ -374,7 +412,7 @@ Sans `width: max-content`, le `m.div` prend la largeur du parent `overflow-hidde
 ## Monetary formatting
 
 **Always** use `formatEur(cents: number)` from `src/utils/formatCurrency.ts`.
-Produces `57€` (no decimal) or `62,70€` (comma, no space before `€`). Never `.toFixed()` directly. Never store amounts as floats — always integer cents.
+Produces `57€` (no decimal) or `62,70€` (comma, no space before `€`). Implémenté via `toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })` — garantit la virgule sur tous les iOS quelle que soit la langue système (le `.toFixed(2).replace('.', ',')` précédent n'était pas garanti). Never `.toFixed()` directly. Never store amounts as floats — always integer cents.
 
 ---
 
@@ -448,20 +486,26 @@ NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentio
 
 ## Known issues fixed (context for future sessions)
 
+- **Flow client iOS résilient au WS lent** (sauvegarde v11) : refonte complète du chemin critique pour ne plus dépendre du WebSocket Convex (cold start 15-30 s sur iOS). Voir section « iOS Safari — résilience réseau ». En résumé :
+  - `payments:create` cassé en prod : `{ ...args }` dans `ctx.db.insert("payments", …)` incluait `paidItemNames` (absent du schema `payments`) → Convex rejetait **tous** les inserts → « Erreur de paiement ». Fix : `const { paidItemNames, ...paymentData } = args` avant l'insert ; `paidItemNames` sert ensuite à marquer `orderItems[].paid` (partiel géré via consommation de `remaining[]` pour les qty > 1).
+  - Mutations `payments:create` / `tables:updateStatus` / `feedbacks:create` basculées sur `httpMutation` (`src/utils/convexHttp.ts`, `fetch keepalive`) — sinon perdues si l'onglet se ferme avant l'établissement du WS → le gérant ne voyait rien.
+  - `TableEntry` : `useQuery` WS → fetch HTTP (`window.__tableBootstrap` puis `POST /api/query`, retry 1×), `navigate('/welcome')` (et non `/items`, qui est `ProtectedRoute`), états d'erreur + `console.error`.
+  - `Landing.tsx` : suppression du spinner « Vérification état de la table » (`tableLoading = false`) qui moulinait 15-30 s ; `paidCents` fallback sur `state.cachedPaidCents`.
+  - `Items.tsx` : `sourceItems = liveTable?.orderItems ?? state.cachedOrderItems` (le cache reste le fallback même quand `liveTable` est défini sans `orderItems`).
+  - `formatEur` : `toFixed(2).replace('.', ',')` → `toLocaleString('fr-FR', …)`.
 - **Bugs texte landing page + marquee logos** (sauvegarde v10) : (1) `TextReveal` dans `CtaFinal.tsx`, `Testimonials.tsx`, `Solution.tsx` : le trailing `' '` à l'intérieur d'un `span` `display:inline-block` est strippé par le browser. Fix documenté dans la section "Marketing site" ci-dessus. (2) Marquee logos mobile (`Logos.tsx`) : le `m.div` flex prenait la largeur du parent `overflow-hidden` (= viewport), les items se compressaient → gaps invisibles. Fix : `style={{ width: 'max-content' }}` + `shrink-0` sur chaque item.
 - **Marketing pages redesign + FonctionnalitesHero** (sauvegarde v9) : Refonte complète des pages secondaires (Changelog, Presse, Aide, Sécurité) + `FonctionnalitesHero.tsx` dans `src/components/Fonctionnalites/`. `package.json` : ajout `"sonner": "^2.0.7"` — manquait (existait en node_modules orphelin → build Vercel échouait avec TS2307). Règle : toujours vérifier que les dépendances sont dans `package.json`, le build local peut passer si elles sont en node_modules orphelin.
 - **Homepage sections 1.5-1.9 + blog routing** (sauvegarde v8) : `Stats.tsx`, `Solution.tsx`, `Testimonials.tsx`, `PricingPreview.tsx`, `CtaFinal.tsx` réécrits. `blogData.ts` + `BlogArticlePage.tsx` créés (route `/blog/:slug`). `Footer.tsx` : liens internes convertis en `<Link to>` + scroll-to-top.
-- **Bouton "Payer" sans réponse sur Safari iOS** (sauvegarde v7) : `handlePay` était `async await` sur mutation Convex — quand la WS est suspendue par Safari iOS, la Promise reste pending indéfiniment. Corrigé en synchrone fire-and-forget : `void createPayment({...}).catch(() => {})` + navigate immédiat. `touchAction: 'manipulation'` + `WebkitTapHighlightColor: 'transparent'` sur les boutons.
-- **Cold start WebSocket Safari iOS sur /t/ routes** (sauvegarde v6) : Scan QR → spinner 5-10 s → "Problème de connexion". Corrigé : (1) `<link rel="preconnect">` vers Convex URL dans `index.html`, (2) `<script>` inline HTTP bootstrap (`POST /api/query`) avant le bundle JS → résultat dans `window.__tableBootstrap`, (3) `TableEntry` import statique (plus `lazy()`). Format Convex HTTP API : `{ path: "module:fn", format: "json", args: [{...}] }` (args dans array).
-- **Bouton "Payer" sans réponse sur Safari iOS** (sauvegarde v7) : `handlePay` était `async await` sur mutation Convex — quand la WS est suspendue par Safari iOS, la Promise reste pending. Fix : fire-and-forget synchrone.
+- **Bouton "Payer" sans réponse sur Safari iOS** (sauvegarde v7, _superseded par v11_) : `handlePay` était `async await` sur mutation Convex — quand la WS est suspendue par Safari iOS, la Promise reste pending indéfiniment. v7 : fire-and-forget synchrone. **v11** : `createPayment` (WS) remplacé par `httpMutation('payments:create', …)`. `touchAction: 'manipulation'` + `WebkitTapHighlightColor: 'transparent'` toujours d'actualité sur les boutons.
+- **Cold start WebSocket Safari iOS sur /t/ routes** (sauvegarde v6, _étendu en v11_) : Scan QR → spinner 5-10 s → "Problème de connexion". Corrigé : (1) `<link rel="preconnect">` vers Convex URL dans `index.html`, (2) `<script>` inline HTTP bootstrap (`POST /api/query`) avant le bundle JS → résultat dans `window.__tableBootstrap`, (3) `TableEntry` import statique (plus `lazy()`). Format Convex HTTP API : `{ path: "module:fn", format: "json", args: [{...}] }` (args dans array). **v11** : `TableEntry` consomme désormais lui-même `__tableBootstrap` + fetch HTTP (plus de `useQuery` WS du tout).
 - **LazyMotion + m.*** (sauvegarde v5) : `motion.*` → `m.*` dans tous les composants + `<LazyMotion features={domAnimation}>` dans `App.tsx`. ~150 kB évités sur le chemin critique.
 - **Clerk chargeait sur /t/ routes** (sauvegarde v5) : `ClerkProvider` déplacé dans `src/restaurant/RestaurantRoot.tsx` (lazy-importé). Le bundle initial ne contient plus de référence Clerk.
-- **TableEntry naviguait avant données prêtes** (sauvegarde v5) : 4 guards dans l'effet de navigation : `context === undefined`, `!context`, `context.restaurant.slug !== slug`, `!context.table`, `navigated.current`.
+- **TableEntry naviguait avant données prêtes** (sauvegarde v5, _superseded par v11_) : guards dans l'effet de navigation : `!context`, `context.restaurant.slug !== slug`, `!context.table`, `navigated.current`. **v11** : même logique de guards mais sur le résultat HTTP (plus de `context === undefined` car plus de `useQuery`), chacun mappé sur un `LoadState` distinct.
 - **Footer liens en `<a href>`** (sauvegarde v5) : rechargement complet. Tous remplacés par `<Link to>`.
 - **Vercel déployait pas depuis sauvegarde-v4** (sauvegarde v5) : Vercel déploie depuis `main` uniquement. Fix : merger dans `main` + `vercel --prod`.
 - **QR Codes flash "Aucune table configurée"** (sauvegarde v4) : `rawTables ?? []` → `[]` pendant le chargement. Règle : ne jamais passer `undefined ?? []` à un composant qui affiche un état vide — garder `undefined` pour afficher un spinner.
 - **VITE_CONVEX_URL prod** : Vercel prod pointe sur `https://mellow-chinchilla-481.eu-west-1.convex.cloud` (défini via `vercel env add`).
-- **Infinite spinner sur /t/ routes** : `TableEntry` timeout 20 s → écran "Problème de connexion" avec bouton Réessayer (`retryKey` state, pas `window.location.reload()`).
+- **Infinite spinner sur /t/ routes** (_superseded par v11_) : `TableEntry` timeout 20 s → écran "Problème de connexion" avec bouton Réessayer (`retryKey` state, pas `window.location.reload()`). **v11** : plus de timeout long — retry HTTP auto (1×, +1 s) puis `LoadState='fetch_error'` avec bouton Réessayer (`retryKey` conservé).
 - **Dashboard/client out of sync** : pointaient vers des documents restaurant différents. Fix : merger les doublons de restaurants pour utiliser le même `_id`.
 - **Square prices 0€** : items sandbox utilisent `VARIABLE_PRICING`. URL production + token requis.
 - **Duplicate restaurant slugs** : `restaurants.create` vérifie slug existant avant insert. `getTableContext` utilise `.first()` pas `.unique()`.

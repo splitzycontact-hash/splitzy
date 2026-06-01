@@ -8,7 +8,10 @@
  * @module
  */
 
+import type * as dependencyStatus from "../dependencyStatus.js";
 import type * as feedbacks from "../feedbacks.js";
+import type * as insights from "../insights.js";
+import type * as members from "../members.js";
 import type * as menuItems from "../menuItems.js";
 import type * as payments from "../payments.js";
 import type * as posIntegrations from "../posIntegrations.js";
@@ -23,7 +26,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  dependencyStatus: typeof dependencyStatus;
   feedbacks: typeof feedbacks;
+  insights: typeof insights;
+  members: typeof members;
   menuItems: typeof menuItems;
   payments: typeof payments;
   posIntegrations: typeof posIntegrations;

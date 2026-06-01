@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { SplitzyLogo } from './Navbar'
-import { IconLinkedin, IconTwitter, IconInstagram } from './Icons'
+import { IconLinkedin, IconInstagram } from './Icons'
 
 const FOOTER_COLS = [
   {
@@ -17,8 +17,8 @@ const FOOTER_COLS = [
     links: [
       { label: 'À propos',  to: '/about' },
       { label: 'Blog',      to: '/blog' },
-      { label: 'Presse',    to: '/presse' },
-      { label: 'Carrières', to: '/careers' },
+      // { label: 'Presse',    to: '/presse' }, // HIDDEN — page sans contenu réel
+      // { label: 'Carrières', to: '/careers' }, // HIDDEN — 0 postes ouverts
     ],
   },
   {
@@ -32,9 +32,8 @@ const FOOTER_COLS = [
 ]
 
 const SOCIAL_LINKS = [
-  { label: 'LinkedIn',    href: 'https://linkedin.com/company/splitzy', Icon: IconLinkedin  },
-  { label: 'Twitter / X', href: 'https://x.com/splitzy',               Icon: IconTwitter   },
-  { label: 'Instagram',   href: 'https://instagram.com/splitzy',        Icon: IconInstagram },
+  { label: 'LinkedIn',  href: 'https://linkedin.com/company/splitzyfr', Icon: IconLinkedin  },
+  { label: 'Instagram', href: 'https://instagram.com/splitzyfr',        Icon: IconInstagram },
 ]
 
 export function Footer() {

@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server"
+import { query, mutation, action } from "./_generated/server"
 import { v } from "convex/values"
 
 export const getTableContext = query({
@@ -20,6 +20,7 @@ export const update = mutation({
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     type: v.optional(v.string()),
+    plan: v.optional(v.string()),
   },
   handler: async (ctx, { id, ...patch }) => {
     await ctx.db.patch(id, patch)
@@ -57,6 +58,13 @@ export const create = mutation({
   },
 })
 
+export const updateQrColor = mutation({
+  args: { id: v.id("restaurants"), qrColor: v.string() },
+  handler: async (ctx, { id, qrColor }) => {
+    await ctx.db.patch(id, { qrColor })
+  },
+})
+
 export const setSuspended = mutation({
   args: { id: v.id("restaurants"), suspended: v.boolean() },
   handler: async (ctx, { id, suspended }) => {
@@ -79,4 +87,20 @@ export const deleteAll = mutation({
     await deleteTable("tables",     "by_restaurant")
     await ctx.db.delete(id)
   },
+})
+
+export const generateUploadUrl = action({
+  handler: async (ctx) => ctx.storage.generateUploadUrl(),
+})
+
+export const setLogoStorageId = mutation({
+  args: { id: v.id("restaurants"), storageId: v.optional(v.id("_storage")) },
+  handler: async (ctx, { id, storageId }) => {
+    await ctx.db.patch(id, { logoStorageId: storageId })
+  },
+})
+
+export const getLogoUrl = query({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, { storageId }) => ctx.storage.getUrl(storageId),
 })

@@ -14,7 +14,7 @@ const CERTIFICATIONS = [
 const STANDARDS = [
   {
     title: 'PCI DSS Level 1',
-    body: 'Tous les paiements sont traités par Viva Wallet, certifié PCI DSS Level 1 — le plus haut niveau de sécurité pour les transactions par carte.',
+    body: 'Tous les paiements sont traités par Stripe, certifié PCI DSS Level 1 — le plus haut niveau de sécurité pour les transactions par carte.',
     icon: '🛡',
   },
   {
@@ -34,7 +34,7 @@ const STANDARDS = [
   },
   {
     title: 'Chiffrement bout en bout',
-    body: "Toutes les communications entre votre téléphone, nos serveurs et Viva Wallet sont chiffrées via TLS 1.3.",
+    body: "Toutes les communications entre votre téléphone, nos serveurs et Stripe sont chiffrées via TLS 1.3.",
     icon: '🔐',
   },
   {
@@ -47,7 +47,7 @@ const STANDARDS = [
 const PAYMENT_STEPS = [
   { n: 1, title: 'Le client scanne le QR code', sub: 'Connexion HTTPS chiffrée' },
   { n: 2, title: 'Il entre ses coordonnées de carte', sub: 'Jamais stockées sur nos serveurs' },
-  { n: 3, title: 'Viva Wallet traite la transaction', sub: 'PCI DSS Level 1' },
+  { n: 3, title: 'Stripe traite la transaction', sub: 'PCI DSS Level 1' },
   { n: 4, title: 'Le paiement est confirmé', sub: 'En moins de 3 secondes' },
   { n: 5, title: "Les fonds arrivent sur votre IBAN", sub: 'Le lendemain ouvré' },
 ]
@@ -378,7 +378,7 @@ function PaymentFlowSection() {
             {[
               { label: 'Client', accent: false },
               { label: 'Splitzy', accent: true },
-              { label: 'Viva Wallet', accent: false },
+              { label: 'Stripe', accent: false },
               { label: 'IBAN restaurant', accent: false },
             ].map((node, i, arr) => (
               <div key={node.label} style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center' }}>

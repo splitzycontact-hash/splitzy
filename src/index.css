@@ -81,3 +81,127 @@
 .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
 
 .marketing-site { width: 100%; min-height: 100vh; }
+
+/* ══════════════════════════════════════════
+   Restaurant Dashboard — Design System
+   ══════════════════════════════════════════ */
+.restaurant-root {
+  --ds-bg-base: #FAFAFA;
+  --ds-bg-surface: #FFFFFF;
+  --ds-bg-subtle: #F4F4F5;
+  --ds-border: #E4E4E7;
+  --ds-border-strong: #D4D4D8;
+  --ds-text-primary: #0A0A0A;
+  --ds-text-secondary: #52525B;
+  --ds-text-tertiary: #A1A1AA;
+  --ds-accent: #E8920A;
+  --ds-accent-soft: #FFF4E5;
+  --ds-accent-strong: #C77A08;
+  --ds-success: #22C55E;
+  --ds-success-soft: #F0FDF4;
+  --ds-success-strong: #15803D;
+  --ds-error: #EF4444;
+  --ds-error-soft: #FEF2F2;
+  --ds-error-strong: #B91C1C;
+  --ds-warning: #F59E0B;
+  --ds-warning-soft: #FFFBEB;
+  --ds-shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --ds-shadow-md: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.restaurant-root[data-theme="dark"] {
+  --ds-bg-base: #09090B;
+  --ds-bg-surface: #18181B;
+  --ds-bg-subtle: #27272A;
+  --ds-border: #3F3F46;
+  --ds-border-strong: #52525B;
+  --ds-text-primary: #FAFAFA;
+  --ds-text-secondary: #A1A1AA;
+  --ds-text-tertiary: #71717A;
+  --ds-accent-soft: #2A1F0A;
+  --ds-accent-strong: #E8920A;
+  --ds-success-soft: #052E16;
+  --ds-success-strong: #22C55E;
+  --ds-error-soft: #450A0A;
+  --ds-error-strong: #EF4444;
+  --ds-warning-soft: #1c1400;
+  --ds-shadow-sm: 0 1px 2px rgba(0,0,0,0.24);
+  --ds-shadow-md: 0 1px 3px rgba(0,0,0,0.32), 0 1px 2px rgba(0,0,0,0.24);
+}
+
+@layer utilities {
+  .ds-bg-base      { background-color: var(--ds-bg-base); }
+  .ds-bg-surface   { background-color: var(--ds-bg-surface); }
+  .ds-bg-subtle    { background-color: var(--ds-bg-subtle); }
+  .ds-bg-accent    { background-color: var(--ds-accent); }
+  .ds-bg-accent-soft  { background-color: var(--ds-accent-soft); }
+  .ds-bg-success-soft { background-color: var(--ds-success-soft); }
+  .ds-bg-error-soft   { background-color: var(--ds-error-soft); }
+  .ds-bg-warning-soft { background-color: var(--ds-warning-soft); }
+  .ds-text-primary   { color: var(--ds-text-primary); }
+  .ds-text-secondary { color: var(--ds-text-secondary); }
+  .ds-text-tertiary  { color: var(--ds-text-tertiary); }
+  .ds-text-accent    { color: var(--ds-accent); }
+  .ds-text-accent-strong { color: var(--ds-accent-strong); }
+  .ds-text-success   { color: var(--ds-success); }
+  .ds-text-success-strong { color: var(--ds-success-strong); }
+  .ds-text-error     { color: var(--ds-error); }
+  .ds-text-error-strong { color: var(--ds-error-strong); }
+  .ds-text-warning   { color: var(--ds-warning); }
+  .ds-border-color   { border-color: var(--ds-border); }
+  .ds-border-strong  { border-color: var(--ds-border-strong); }
+}
+
+/* Dark mode overrides for legacy Settings sections that still use Tailwind color utilities */
+.restaurant-root[data-theme="dark"] .bg-white {
+  background-color: var(--ds-bg-surface);
+}
+.restaurant-root[data-theme="dark"] .shadow-card {
+  box-shadow: var(--ds-shadow-md);
+}
+.restaurant-root[data-theme="dark"] .border-border {
+  border-color: var(--ds-border);
+}
+.restaurant-root[data-theme="dark"] .text-dark {
+  color: var(--ds-text-primary);
+}
+.restaurant-root[data-theme="dark"] .text-muted {
+  color: var(--ds-text-tertiary);
+}
+.restaurant-root[data-theme="dark"] .text-mid {
+  color: var(--ds-text-secondary);
+}
+.restaurant-root[data-theme="dark"] .bg-bg {
+  background-color: var(--ds-bg-base);
+}
+.restaurant-root[data-theme="dark"] input.border-border,
+.restaurant-root[data-theme="dark"] textarea.border-border,
+.restaurant-root[data-theme="dark"] select.border-border {
+  background-color: var(--ds-bg-subtle);
+  color: var(--ds-text-primary);
+  border-color: var(--ds-border);
+}
+/* Override modal overlay backgrounds */
+.restaurant-root[data-theme="dark"] .bg-white.rounded-2xl,
+.restaurant-root[data-theme="dark"] .bg-white.rounded-xl {
+  background-color: var(--ds-bg-surface);
+}
+
+/* Live pulse dot animation */
+@keyframes ds-live-pulse {
+  0%   { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@keyframes ds-live-blink {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+  50%       { box-shadow: 0 0 0 4px rgba(34,197,94,0); }
+}
+
+/* Panel — base card */
+.ds-panel {
+  background-color: var(--ds-bg-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: 12px;
+  box-shadow: var(--ds-shadow-sm);
+  overflow: hidden;
+}

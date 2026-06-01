@@ -5,12 +5,13 @@ export default defineSchema({
   restaurants: defineTable({
     name: v.string(),
     slug: v.string(),
-    address: v.string(),
-    phone: v.string(),
-    email: v.string(),
-    type: v.string(),
+    address: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    type: v.optional(v.string()),
     clerkUserId: v.optional(v.string()),
     suspended: v.optional(v.boolean()),
+    qrColor: v.optional(v.string()),
     // Champs legacy présents sur d'anciens documents (plus écrits par create/update).
     // Déclarés en optionnel pour que le schéma valide les docs existants en prod.
     plan: v.optional(v.string()),
@@ -19,8 +20,35 @@ export default defineSchema({
     siret: v.optional(v.string()),
     stripeAccountId: v.optional(v.string()),
     posProvider: v.optional(v.string()),
+    logoStorageId: v.optional(v.id("_storage")),
   }).index("by_slug", ["slug"])
     .index("by_clerk_user", ["clerkUserId"]),
+
+  insights: defineTable({
+    restaurantId: v.id("restaurants"),
+    generatedAt: v.number(),
+    period: v.string(),
+    insights: v.array(v.object({
+      type: v.string(),
+      priority: v.string(),
+      title: v.string(),
+      body: v.string(),
+      metric: v.optional(v.string()),
+      action: v.optional(v.string()),
+    })),
+  })
+    .index("by_restaurant", ["restaurantId"])
+    .index("by_restaurant_date", ["restaurantId", "generatedAt"]),
+
+  members: defineTable({
+    restaurantId: v.id("restaurants"),
+    email: v.string(),
+    name: v.string(),
+    role: v.union(v.literal("owner"), v.literal("manager"), v.literal("staff")),
+    status: v.union(v.literal("active"), v.literal("pending")),
+    invitedAt: v.number(),
+    joinedAt: v.optional(v.number()),
+  }).index("by_restaurant", ["restaurantId"]),
 
   tables: defineTable({
     restaurantId: v.id("restaurants"),
@@ -93,5 +121,8 @@ export default defineSchema({
     priceCents: v.number(),
     emoji: v.string(),
     description: v.optional(v.string()),
+    isAvailable: v.optional(v.boolean()),
+    tags: v.optional(v.array(v.string())),
+    allergenes: v.optional(v.string()),
   }).index("by_restaurant", ["restaurantId"]),
 })

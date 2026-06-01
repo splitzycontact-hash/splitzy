@@ -20,6 +20,9 @@ export const updateItem = mutation({
     priceCents: v.optional(v.number()),
     emoji: v.optional(v.string()),
     description: v.optional(v.string()),
+    isAvailable: v.optional(v.boolean()),
+    tags: v.optional(v.array(v.string())),
+    allergenes: v.optional(v.string()),
   },
   handler: async (ctx, { id, ...patch }) => {
     await ctx.db.patch(id, patch)
@@ -41,6 +44,9 @@ export const addItem = mutation({
     priceCents: v.number(),
     emoji: v.string(),
     description: v.optional(v.string()),
+    isAvailable: v.optional(v.boolean()),
+    tags: v.optional(v.array(v.string())),
+    allergenes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     return ctx.db.insert("menuItems", args)

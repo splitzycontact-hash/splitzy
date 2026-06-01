@@ -1,32 +1,37 @@
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useAction } from 'convex/react'
-import { useClerk } from '@clerk/clerk-react'
+import { useClerk, useUser } from '@clerk/clerk-react'
 import { useNavigate } from 'react-router-dom'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { QRCodeSVG } from 'qrcode.react'
-import { Download } from 'lucide-react'
+import {
+  Download, Store, QrCode, UserCog, Bell, UserRound,
+  CreditCard, Sparkles, Plus, MoreHorizontal, Trash2,
+  Check, Shield, KeyRound, ChevronRight, Utensils, Beer, Coffee, Upload, X,
+} from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
-import { Topbar } from '../layout/Topbar'
+import { PageHeader } from '../components/PageHeader'
 import { useRestaurant, useRestaurantId } from '../context/RestaurantContext'
 import { assignEmoji, normalizeCategoryId } from '../../utils/menuEmoji'
 import { generateBillingInvoicePDF, downloadAllInvoices, type BillingInvoiceData } from '../../utils/generateBillingInvoice'
 
-type SectionKey = 'restaurant' | 'menu' | 'qr' | 'notifications' | 'pos' | 'billing'
+type SectionKey = 'restaurant' | 'menu' | 'qr' | 'notifications' | 'pos' | 'billing' | 'team' | 'account' | 'plan'
 
-const SUB_NAV: { key: SectionKey; label: string }[] = [
-  { key: 'restaurant',    label: 'Votre restaurant' },
-  { key: 'menu',          label: 'Votre menu' },
-  { key: 'qr',            label: 'QR Codes tables' },
-  { key: 'notifications', label: 'Notifications' },
-  { key: 'pos',           label: 'Intégrations POS' },
-  { key: 'billing',       label: 'Compte & facturation' },
+const SUB_NAV: { key: SectionKey; label: string; icon: React.ElementType; pendingDot?: boolean }[] = [
+  { key: 'restaurant',    label: 'Restaurant',       icon: Store       },
+  { key: 'qr',            label: 'QR Codes',          icon: QrCode      },
+  { key: 'team',          label: 'Équipe',            icon: UserCog, pendingDot: true },
+  { key: 'notifications', label: 'Notifications',    icon: Bell        },
+  { key: 'account',       label: 'Compte',            icon: UserRound   },
+  { key: 'billing',       label: 'Facturation',       icon: CreditCard  },
+  { key: 'plan',          label: "Plan & abonnement", icon: Sparkles    },
 ]
 
-const ESTABLISHMENT_TYPES = [
-  { id: 'restaurant', emoji: '🍽', label: 'Restaurant' },
-  { id: 'bar',        emoji: '🍺', label: 'Bar' },
-  { id: 'cafe',       emoji: '☕', label: 'Café' },
+const ESTABLISHMENT_TYPES: { id: string; icon: React.ElementType; label: string }[] = [
+  { id: 'restaurant', icon: Utensils, label: 'Restaurant' },
+  { id: 'bar',        icon: Beer,     label: 'Bar' },
+  { id: 'cafe',       icon: Coffee,   label: 'Café' },
 ]
 
 type PosStatus = 'connect' | 'connected' | 'soon'
@@ -722,19 +727,33 @@ function PosCard({ pos, connected, onClick }: { pos: PosIntegration; connected: 
   )
 }
 
+const QR_COLOR_SWATCHES = [
+  { label: 'Noir',    value: '#0A0A0A' },
+  { label: 'Orange',  value: '#E8920A' },
+  { label: 'Bleu',    value: '#2563EB' },
+  { label: 'Vert',    value: '#16A34A' },
+  { label: 'Rouge',   value: '#DC2626' },
+  { label: 'Violet',  value: '#7C3AED' },
+]
+
 function QRCodesSection({
-  tables, restaurantSlug,
+  tables, restaurantSlug, restaurantId,
 }: {
   tables: { number: number; capacity: number }[]
   restaurantSlug: string
+  restaurantId: Id<'restaurants'> | null
 }) {
+  const restaurant = useRestaurant()
+  const updateQrColor = useMutation(api.restaurants.updateQrColor)
+
+  const [qrColor, setQrColor] = useState(restaurant?.qrColor ?? '#0A0A0A')
+  const [savedColor, setSavedColor] = useState(false)
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
 
   function downloadSVG(tableNumber: number) {
     const svgEl = document.getElementById(`qr-table-${tableNumber}`)
     if (!svgEl) return
-    const svg = svgEl.outerHTML
-    const blob = new Blob([svg], { type: 'image/svg+xml' })
+    const blob = new Blob([svgEl.outerHTML], { type: 'image/svg+xml' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -743,63 +762,214 @@ function QRCodesSection({
     URL.revokeObjectURL(url)
   }
 
+  async function handleSaveColor() {
+    if (!restaurantId) return
+    await updateQrColor({ id: restaurantId, qrColor }).catch(() => {})
+    setSavedColor(true)
+    setTimeout(() => setSavedColor(false), 2000)
+  }
+
   if (tables.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-border shadow-card p-12 text-center">
-        <div className="text-4xl mb-3">🪑</div>
-        <div className="text-base font-semibold text-dark">Aucune table configurée</div>
-        <div className="text-sm text-muted mt-1">Vos QR codes apparaîtront ici.</div>
+      <div
+        className="ds-panel p-12 text-center"
+        style={{ color: 'var(--ds-text-tertiary)' }}
+      >
+        <div className="text-[13.5px] font-semibold ds-text-primary mt-3">Aucune table configurée</div>
+        <div className="text-[12px] ds-text-tertiary mt-1">Vos QR codes apparaîtront ici.</div>
       </div>
     )
   }
 
+  const previewUrl = `${baseUrl}/t/${restaurantSlug}/1`
+
   return (
     <div className="space-y-5">
-      <div className="bg-white rounded-xl border border-border shadow-card p-5">
-        <h2 className="text-base font-bold text-dark mb-1">QR Codes de vos tables</h2>
-        <p className="text-sm text-muted mb-5">
-          Chaque QR code ouvre directement la page de paiement pour la table correspondante.
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+
+      {/* Color customization */}
+      <div className="ds-panel">
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+          <div>
+            <div className="font-bold text-[13.5px] ds-text-primary">Personnalisation</div>
+            <div className="text-[12px] ds-text-tertiary mt-0.5">Couleur du QR code</div>
+          </div>
+          <button
+            onClick={handleSaveColor}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold text-white transition-colors"
+            style={{ background: savedColor ? 'var(--ds-success)' : '#E8920A' }}
+          >
+            {savedColor ? <><Check size={13} />Enregistré</> : 'Enregistrer'}
+          </button>
+        </div>
+        <div className="px-5 py-5">
+          <div className="flex flex-col md:flex-row gap-8 items-start">
+            {/* Preview */}
+            <div className="flex flex-col items-center gap-3">
+              <div
+                className="rounded-[14px] flex flex-col items-center justify-center px-4 py-4 gap-3"
+                style={{
+                  background: 'white',
+                  border: '1px solid var(--ds-border)',
+                  boxShadow: 'var(--ds-shadow-md)',
+                  width: '180px',
+                }}
+              >
+                <div
+                  className="text-[8px] font-bold uppercase tracking-[0.08em]"
+                  style={{ color: '#E8920A' }}
+                >
+                  Splitzy
+                </div>
+                <div className="relative">
+                  <QRCodeSVG
+                    value={previewUrl}
+                    size={120}
+                    level="M"
+                    fgColor={qrColor}
+                    includeMargin={false}
+                  />
+                  <div
+                    className="absolute inset-0 flex items-center justify-center"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    <div
+                      className="rounded-[6px] flex items-center justify-center"
+                      style={{ background: 'white', padding: '3px', boxShadow: '0 0 0 3px white' }}
+                    >
+                      <div
+                        className="w-5 h-5 rounded-full flex items-center justify-center"
+                        style={{ background: '#1A1A1A' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                          <rect x="3" y="5.5" width="6" height="9" rx="1.4" fill="#FFFFFF"/>
+                          <rect x="11" y="5.5" width="6" height="9" rx="1.4" fill="#E8920A"/>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-[8px] font-semibold uppercase tracking-[0.04em]" style={{ color: '#A1A1AA' }}>
+                  Table 1
+                </div>
+              </div>
+              <span className="text-[11.5px] ds-text-tertiary">Aperçu live</span>
+            </div>
+
+            {/* Swatches + custom */}
+            <div className="flex-1 space-y-4">
+              <div>
+                <div className="text-[12px] font-semibold ds-text-primary mb-2.5">Couleur prédéfinie</div>
+                <div className="flex flex-wrap gap-2">
+                  {QR_COLOR_SWATCHES.map(swatch => (
+                    <button
+                      key={swatch.value}
+                      onClick={() => setQrColor(swatch.value)}
+                      className="w-8 h-8 rounded-[8px] transition-all"
+                      title={swatch.label}
+                      style={{
+                        background: swatch.value,
+                        border: '2px solid white',
+                        boxShadow: qrColor === swatch.value
+                          ? '0 0 0 2px #E8920A'
+                          : '0 0 0 1px var(--ds-border)',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-[12px] font-semibold ds-text-primary mb-1.5">Couleur personnalisée</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={qrColor}
+                    onChange={e => setQrColor(e.target.value)}
+                    className="w-10 h-10 rounded-lg border cursor-pointer"
+                    style={{ borderColor: 'var(--ds-border)' }}
+                  />
+                  <input
+                    type="text"
+                    value={qrColor}
+                    onChange={e => setQrColor(e.target.value)}
+                    className="w-28 rounded-lg border px-3 py-2 text-[13px] font-mono outline-none"
+                    style={{
+                      background: 'var(--ds-bg-surface)',
+                      borderColor: 'var(--ds-border)',
+                      color: 'var(--ds-text-primary)',
+                      fontSize: '13px',
+                    }}
+                    maxLength={7}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* QR grid */}
+      <div className="ds-panel">
+        <div className="flex items-center justify-between px-5 py-4 border-b gap-3" style={{ borderColor: 'var(--ds-border)' }}>
+          <div>
+            <div className="font-bold text-[13.5px] ds-text-primary">QR Codes de vos tables</div>
+            <div className="text-[12px] ds-text-tertiary mt-0.5">
+              Chaque QR code ouvre directement la page de paiement.
+            </div>
+          </div>
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-1.5 px-3 py-[7px] rounded-lg border text-[12.5px] font-medium transition-colors shrink-0"
+            style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
+          >
+            <Download size={13} />
+            Pack imprimable
+          </button>
+        </div>
+        <div className="p-5 grid grid-cols-2 md:grid-cols-3 gap-4">
           {tables.map(table => {
             const url = `${baseUrl}/t/${restaurantSlug}/${table.number}`
             return (
-              <div key={table.number} className="flex flex-col items-center gap-3 border border-border rounded-xl p-4">
-                <div className="text-sm font-bold text-dark">Table {table.number}</div>
-                <a href={url} target="_blank" rel="noreferrer" className="bg-white p-2 rounded-lg border border-border hover:border-brand transition-colors">
+              <div
+                key={table.number}
+                className="flex flex-col items-center gap-2.5 rounded-xl p-4 border transition-colors hover:ds-bg-subtle"
+                style={{ borderColor: 'var(--ds-border)' }}
+              >
+                <div className="text-[13px] font-semibold ds-text-primary">Table {table.number}</div>
+                <a href={url} target="_blank" rel="noreferrer" className="p-2 rounded-lg border transition-colors relative block" style={{ background: 'white', borderColor: 'var(--ds-border)' }}>
                   <QRCodeSVG
                     id={`qr-table-${table.number}`}
                     value={url}
-                    size={110}
-                    level="M"
+                    size={100}
+                    level="H"
+                    fgColor={qrColor}
                     includeMargin={false}
                   />
+                  {/* Splitzy logo overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="rounded-[5px] flex items-center justify-center gap-[2px]" style={{ background: 'white', padding: '3px', boxShadow: '0 0 0 2px white' }}>
+                      <div className="w-[7px] h-[14px] rounded-[2px]" style={{ background: '#1A1A1A' }} />
+                      <div className="w-[7px] h-[14px] rounded-[2px]" style={{ background: '#E8920A' }} />
+                    </div>
+                  </div>
                 </a>
                 <a
                   href={url}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[10px] text-brand underline text-center break-all px-1 hover:text-brand-dark"
+                  className="text-[10px] ds-text-accent underline text-center break-all px-1"
                 >
                   Tester le lien →
                 </a>
                 <button
                   onClick={() => downloadSVG(table.number)}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-dark transition-colors"
+                  className="flex items-center gap-1 text-[11px] font-semibold ds-text-tertiary hover:ds-text-primary transition-colors"
                 >
-                  <Download size={12} />
+                  <Download size={11} />
                   Télécharger SVG
                 </button>
               </div>
             )
           })}
-        </div>
-      </div>
-
-      <div className="bg-brand-bg border border-brand/20 rounded-xl p-4 flex items-start gap-3">
-        <span className="text-xl shrink-0">💡</span>
-        <div className="text-sm text-dark">
-          <strong>Comment utiliser ?</strong> Imprimez chaque QR code et posez-le sur la table correspondante. Vos clients scannent, paient et laissent un avis — sans attendre le serveur.
         </div>
       </div>
     </div>
@@ -1204,7 +1374,12 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
   const setSuspended = useMutation(api.restaurants.setSuspended)
   const deleteAll    = useMutation(api.restaurants.deleteAll)
 
-  const [currentPlan] = useState('starter')
+  const currentPlan = restaurant?.plan ?? 'essentiel'
+  const PLAN_LABELS: Record<string, string> = {
+    gratuit: 'Plan Gratuit', starter: 'Plan Starter',
+    essentiel: 'Plan Essentiel', pro: 'Plan Pro',
+  }
+  const currentPlanLabel = PLAN_LABELS[currentPlan] ?? 'Plan Essentiel'
   const [billingForm, setBillingForm] = useState({
     company: restaurant?.name ?? '',
     address: restaurant?.address ?? '',
@@ -1266,18 +1441,28 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
     <div className="space-y-5">
 
       {/* Current plan banner */}
-      <div className="bg-white rounded-xl border border-border shadow-card p-5">
+      <div className="ds-panel p-5">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-base font-bold text-dark">Plan Starter</span>
-              <span className="text-[11px] font-semibold bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">Gratuit</span>
+              <span className="font-bold text-[15px] ds-text-primary">{currentPlanLabel}</span>
+              <span
+                className="text-[11px] font-semibold rounded-full px-2 py-0.5"
+                style={{ background: 'var(--ds-accent-soft)', color: 'var(--ds-accent-strong)' }}
+              >
+                Actuel
+              </span>
             </div>
-            <p className="text-xs text-muted">Jusqu'à 5 tables · 100 paiements / mois · QR codes inclus</p>
+            <p className="text-[12.5px] ds-text-tertiary">
+              {currentPlan === 'pro' ? 'Tables illimitées · Paiements illimités · Support prioritaire'
+                : currentPlan === 'essentiel' ? "Jusqu'à 20 tables · Paiements illimités · Analytics"
+                : "Jusqu'à 5 tables · 50 paiements / mois · QR codes inclus"}
+            </p>
           </div>
           <button
             onClick={() => setShowPlans(v => !v)}
-            className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark transition-colors"
+            className="px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors"
+            style={{ background: '#E8920A' }}
           >
             {showPlans ? 'Fermer' : 'Changer de plan'}
           </button>
@@ -1689,15 +1874,824 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   )
 }
 
+// ══════════════════════════════════════════════════════════════
+// TEAM SECTION
+// ══════════════════════════════════════════════════════════════
+
+type MemberRole = 'owner' | 'manager' | 'staff'
+
+const ROLE_STYLE: Record<MemberRole, { bg: string; color: string; label: string }> = {
+  owner:   { bg: 'var(--ds-accent-soft)',   color: 'var(--ds-accent)',         label: 'Propriétaire' },
+  manager: { bg: '#EFF6FF',                 color: '#2563EB',                  label: 'Manager' },
+  staff:   { bg: 'var(--ds-bg-subtle)',     color: 'var(--ds-text-secondary)', label: 'Équipier' },
+}
+
+function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null }) {
+  const { user } = useUser()
+  const members = useQuery(api.members.getTeamMembers, restaurantId ? { restaurantId } : 'skip') ?? []
+  const inviteMember     = useMutation(api.members.inviteMember)
+  const updateMemberRole = useMutation(api.members.updateMemberRole)
+  const removeMember     = useMutation(api.members.removeMember)
+
+  const [showInvite, setShowInvite] = useState(false)
+  const [showRoles, setShowRoles] = useState(false)
+  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'staff' as MemberRole })
+  const [inviting, setInviting] = useState(false)
+  const [openMenu, setOpenMenu] = useState<string | null>(null)
+
+  async function handleInvite() {
+    if (!restaurantId || !inviteForm.name.trim() || !inviteForm.email.trim()) return
+    setInviting(true)
+    await inviteMember({
+      restaurantId,
+      name: inviteForm.name.trim(),
+      email: inviteForm.email.trim(),
+      role: inviteForm.role,
+    }).catch(() => {})
+    setInviting(false)
+    setShowInvite(false)
+    setInviteForm({ name: '', email: '', role: 'staff' })
+  }
+
+  // Synthetic owner row from Clerk user (always shown first)
+  const ownerName  = user
+    ? `${user.firstName ?? ''}${user.lastName ? ' ' + user.lastName : ''}`.trim() || 'Gérant'
+    : 'Gérant'
+  const ownerEmail = user?.emailAddresses[0]?.emailAddress ?? ''
+  const ownerInitials = ownerName.split(' ').map(w => w[0]?.toUpperCase() ?? '').slice(0, 2).join('')
+
+  const pendingCount = members.filter(m => m.status === 'pending').length
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2
+            className="font-extrabold tracking-[-0.03em]"
+            style={{ fontSize: '24px', color: 'var(--ds-text-primary)' }}
+          >
+            Équipe
+          </h2>
+          <p className="text-[13.5px] mt-1.5 max-w-lg" style={{ color: 'var(--ds-text-secondary)' }}>
+            Gérez les accès de votre équipe au dashboard Splitzy.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowRoles(true)}
+            className="px-3 py-[7px] rounded-lg text-[13px] font-medium border transition-colors"
+            style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
+          >
+            Comprendre les rôles
+          </button>
+          <button
+            onClick={() => setShowInvite(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[13px] font-semibold text-white"
+            style={{ background: '#E8920A' }}
+          >
+            <Plus size={14} />
+            Inviter un membre
+          </button>
+        </div>
+      </div>
+
+      {/* Members table */}
+      <div className="ds-panel">
+        {/* Header row */}
+        <div
+          className="grid gap-3.5 px-5 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.07em]"
+          style={{
+            gridTemplateColumns: '36px 1.5fr 1fr 100px 90px 40px',
+            background: 'var(--ds-bg-subtle)',
+            color: 'var(--ds-text-tertiary)',
+            borderBottom: '1px solid var(--ds-border)',
+          }}
+        >
+          <div />
+          <div>Membre</div>
+          <div>Email</div>
+          <div>Rôle</div>
+          <div>Statut</div>
+          <div />
+        </div>
+
+        <div>
+          {/* Owner row (always visible — current Clerk user) */}
+          <div
+            className="grid gap-3.5 px-5 py-3 border-b items-center"
+            style={{ gridTemplateColumns: '36px 1.5fr 1fr 100px 90px 40px', borderColor: 'var(--ds-border)' }}
+          >
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[11.5px] font-bold text-white"
+              style={{ background: 'linear-gradient(135deg, #FFB453, #E8920A)' }}
+            >
+              {ownerInitials}
+            </div>
+            <div>
+              <div className="text-[13px] font-semibold ds-text-primary">{ownerName}</div>
+            </div>
+            <div className="text-[11.5px] ds-text-tertiary truncate">{ownerEmail}</div>
+            <div>
+              <span
+                className="inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold"
+                style={{ background: ROLE_STYLE.owner.bg, color: ROLE_STYLE.owner.color }}
+              >
+                {ROLE_STYLE.owner.label}
+              </span>
+            </div>
+            <div>
+              <span
+                className="inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold"
+                style={{ background: 'var(--ds-success-soft)', color: 'var(--ds-success-strong)' }}
+              >
+                Actif
+              </span>
+            </div>
+            <div />
+          </div>
+
+          {members.length === 0 && (
+            <div className="py-8 text-center text-[13px]" style={{ color: 'var(--ds-text-tertiary)' }}>
+              Aucun autre membre. Invitez quelqu'un pour commencer.
+            </div>
+          )}
+          {members.map(member => {
+              const roleStyle = ROLE_STYLE[member.role as MemberRole] ?? ROLE_STYLE.staff
+              const initials = member.name.split(' ').map(w => w[0]?.toUpperCase() ?? '').slice(0, 2).join('')
+              return (
+                <div
+                  key={member._id}
+                  className="grid gap-3.5 px-5 py-3 border-b items-center transition-colors hover:ds-bg-subtle"
+                  style={{
+                    gridTemplateColumns: '36px 1.5fr 1fr 100px 90px 40px',
+                    borderColor: 'var(--ds-border)',
+                  }}
+                >
+                  {/* Avatar */}
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[11.5px] font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg, #FFB453, #E8920A)' }}
+                  >
+                    {initials}
+                  </div>
+                  {/* Name */}
+                  <div>
+                    <div className="text-[13px] font-semibold ds-text-primary">{member.name}</div>
+                  </div>
+                  {/* Email */}
+                  <div className="text-[11.5px] ds-text-tertiary truncate">{member.email}</div>
+                  {/* Role */}
+                  <div>
+                    <span
+                      className="inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold"
+                      style={{ background: roleStyle.bg, color: roleStyle.color }}
+                    >
+                      {roleStyle.label}
+                    </span>
+                  </div>
+                  {/* Status */}
+                  <div>
+                    <span
+                      className="inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold"
+                      style={
+                        member.status === 'active'
+                          ? { background: 'var(--ds-success-soft)', color: 'var(--ds-success-strong)' }
+                          : { background: 'var(--ds-warning-soft)', color: 'var(--ds-warning)' }
+                      }
+                    >
+                      {member.status === 'active' ? 'Actif' : 'En attente'}
+                    </span>
+                  </div>
+                  {/* Actions */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setOpenMenu(openMenu === member._id ? null : member._id)}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:ds-bg-subtle"
+                      style={{ color: 'var(--ds-text-tertiary)' }}
+                    >
+                      <MoreHorizontal size={15} />
+                    </button>
+                    {openMenu === member._id && (
+                      <div
+                        className="absolute right-0 top-9 rounded-[10px] py-1 z-20 min-w-[160px]"
+                        style={{
+                          background: 'var(--ds-bg-surface)',
+                          border: '1px solid var(--ds-border)',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                        }}
+                      >
+                        {(['owner', 'manager', 'staff'] as MemberRole[]).map(r => (
+                          <button
+                            key={r}
+                            onClick={() => {
+                              updateMemberRole({ memberId: member._id, role: r }).catch(() => {})
+                              setOpenMenu(null)
+                            }}
+                            className="w-full text-left flex items-center gap-2 px-3 py-2 text-[13px] hover:ds-bg-subtle transition-colors"
+                            style={{ color: 'var(--ds-text-primary)' }}
+                          >
+                            {member.role === r && <Check size={13} style={{ color: '#E8920A' }} />}
+                            {member.role !== r && <span className="w-[13px]" />}
+                            {ROLE_STYLE[r].label}
+                          </button>
+                        ))}
+                        <div className="my-1" style={{ borderTop: '1px solid var(--ds-border)' }} />
+                        <button
+                          onClick={() => {
+                            removeMember({ memberId: member._id }).catch(() => {})
+                            setOpenMenu(null)
+                          }}
+                          className="w-full text-left flex items-center gap-2 px-3 py-2 text-[13px] hover:ds-bg-error-soft transition-colors"
+                          style={{ color: 'var(--ds-error)' }}
+                        >
+                          <Trash2 size={13} />
+                          Retirer du compte
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+        </div>
+
+        {pendingCount > 0 && (
+          <div
+            className="px-5 py-2.5 text-[12px] font-medium"
+            style={{
+              background: 'var(--ds-warning-soft)',
+              borderTop: '1px solid var(--ds-border)',
+              color: 'var(--ds-warning)',
+            }}
+          >
+            {pendingCount} invitation{pendingCount > 1 ? 's' : ''} en attente de confirmation
+          </div>
+        )}
+      </div>
+
+      {/* Invite modal */}
+      {showInvite && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={e => { if (e.target === e.currentTarget) setShowInvite(false) }}
+        >
+          <div
+            className="rounded-2xl overflow-hidden w-[440px] max-w-full"
+            style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+              <div className="font-bold text-[15px] ds-text-primary">Inviter un membre</div>
+              <button onClick={() => setShowInvite(false)} className="ds-text-tertiary hover:ds-text-primary">
+                <Plus size={16} className="rotate-45" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Nom complet</label>
+                <input
+                  value={inviteForm.name}
+                  onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Marie Dupont"
+                  className="w-full rounded-lg border px-3 py-2 text-[13.5px] outline-none transition-all"
+                  style={{
+                    background: 'var(--ds-bg-surface)',
+                    borderColor: 'var(--ds-border)',
+                    color: 'var(--ds-text-primary)',
+                    fontSize: '16px',
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Email</label>
+                <input
+                  type="email"
+                  value={inviteForm.email}
+                  onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="marie@restaurant.fr"
+                  className="w-full rounded-lg border px-3 py-2 text-[13.5px] outline-none transition-all"
+                  style={{
+                    background: 'var(--ds-bg-surface)',
+                    borderColor: 'var(--ds-border)',
+                    color: 'var(--ds-text-primary)',
+                    fontSize: '16px',
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-2">Rôle</label>
+                <div className="space-y-2">
+                  {(['owner', 'manager', 'staff'] as MemberRole[]).map(r => (
+                    <label
+                      key={r}
+                      className="flex items-center gap-3 p-3 rounded-[9px] border cursor-pointer transition-colors"
+                      style={{
+                        borderColor: inviteForm.role === r ? '#E8920A' : 'var(--ds-border)',
+                        background: inviteForm.role === r ? 'var(--ds-accent-soft)' : 'var(--ds-bg-base)',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="role"
+                        value={r}
+                        checked={inviteForm.role === r}
+                        onChange={() => setInviteForm(f => ({ ...f, role: r }))}
+                        className="sr-only"
+                      />
+                      <div
+                        className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                        style={{ borderColor: inviteForm.role === r ? '#E8920A' : 'var(--ds-border-strong)' }}
+                      >
+                        {inviteForm.role === r && (
+                          <div className="w-2 h-2 rounded-full" style={{ background: '#E8920A' }} />
+                        )}
+                      </div>
+                      <span
+                        className="text-[13px] font-semibold"
+                        style={{ color: inviteForm.role === r ? 'var(--ds-accent-strong)' : 'var(--ds-text-primary)' }}
+                      >
+                        {ROLE_STYLE[r].label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-6 pb-5">
+              <button
+                onClick={() => setShowInvite(false)}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-colors"
+                style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleInvite}
+                disabled={inviting || !inviteForm.name.trim() || !inviteForm.email.trim()}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
+                style={{ background: '#E8920A' }}
+              >
+                {inviting ? 'Envoi…' : 'Envoyer invitation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Roles explanation modal */}
+      {showRoles && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={e => { if (e.target === e.currentTarget) setShowRoles(false) }}
+        >
+          <div
+            className="rounded-2xl overflow-hidden w-[480px] max-w-full"
+            style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+              <div className="font-bold text-[15px] ds-text-primary">Comprendre les rôles</div>
+              <button onClick={() => setShowRoles(false)} className="ds-text-tertiary hover:ds-text-primary">
+                <Plus size={16} className="rotate-45" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {[
+                {
+                  role: 'owner' as MemberRole,
+                  desc: "Accès complet : paramètres, équipe, facturation, toutes les sections. Peut supprimer le compte.",
+                },
+                {
+                  role: 'manager' as MemberRole,
+                  desc: "Accès au dashboard opérationnel : tables, feedbacks, analytics, factures. Ne peut pas gérer l'équipe ni la facturation.",
+                },
+                {
+                  role: 'staff' as MemberRole,
+                  desc: "Accès en lecture aux tables et feedbacks du jour uniquement. Idéal pour le personnel de salle.",
+                },
+              ].map(({ role, desc }) => {
+                const s = ROLE_STYLE[role]
+                return (
+                  <div key={role} className="flex gap-3">
+                    <span
+                      className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold flex-shrink-0 h-fit mt-0.5"
+                      style={{ background: s.bg, color: s.color }}
+                    >
+                      {s.label}
+                    </span>
+                    <p className="text-[13px] ds-text-secondary leading-[1.5]">{desc}</p>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="px-6 pb-5">
+              <button
+                onClick={() => setShowRoles(false)}
+                className="w-full py-2.5 rounded-xl text-[13px] font-semibold text-white"
+                style={{ background: '#E8920A' }}
+              >
+                Compris
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+// ACCOUNT SECTION
+// ══════════════════════════════════════════════════════════════
+
+function AccountSection({
+  restaurant,
+  restaurantId,
+}: {
+  restaurant: ReturnType<typeof useRestaurant>
+  restaurantId: Id<'restaurants'> | null
+}) {
+  const { user } = useUser()
+  const { openUserProfile, signOut } = useClerk()
+  const navigate = useNavigate()
+  const deleteAll    = useMutation(api.restaurants.deleteAll)
+
+  const [deleteModal,    setDeleteModal]   = useState(false)
+  const [deleteConfirm,  setDeleteConfirm] = useState('')
+  const [dangerLoading,  setDangerLoading] = useState(false)
+
+  async function handleDelete() {
+    if (!restaurantId || deleteConfirm.trim().toLowerCase() !== (restaurant?.name ?? '').toLowerCase()) return
+    setDangerLoading(true)
+    await deleteAll({ id: restaurantId }).catch(() => {})
+    await signOut()
+    navigate('/restaurant/sign-in', { replace: true })
+  }
+
+  const inputStyle = {
+    background: 'var(--ds-bg-surface)',
+    borderColor: 'var(--ds-border)',
+    color: 'var(--ds-text-primary)',
+    fontSize: '16px' as const,
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2
+          className="font-extrabold tracking-[-0.03em]"
+          style={{ fontSize: '24px', color: 'var(--ds-text-primary)' }}
+        >
+          Compte
+        </h2>
+        <p className="text-[13.5px] mt-1.5" style={{ color: 'var(--ds-text-secondary)' }}>
+          Informations personnelles et sécurité de votre compte.
+        </p>
+      </div>
+
+      {/* Profile block */}
+      <div className="ds-panel">
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+          <div>
+            <div className="font-bold text-[13.5px] ds-text-primary">Profil</div>
+            <div className="text-[12px] ds-text-tertiary mt-0.5">Vos informations personnelles</div>
+          </div>
+        </div>
+        <div className="px-5 py-5 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Prénom</label>
+              <input
+                readOnly
+                value={user?.firstName ?? ''}
+                className="w-full rounded-lg border px-3 py-2 text-[13.5px] cursor-default"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Nom</label>
+              <input
+                readOnly
+                value={user?.lastName ?? ''}
+                className="w-full rounded-lg border px-3 py-2 text-[13.5px] cursor-default"
+                style={inputStyle}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">
+              Email
+              <span className="ml-2 text-[11px] font-normal ds-text-tertiary">(lecture seule)</span>
+            </label>
+            <input
+              readOnly
+              value={user?.emailAddresses[0]?.emailAddress ?? ''}
+              className="w-full rounded-lg border px-3 py-2 text-[13.5px] cursor-default"
+              style={{ ...inputStyle, opacity: 0.7 }}
+            />
+          </div>
+        </div>
+        <div
+          className="flex items-center justify-between px-5 py-3 border-t"
+          style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}
+        >
+          <span className="text-[12px] ds-text-tertiary">Géré via Clerk</span>
+          <button
+            onClick={() => openUserProfile()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium border transition-colors"
+            style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
+          >
+            <KeyRound size={13} />
+            Changer le mot de passe
+            <ChevronRight size={12} style={{ color: 'var(--ds-text-tertiary)' }} />
+          </button>
+        </div>
+      </div>
+
+      {/* Security block */}
+      <div className="ds-panel">
+        <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+          <div className="font-bold text-[13.5px] ds-text-primary flex items-center gap-2">
+            <Shield size={14} style={{ color: 'var(--ds-text-tertiary)' }} />
+            Sécurité
+          </div>
+        </div>
+        <div className="px-5 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-[13.5px] font-semibold ds-text-primary">Authentification à deux facteurs</div>
+              <div className="text-[12px] ds-text-tertiary mt-0.5">Renforcez la sécurité de votre compte avec une 2FA.</div>
+            </div>
+            <button
+              onClick={() => openUserProfile()}
+              className="shrink-0 px-3 py-1.5 rounded-lg text-[12.5px] font-medium border transition-colors"
+              style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
+            >
+              Configurer
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Danger zone */}
+      <div className="ds-panel" style={{ borderColor: '#FECACA' }}>
+        <div className="px-5 py-4 border-b" style={{ borderColor: '#FECACA' }}>
+          <div className="font-bold text-[13.5px]" style={{ color: 'var(--ds-error)' }}>Zone dangereuse</div>
+          <div className="text-[12px] ds-text-tertiary mt-0.5">Ces actions sont irréversibles.</div>
+        </div>
+        <div className="px-5 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-[13.5px] font-semibold ds-text-primary">Supprimer mon compte</div>
+              <div className="text-[12px] ds-text-tertiary mt-0.5">
+                Supprime toutes les données du restaurant (tables, paiements, feedbacks).
+              </div>
+            </div>
+            <button
+              onClick={() => setDeleteModal(true)}
+              className="shrink-0 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold transition-colors"
+              style={{ background: 'var(--ds-error-soft)', color: 'var(--ds-error-strong)', border: 'none' }}
+            >
+              Supprimer
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Delete confirmation modal */}
+      {deleteModal && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={e => { if (e.target === e.currentTarget) setDeleteModal(false) }}
+        >
+          <div
+            className="rounded-2xl overflow-hidden w-[440px] max-w-full"
+            style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.28)' }}
+          >
+            <div className="px-6 py-5">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center mb-4"
+                style={{ background: 'var(--ds-error-soft)' }}
+              >
+                <Trash2 size={18} style={{ color: 'var(--ds-error)' }} />
+              </div>
+              <div className="font-bold text-[17px] ds-text-primary mb-1.5">Supprimer le compte</div>
+              <p className="text-[13px] ds-text-secondary leading-[1.5] mb-4">
+                Cette action est irréversible. Toutes les données (tables, paiements, feedbacks, menu) seront définitivement supprimées.
+              </p>
+              <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">
+                Pour confirmer, tapez le nom du restaurant : <strong>{restaurant?.name}</strong>
+              </label>
+              <input
+                value={deleteConfirm}
+                onChange={e => setDeleteConfirm(e.target.value)}
+                placeholder={restaurant?.name ?? ''}
+                className="w-full rounded-lg border px-3 py-2 text-[13.5px] outline-none"
+                style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '16px' }}
+              />
+            </div>
+            <div className="flex gap-2 px-6 pb-5">
+              <button
+                onClick={() => { setDeleteModal(false); setDeleteConfirm('') }}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold border"
+                style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={dangerLoading || deleteConfirm.trim().toLowerCase() !== (restaurant?.name ?? '').toLowerCase()}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors disabled:opacity-40"
+                style={{ background: 'var(--ds-error)' }}
+              >
+                {dangerLoading ? 'Suppression…' : 'Supprimer définitivement'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+// PLAN SECTION
+// ══════════════════════════════════════════════════════════════
+
+const PLAN_FEATURES = {
+  gratuit: [
+    "Jusqu'à 5 tables",
+    '50 paiements / mois',
+    'QR codes inclus',
+    'Feedbacks clients',
+    'Dashboard basique',
+  ],
+  essentiel: [
+    "Jusqu'à 20 tables",
+    'Paiements illimités',
+    'QR codes personnalisés',
+    'Analytics hebdomadaires',
+    'Réputation & Google',
+    'Support email',
+  ],
+  pro: [
+    'Tables illimitées',
+    'Paiements illimités',
+    'Score Splitzy avancé',
+    'Insights IA',
+    'Intégrations POS',
+    'Gestion équipe',
+    'Support prioritaire',
+  ],
+}
+
+function PlanSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null }) {
+  const feedbackCount = useQuery(api.feedbacks.list, restaurantId ? { restaurantId } : 'skip')?.length ?? 0
+  const currentPlan = 'essentiel'
+  const planLimit   = 300
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2
+          className="font-extrabold tracking-[-0.03em]"
+          style={{ fontSize: '24px', color: 'var(--ds-text-primary)' }}
+        >
+          Plan & abonnement
+        </h2>
+        <p className="text-[13.5px] mt-1.5" style={{ color: 'var(--ds-text-secondary)' }}>
+          Gérez votre abonnement Splitzy.
+        </p>
+      </div>
+
+      {/* Plans grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {(
+          [
+            { id: 'gratuit',   name: 'Gratuit',   price: '0€',   period: '',           features: PLAN_FEATURES.gratuit,   cta: null },
+            { id: 'essentiel', name: 'Essentiel', price: '59€',  period: ' /mois',     features: PLAN_FEATURES.essentiel, cta: null },
+            { id: 'pro',       name: 'Pro',        price: '99€',  period: ' /mois',     features: PLAN_FEATURES.pro,        cta: 'Passer au Pro' },
+          ] as const
+        ).map(plan => {
+          const isCurrent = plan.id === currentPlan
+          return (
+            <div
+              key={plan.id}
+              className="rounded-[12px] p-[18px] flex flex-col gap-3 relative"
+              style={{
+                background: 'var(--ds-bg-surface)',
+                border: isCurrent ? '1px solid #E8920A' : '1px solid var(--ds-border)',
+                boxShadow: isCurrent ? '0 0 0 3px rgba(232,146,10,0.10)' : 'var(--ds-shadow-sm)',
+              }}
+            >
+              {isCurrent && (
+                <span
+                  className="absolute top-3 right-3 text-[9.5px] font-bold uppercase tracking-[0.06em] px-1.5 py-0.5 rounded-full"
+                  style={{ background: 'var(--ds-accent-soft)', color: 'var(--ds-accent)' }}
+                >
+                  Actuel
+                </span>
+              )}
+              <div className="font-bold text-[13px] ds-text-primary tracking-[-0.005em]">{plan.name}</div>
+              <div className="flex items-baseline gap-1">
+                <span
+                  className="font-extrabold tracking-[-0.03em]"
+                  style={{ fontSize: '28px', color: 'var(--ds-text-primary)', fontFamily: 'Inter, sans-serif' }}
+                >
+                  {plan.price}
+                </span>
+                <span className="text-[12px] ds-text-secondary">{plan.period}</span>
+              </div>
+              <ul
+                className="flex flex-col gap-1.5 pt-1 border-t"
+                style={{ borderColor: 'var(--ds-border)' }}
+              >
+                {plan.features.map(feat => (
+                  <li key={feat} className="flex items-start gap-1.5 text-[12.5px] ds-text-secondary">
+                    <Check size={12} style={{ color: 'var(--ds-success)', flexShrink: 0, marginTop: 3 }} />
+                    {feat}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-auto pt-1">
+                {plan.cta ? (
+                  <a
+                    href="mailto:splitzy.contact@gmail.com?subject=Passage au Plan Pro"
+                    className="block text-center w-full py-2 rounded-[7px] text-[12px] font-semibold text-white transition-colors"
+                    style={{ background: '#E8920A' }}
+                  >
+                    {plan.cta}
+                  </a>
+                ) : isCurrent ? (
+                  <div
+                    className="text-center text-[12px] font-medium py-2 rounded-[7px]"
+                    style={{ background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-tertiary)' }}
+                  >
+                    Plan actuel
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Usage block */}
+      <div className="ds-panel">
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+          <div className="font-bold text-[13.5px] ds-text-primary">Utilisation ce mois</div>
+          <span className="text-[12px] ds-text-tertiary">Plan {currentPlan}</span>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          {[
+            { label: 'Feedbacks reçus', value: feedbackCount, limit: planLimit, unit: `/ ${planLimit}` },
+            { label: 'Tables actives',  value: 10,            limit: 20,        unit: '/ 20 tables' },
+          ].map(row => {
+            const pct = Math.min(Math.round((row.value / row.limit) * 100), 100)
+            const warning = pct >= 80
+            return (
+              <div key={row.label} className="grid items-center gap-3.5" style={{ gridTemplateColumns: '140px 1fr 100px' }}>
+                <span className="text-[12.5px] font-medium ds-text-primary">{row.label}</span>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--ds-bg-subtle)' }}>
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${pct}%`,
+                      background: warning ? 'var(--ds-warning)' : '#E8920A',
+                    }}
+                  />
+                </div>
+                <span
+                  className="text-[12px] text-right tabular-nums"
+                  style={{ color: 'var(--ds-text-secondary)', fontFamily: 'monospace' }}
+                >
+                  {row.value} {row.unit}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Settings() {
   const restaurant = useRestaurant()
   const restaurantId = useRestaurantId()
-  const updateRestaurant = useMutation(api.restaurants.update)
+  const updateRestaurant  = useMutation(api.restaurants.update)
+  const setLogoStorageId  = useMutation((api.restaurants as any).setLogoStorageId)
+  const generateUploadUrl = useAction((api.restaurants as any).generateUploadUrl)
+  const logoUrl = useQuery(
+    (api.restaurants as any).getLogoUrl,
+    restaurant?.logoStorageId ? { storageId: restaurant.logoStorageId } : 'skip'
+  ) as string | null | undefined
   const rawTables = useQuery(api.tables.list, restaurantId ? { restaurantId } : 'skip')
+  const teamMembers = useQuery(api.members.getTeamMembers, restaurantId ? { restaurantId } : 'skip')
 
-  const [section, setSection] = useState<SectionKey>('restaurant')
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [section, setSection]       = useState<SectionKey>('restaurant')
+  const [saving, setSaving]         = useState(false)
+  const [saved, setSaved]           = useState(false)
+  const [logoUploading, setLogoUploading] = useState(false)
 
   const [form, setForm] = useState({
     name: '',
@@ -1711,11 +2705,11 @@ export function Settings() {
   useEffect(() => {
     if (restaurant) {
       setForm({
-        name: restaurant.name,
-        phone: restaurant.phone,
-        address: restaurant.address,
-        email: restaurant.email,
-        type: restaurant.type,
+        name: restaurant.name ?? '',
+        phone: restaurant.phone ?? '',
+        address: restaurant.address ?? '',
+        email: restaurant.email ?? '',
+        type: restaurant.type ?? '',
       })
     }
   }, [restaurant?._id])
@@ -1741,26 +2735,54 @@ export function Settings() {
 
   return (
     <RestaurantLayout>
-      <Topbar title="Paramètres" subtitle="Gérez votre établissement" />
+      <PageHeader title="Paramètres" subtitle={<span>Gérez votre établissement</span>} />
       <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6">
         <div className="flex flex-col md:flex-row gap-5 min-h-full">
           {/* Sub-nav */}
-          <aside className="w-full md:w-[230px] md:shrink-0">
-            <div className="bg-white rounded-xl border border-border shadow-card overflow-hidden">
-              <div className="flex overflow-x-auto md:block">
-                {SUB_NAV.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setSection(key)}
-                    className={`shrink-0 md:w-full text-left px-4 py-2.5 md:py-3 text-sm font-medium md:border-b md:last:border-b-0 border-border transition-colors whitespace-nowrap ${
-                      section === key
-                        ? 'md:bg-brand-bg text-brand md:border-l-[3px] md:border-l-brand md:pl-[13px] font-semibold border-b-2 border-b-brand'
-                        : 'text-mid hover:bg-bg md:border-l-[3px] md:border-l-transparent md:pl-[13px]'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+          <aside className="w-full md:w-[224px] md:shrink-0">
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ background: 'var(--ds-bg-surface)', border: '1px solid var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
+            >
+              <div
+                className="px-2.5 pt-3 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.07em] hidden md:block"
+                style={{ color: 'var(--ds-text-tertiary)' }}
+              >
+                Paramètres
+              </div>
+              <div className="flex overflow-x-auto md:block p-1.5 md:p-1.5 gap-1">
+                {SUB_NAV.map(({ key, label, icon: Icon, pendingDot }) => {
+                  const active = section === key
+                  const pendingCount = pendingDot
+                    ? (teamMembers?.filter(m => m.status === 'pending').length ?? 0)
+                    : 0
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setSection(key)}
+                      className="shrink-0 md:w-full text-left flex items-center gap-2.5 px-2.5 py-2 rounded-[7px] text-[13.5px] font-medium transition-colors whitespace-nowrap"
+                      style={{
+                        background: active ? 'var(--ds-bg-surface)' : 'transparent',
+                        color: active ? 'var(--ds-text-primary)' : 'var(--ds-text-secondary)',
+                        fontWeight: active ? 600 : 500,
+                        boxShadow: active ? 'var(--ds-shadow-sm)' : 'none',
+                      }}
+                    >
+                      <Icon
+                        size={15}
+                        strokeWidth={1.75}
+                        style={{ color: active ? '#E8920A' : 'var(--ds-text-tertiary)', flexShrink: 0 }}
+                      />
+                      <span className="flex-1 truncate">{label}</span>
+                      {pendingCount > 0 && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                          style={{ background: 'var(--ds-warning)', boxShadow: '0 0 0 2px rgba(245,158,11,0.18)' }}
+                        />
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </aside>
@@ -1769,93 +2791,171 @@ export function Settings() {
           <div className="flex-1 space-y-5">
             {section === 'restaurant' && (
               <>
-                <div className="bg-white rounded-xl border border-border shadow-card p-6">
-                  <h2 className="text-base font-bold text-dark mb-5">Informations générales</h2>
-                  <div className="grid grid-cols-2 gap-4">
+                {/* Logo upload */}
+                <div className="ds-panel">
+                  <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
                     <div>
-                      <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Nom</label>
-                      <input
-                        value={form.name}
-                        onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                        className="w-full border border-border rounded-lg px-3 py-2 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                      />
+                      <div className="font-bold text-[13.5px] ds-text-primary">Logo du restaurant</div>
+                      <div className="text-[12px] ds-text-tertiary mt-0.5">PNG ou SVG transparent, 512 × 512 minimum</div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Téléphone</label>
-                      <input
-                        value={form.phone}
-                        onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                        className="w-full border border-border rounded-lg px-3 py-2 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Adresse</label>
-                      <input
-                        value={form.address}
-                        onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-                        className="w-full border border-border rounded-lg px-3 py-2 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Email professionnel</label>
-                      <input
-                        value={form.email}
-                        onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                        className="w-full border border-border rounded-lg px-3 py-2 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
-                      />
+                  </div>
+                  <div className="px-5 py-5 flex items-center gap-5">
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="Logo" className="w-20 h-20 rounded-[14px] object-contain flex-shrink-0" style={{ background: '#1A1A1A', padding: '8px' }} />
+                    ) : (
+                      <div className="w-20 h-20 rounded-[14px] flex items-center justify-center gap-1 flex-shrink-0" style={{ background: '#1A1A1A', padding: '14px' }}>
+                        <div className="w-[22px] h-[52px] rounded-[5px]" style={{ background: '#FAFAFA', boxShadow: 'inset 0 -16px 0 -8px rgba(0,0,0,0.18)' }} />
+                        <div className="w-[22px] h-[52px] rounded-[5px]" style={{ background: '#E8920A', boxShadow: 'inset 0 -16px 0 -8px rgba(0,0,0,0.25)' }} />
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="font-semibold text-[13.5px] ds-text-primary">{logoUrl ? 'Logo personnalisé' : 'Logo Splitzy par défaut'}</div>
+                      <div className="text-[12px] ds-text-tertiary">Affiché sur l'addition et les QR codes · PNG, JPG ou SVG</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <label
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12.5px] font-medium cursor-pointer transition-colors hover:ds-bg-subtle"
+                          style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: logoUploading ? 'var(--ds-text-tertiary)' : 'var(--ds-text-primary)', opacity: logoUploading ? 0.6 : 1 }}
+                        >
+                          <Upload size={13} />
+                          {logoUploading ? 'Upload…' : 'Télécharger ↑'}
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                            className="sr-only"
+                            disabled={logoUploading}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0]
+                              if (!file || !restaurant?._id) return
+                              setLogoUploading(true)
+                              try {
+                                const uploadUrl = await generateUploadUrl()
+                                const res = await fetch(uploadUrl, { method: 'POST', headers: { 'Content-Type': file.type }, body: file })
+                                const { storageId } = await res.json()
+                                await setLogoStorageId({ id: restaurant._id, storageId })
+                              } catch (err) {
+                                console.error('[Logo upload]', err)
+                              } finally {
+                                setLogoUploading(false)
+                                e.target.value = ''
+                              }
+                            }}
+                          />
+                        </label>
+                        {logoUrl && (
+                          <button
+                            onClick={async () => {
+                              if (!restaurant?._id) return
+                              await setLogoStorageId({ id: restaurant._id, storageId: undefined }).catch(() => {})
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium transition-colors"
+                            style={{ background: 'transparent', color: 'var(--ds-text-tertiary)' }}
+                          >
+                            <X size={13} />
+                            Retirer
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-xl border border-border shadow-card p-6">
-                  <h2 className="text-base font-bold text-dark mb-4">Type d'établissement</h2>
-                  <div className="flex gap-3">
-                    {ESTABLISHMENT_TYPES.map(({ id, emoji, label }) => (
+                {/* General info */}
+                <div className="ds-panel">
+                  <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+                    <div>
+                      <div className="font-bold text-[13.5px] ds-text-primary">Informations générales</div>
+                      <div className="text-[12px] ds-text-tertiary mt-0.5">Identité visible par vos convives</div>
+                    </div>
+                  </div>
+                  <div className="px-5 py-5 grid grid-cols-2 gap-4">
+                    {[
+                      { label: 'Nom du restaurant', key: 'name' as const, placeholder: 'Mon Restaurant', span: false },
+                      { label: 'Téléphone', key: 'phone' as const, placeholder: '+33 1 23 45 67 89', span: false },
+                      { label: 'Adresse', key: 'address' as const, placeholder: '12 rue de la Paix, Paris', span: true },
+                      { label: 'Email professionnel', key: 'email' as const, placeholder: 'contact@restaurant.fr', span: true },
+                    ].map(({ label, key, placeholder, span }) => (
+                      <div key={key} className={span ? 'col-span-2' : ''}>
+                        <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">{label}</label>
+                        <input
+                          value={form[key]}
+                          onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                          placeholder={placeholder}
+                          className="w-full rounded-lg border px-3 py-2 text-[13.5px] outline-none transition-all"
+                          style={{
+                            background: 'var(--ds-bg-surface)',
+                            borderColor: 'var(--ds-border)',
+                            color: 'var(--ds-text-primary)',
+                            fontSize: '16px',
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div
+                    className="flex items-center justify-between px-5 py-3 border-t"
+                    style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}
+                  >
+                    <div className="text-[12px] ds-text-tertiary">
+                      {saved ? (
+                        <span className="ds-text-success font-semibold flex items-center gap-1">
+                          <Check size={13} /> Modifications enregistrées
+                        </span>
+                      ) : null}
+                    </div>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving || !restaurant}
+                      className="px-4 py-2 rounded-lg text-white text-[13px] font-semibold transition-colors disabled:opacity-50"
+                      style={{ background: '#E8920A' }}
+                    >
+                      {saving ? 'Enregistrement…' : 'Enregistrer'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Type d'établissement */}
+                <div className="ds-panel p-5">
+                  <div className="font-bold text-[13.5px] ds-text-primary mb-4">Type d'établissement</div>
+                  <div className="flex gap-3 flex-wrap">
+                    {ESTABLISHMENT_TYPES.map(({ id, icon: Icon, label }) => (
                       <button
                         key={id}
                         onClick={() => setForm(f => ({ ...f, type: id }))}
-                        className={`flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold transition-all ${
-                          form.type === id
-                            ? 'bg-brand-bg border-brand text-brand'
-                            : 'bg-white border-border text-mid hover:bg-bg'
-                        }`}
+                        className="flex items-center gap-2 rounded-xl border px-5 py-3 text-[13.5px] font-semibold transition-all"
+                        style={{
+                          background: form.type === id ? 'var(--ds-accent-soft)' : 'var(--ds-bg-surface)',
+                          borderColor: form.type === id ? '#E8920A' : 'var(--ds-border)',
+                          color: form.type === id ? 'var(--ds-accent-strong)' : 'var(--ds-text-secondary)',
+                        }}
                       >
-                        <span className="text-lg">{emoji}</span>
+                        <Icon size={16} />
                         {label}
                       </button>
                     ))}
                   </div>
                 </div>
-
-                <div className="flex justify-end items-center gap-3">
-                  {saved && (
-                    <span className="text-sm text-success font-medium">✓ Modifications enregistrées</span>
-                  )}
-                  <button
-                    onClick={handleSave}
-                    disabled={saving || !restaurant}
-                    className="bg-brand text-white font-semibold text-sm rounded-xl px-6 py-2.5 hover:bg-brand-dark transition-colors disabled:opacity-50"
-                  >
-                    {saving ? 'Enregistrement…' : 'Enregistrer les modifications'}
-                  </button>
-                </div>
               </>
             )}
 
             {section === 'notifications' && (
-              <div className="bg-white rounded-xl border border-border shadow-card p-6">
-                <h2 className="text-base font-bold text-dark mb-5">Notifications</h2>
-                <div className="space-y-4">
+              <div className="ds-panel">
+                <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+                  <div>
+                    <div className="font-bold text-[13.5px] ds-text-primary">Notifications</div>
+                    <div className="text-[12px] ds-text-tertiary mt-0.5">Choisissez quand être alerté</div>
+                  </div>
+                </div>
+                <div className="px-5 divide-y" style={{ borderColor: 'var(--ds-border)' }}>
                   {[
                     { key: 'negativeFeedback' as const, label: 'Alerte feedback négatif (≤ 3★)', desc: "Soyez notifié immédiatement dès qu'un avis négatif arrive." },
                     { key: 'morningDigest'    as const, label: 'Digest matinal 8h',              desc: 'Résumé de la veille envoyé chaque matin à 8h.' },
                     { key: 'endOfService'     as const, label: 'Rappel fin de service',           desc: 'Notification à la fermeture pour clôturer les sessions.' },
                     { key: 'weeklyRecap'      as const, label: 'Hebdo : récap CA & pourboires',   desc: 'Bilan de la semaine chaque lundi matin.' },
                   ].map(({ key, label, desc }) => (
-                    <div key={key} className="flex items-center justify-between py-3 border-b border-border last:border-b-0">
-                      <div>
-                        <div className="text-sm font-semibold text-dark">{label}</div>
-                        <div className="text-xs text-muted mt-0.5">{desc}</div>
+                    <div key={key} className="flex items-center justify-between py-4">
+                      <div className="flex-1 min-w-0 pr-4">
+                        <div className="text-[13.5px] font-semibold ds-text-primary">{label}</div>
+                        <div className="text-[12px] ds-text-tertiary mt-0.5">{desc}</div>
                       </div>
                       <Toggle
                         checked={notifs[key]}
@@ -1876,13 +2976,14 @@ export function Settings() {
 
             {section === 'qr' && (
               rawTables === undefined ? (
-                <div className="bg-white rounded-xl border border-border shadow-card p-12 flex items-center justify-center">
-                  <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                <div className="ds-panel p-12 flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#E8920A', borderTopColor: 'transparent' }} />
                 </div>
               ) : (
                 <QRCodesSection
                   tables={rawTables as { number: number; capacity: number }[]}
                   restaurantSlug={restaurant?.slug ?? ''}
+                  restaurantId={restaurantId}
                 />
               )
             )}
@@ -1893,6 +2994,18 @@ export function Settings() {
 
             {section === 'billing' && (
               <BillingSection restaurant={restaurant} />
+            )}
+
+            {section === 'team' && (
+              <TeamSection restaurantId={restaurantId} />
+            )}
+
+            {section === 'account' && (
+              <AccountSection restaurant={restaurant} restaurantId={restaurantId} />
+            )}
+
+            {section === 'plan' && (
+              <PlanSection restaurantId={restaurantId} />
             )}
           </div>
         </div>

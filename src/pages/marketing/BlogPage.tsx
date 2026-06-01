@@ -334,7 +334,7 @@ export function BlogPage() {
             </div>
           </div>
 
-          {/* Editorial stats */}
+          {/* Editorial stats — HIDDEN: "47 articles" et "12k lecteurs" fictifs
           <div className="mt-20 flex items-center gap-10 flex-wrap text-[12px] text-zinc-500 border-t pt-7" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
             {[
               { value: '47',    label: 'articles\npubliés' },
@@ -347,7 +347,7 @@ export function BlogPage() {
                 <span className="leading-tight whitespace-pre-line">{s.label}</span>
               </div>
             ))}
-          </div>
+          </div> */}
         </div>
       </section>
 
@@ -358,13 +358,16 @@ export function BlogPage() {
           {/* Filters */}
           <div className="flex items-center justify-between gap-6 flex-wrap mb-10">
             <div className="flex items-center gap-2 flex-wrap">
+              {/* HIDDEN compteurs fictifs — remettre quand on aura de vrais chiffres
+              { label: 'Tous · 47', active: true },
+              { label: 'Guides · 12' }, etc. */}
               {[
-                { label: 'Tous · 47', active: true },
-                { label: 'Guides · 12' },
-                { label: 'Études de cas · 9' },
-                { label: 'Data & chiffres · 8' },
-                { label: 'Opinion · 11' },
-                { label: 'Comparatifs · 7' },
+                { label: 'Tous', active: true },
+                { label: 'Guides' },
+                { label: 'Études de cas' },
+                { label: 'Data & chiffres' },
+                { label: 'Opinion' },
+                { label: 'Comparatifs' },
               ].map(chip => (
                 <button
                   key={chip.label}
@@ -387,7 +390,7 @@ export function BlogPage() {
             </div>
           </div>
 
-          {/* Featured article */}
+          {/* HIDDEN — article fictif "50 000€" — décommenter quand on a un vrai cas client
           <Link to="/blog/3-avis-50000-euros" onClick={() => window.scrollTo(0, 0)} className="blog-post group block bg-white border border-zinc-200 rounded-3xl overflow-hidden mb-10">
             <div className="grid grid-cols-1 lg:grid-cols-2">
               <div className="relative overflow-hidden aspect-[16/10] lg:aspect-auto" style={{ background: '#E8920A' }}>
@@ -428,6 +431,8 @@ export function BlogPage() {
               </div>
             </div>
           </Link>
+
+          */ }
 
           {/* Article grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -487,19 +492,19 @@ export function BlogPage() {
             })}
           </div>
 
-          {/* Load more */}
+          {/* HIDDEN — "38 restants" fictif
           <div className="mt-12 flex justify-center">
             <button className="inline-flex items-center gap-2 bg-white border border-zinc-200 hover:border-zinc-800 text-[14px] font-semibold px-5 py-3 rounded-xl transition" style={{ color: '#0A0A0A' }}>
               Charger plus d'articles
               <span className="text-zinc-400">·</span>
               <span className="text-zinc-500 font-mono text-[12px]">38 restants</span>
             </button>
-          </div>
+          </div> */}
         </div>
       </section>
 
-      {/* ── SERIES (dark) ── */}
-      <section className="relative py-24 overflow-hidden" style={{ background: '#0A0A0A' }}>
+      {/* HIDDEN — Séries fictives + marquee "Lus en ce moment" (0 abonnés réels) — passer false à true pour remettre */}
+      {false && <section className="relative py-24 overflow-hidden" style={{ background: '#0A0A0A' }}>
         <div
           aria-hidden="true"
           className="absolute -bottom-32 right-0 w-[700px] h-[500px] rounded-full pointer-events-none"
@@ -550,7 +555,7 @@ export function BlogPage() {
             ))}
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* ── TRENDING MARQUEE ── */}
       <section className="py-14 border-t" style={{ background: '#0A0A0A', borderColor: 'rgba(255,255,255,0.05)' }}>
@@ -610,7 +615,8 @@ export function BlogPage() {
           </form>
 
           <div className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12px]" style={{ color: 'rgba(255,255,255,0.75)' }}>
-            {['12 000 abonnés', 'Désabonnement en 1 clic', '100% écrit à la main'].map(t => (
+            {/* HIDDEN '12 000 abonnés' fictif */}
+            {['Désabonnement en 1 clic', '100% écrit à la main'].map(t => (
               <span key={t} className="flex items-center gap-1.5"><CheckIcon /> {t}</span>
             ))}
           </div>

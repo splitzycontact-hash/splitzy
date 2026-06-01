@@ -21,8 +21,9 @@ export interface Article {
   blocks: Block[]
 }
 
-export const BLOG_ARTICLES: Article[] = [
-  // ─── FEATURED ────────────────────────────────────────────────────────────────
+// HIDDEN — article fictif (cas d'usage illustratif, pas un vrai client)
+// Pour remettre en ligne : déplacer cet objet dans BLOG_ARTICLES ci-dessous
+export const HIDDEN_BLOG_ARTICLES: Article[] = [
   {
     slug: '3-avis-50000-euros',
     id: 0,
@@ -69,7 +70,9 @@ export const BLOG_ARTICLES: Article[] = [
       { t: 'p', v: "50 000 €. Pour 3 avis. Qui auraient pu ne jamais exister." },
     ],
   },
+]
 
+export const BLOG_ARTICLES: Article[] = [
   // ─── COMPARATIF ───────────────────────────────────────────────────────────────
   {
     slug: 'comparatif-sunday-pleez-obypay',
@@ -373,8 +376,14 @@ export const BLOG_ARTICLES: Article[] = [
     ],
   },
 
-  // ─── ÉTUDE DE CAS ────────────────────────────────────────────────────────────
-  {
+]
+
+export function getArticleBySlug(slug: string): Article | undefined {
+  return BLOG_ARTICLES.find(a => a.slug === slug)
+}
+
+/* HIDDEN — L'Ardoise : cas client fictif — décommenter et déplacer dans BLOG_ARTICLES quand on a un vrai cas
+export const HIDDEN_LARDOISE: Article = {
     slug: 'lardoise-plus-03-etoiles-3-mois',
     id: 9,
     category: 'Étude de cas',
@@ -415,8 +424,4 @@ export const BLOG_ARTICLES: Article[] = [
       { t: 'p', v: "4,1 → 4,4. Pas de magie. Pas de budget pub. Juste être là quand le client est mécontent, avant qu'il décide d'aller sur Google." },
     ],
   },
-]
-
-export function getArticleBySlug(slug: string): Article | undefined {
-  return BLOG_ARTICLES.find(a => a.slug === slug)
-}
+*/

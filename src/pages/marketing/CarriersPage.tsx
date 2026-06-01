@@ -50,7 +50,7 @@ const JOBS = [
     title: 'Product Designer',
     badge: 'Urgent',
     badgeStyle: { background: 'rgba(16,185,129,0.12)', color: '#10b981' },
-    desc: "Vous dessinerez l'expérience qui touche 240+ restaurants et 80 000 convives par mois. Du Figma au shipping, avec accès direct aux fondateurs.",
+    desc: "Vous dessinerez l'expérience client de bout en bout. Du Figma au shipping, avec accès direct aux fondateurs.",
     type: 'Stage · 6 mois',
     location: 'Paris · sur site',
     salary: '1 300 € / mois',
@@ -129,11 +129,7 @@ export function CarriersPage() {
                 <span className="text-white font-semibold">3<sup>e</sup> personne</span>. Vous serez là quand on multipliera par 10.
               </p>
               <div className="mt-6 flex items-center gap-4 text-[12px] text-zinc-500">
-                <span className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-dot" />
-                  3 postes ouverts
-                </span>
-                <span className="text-zinc-700">·</span>
+                {/* HIDDEN "3 postes ouverts" — 0 postes pour l'instant */}
                 <span>Paris · 11<sup>e</sup></span>
               </div>
             </div>
@@ -177,7 +173,7 @@ export function CarriersPage() {
               </h2>
             </div>
             <p className="md:col-span-5 text-[16px] text-zinc-600">
-              On a fait 240 restaurants, 1,2&nbsp;M€ encaissés, et on est rentables. Ici, vous ne construirez pas pour des slides — vous construirez pour des gens qui dépendent de Splitzy chaque soir.
+              On construit en vrai, avec de vrais restaurants. Ici, vous ne construirez pas pour des slides — vous construirez pour des gens qui dépendent de Splitzy chaque soir.
             </p>
           </div>
 
@@ -198,8 +194,8 @@ export function CarriersPage() {
         </div>
       </section>
 
-      {/* ── OPEN ROLES ── */}
-      <section className="bg-ink-50 pb-28" style={{ color: '#0A0A0A' }}>
+      {/* HIDDEN — 0 postes ouverts pour l'instant — décommenter quand on recrute */}
+      {false && <section className="bg-ink-50 pb-28" style={{ color: '#0A0A0A' }}>
         <div className="max-w-[1100px] mx-auto px-6">
           <div className="flex items-end justify-between gap-6 flex-wrap mb-10">
             <div>
@@ -269,6 +265,8 @@ export function CarriersPage() {
           </div>
         </div>
       </section>
+
+      }
 
       {/* ── SALARY TRANSPARENCY (dark) ── */}
       <section className="relative py-28 overflow-hidden" style={{ background: '#0A0A0A' }}>

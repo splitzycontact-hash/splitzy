@@ -5,8 +5,12 @@ import { RestaurantSignIn } from './pages/RestaurantSignIn'
 import { RestaurantOnboarding } from './pages/RestaurantOnboarding'
 import { Overview } from './pages/Overview'
 import { Tables } from './pages/Tables'
-import { Feedbacks } from './pages/Feedbacks'
+import { Reputation } from './pages/Reputation'
+import { Analytics } from './pages/Analytics'
 import { Factures } from './pages/Factures'
+import { Integrations } from './pages/Integrations'
+import { MenuPage } from './pages/MenuPage'
+import { Clients } from './pages/Clients'
 import { Settings } from './pages/Settings'
 
 export function RestaurantApp() {
@@ -24,12 +28,18 @@ export function RestaurantApp() {
                 element={
                   <RestaurantGuard>
                     <Routes>
-                      <Route path="/"          element={<Overview />} />
-                      <Route path="/tables"    element={<Tables />} />
-                      <Route path="/feedbacks" element={<Feedbacks />} />
-                      <Route path="/factures"  element={<Factures />} />
-                      <Route path="/settings"  element={<Settings />} />
-                      <Route path="*"          element={<Navigate to="/restaurant" replace />} />
+                      <Route path="/"             element={<Overview />} />
+                      <Route path="/tables"       element={<Tables />} />
+                      <Route path="/reputation"   element={<Reputation />} />
+                      <Route path="/analytics"    element={<Analytics />} />
+                      <Route path="/factures"     element={<Factures />} />
+                      <Route path="/integrations" element={<Integrations />} />
+                      <Route path="/menu"         element={<MenuPage />} />
+                      <Route path="/clients"      element={<Clients />} />
+                      <Route path="/settings"     element={<Settings />} />
+                      {/* Legacy redirect */}
+                      <Route path="/feedbacks"    element={<Navigate to="/restaurant/reputation" replace />} />
+                      <Route path="*"             element={<Navigate to="/restaurant" replace />} />
                     </Routes>
                   </RestaurantGuard>
                 }
