@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as actions_generateInsights from "../actions/generateInsights.js";
 import type * as dependencyStatus from "../dependencyStatus.js";
 import type * as feedbacks from "../feedbacks.js";
 import type * as insights from "../insights.js";
@@ -26,6 +27,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "actions/generateInsights": typeof actions_generateInsights;
   dependencyStatus: typeof dependencyStatus;
   feedbacks: typeof feedbacks;
   insights: typeof insights;

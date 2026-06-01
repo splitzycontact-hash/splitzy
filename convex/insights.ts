@@ -1,4 +1,4 @@
-import { query } from "./_generated/server"
+import { query, internalMutation } from "./_generated/server"
 import { v } from "convex/values"
 
 export const getLatestInsights = query({
@@ -9,5 +9,24 @@ export const getLatestInsights = query({
       .withIndex("by_restaurant_date", q => q.eq("restaurantId", restaurantId))
       .order("desc")
       .first()
+  },
+})
+
+export const store = internalMutation({
+  args: {
+    restaurantId: v.id("restaurants"),
+    generatedAt: v.number(),
+    period: v.string(),
+    insights: v.array(v.object({
+      type: v.string(),
+      priority: v.string(),
+      title: v.string(),
+      body: v.string(),
+      metric: v.optional(v.string()),
+      action: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("insights", args)
   },
 })
