@@ -1,3 +1,4 @@
+import { Helmet } from 'react-helmet-async'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 
@@ -99,6 +100,10 @@ const CheckIcon = () => (
 export function CarriersPage() {
   return (
     <div className="w-full min-h-screen" style={{ background: '#0A0A0A', color: 'white' }}>
+      <Helmet>
+        <title>Carrières — Splitzy</title>
+        <meta name="description" content="Rejoignez l'équipe qui réinvente l'addition au restaurant. Postes ouverts en tech, produit et sales. Travail remote-friendly." />
+      </Helmet>
       <Navbar />
 
       {/* ── HERO ── */}

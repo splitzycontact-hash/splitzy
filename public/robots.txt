@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+Disallow: /restaurant/
+Disallow: /t/
+Disallow: /welcome
+Disallow: /profile
+Disallow: /items
+Disallow: /tip
+Disallow: /payment
+Disallow: /confirmation
+Disallow: /feedback
+
+Sitemap: https://www.splitzy.fr/sitemap.xml

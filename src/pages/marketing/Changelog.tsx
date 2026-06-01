@@ -1,3 +1,4 @@
+import { Helmet } from 'react-helmet-async'
 import { m } from 'framer-motion'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
@@ -417,6 +418,10 @@ function CtaSection() {
 export function ChangelogPage() {
   return (
     <div className="w-full min-h-screen" style={{ background: '#18181B' }}>
+      <Helmet>
+        <title>Changelog — Splitzy</title>
+        <meta name="description" content="Toutes les mises à jour de Splitzy : nouvelles fonctionnalités, améliorations et corrections. On itère vite, pour vous." />
+      </Helmet>
       <Navbar />
       <HeroSection />
       <TimelineSection />

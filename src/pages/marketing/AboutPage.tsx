@@ -1,3 +1,4 @@
+import { Helmet } from 'react-helmet-async'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 
@@ -69,6 +70,10 @@ const CheckIcon = () => (
 export function AboutPage() {
   return (
     <div className="w-full min-h-screen" style={{ background: '#0A0A0A', color: 'white' }}>
+      <Helmet>
+        <title>À propos — Splitzy</title>
+        <meta name="description" content="Splitzy est né d'un constat simple : l'addition reste le pire moment du repas. On a construit l'outil que les restaurateurs méritaient." />
+      </Helmet>
       <Navbar />
 
       {/* ── HERO ── */}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { m, AnimatePresence } from 'framer-motion'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
@@ -431,6 +432,10 @@ function ContactSection() {
 export function AidePage() {
   return (
     <div className="w-full min-h-screen" style={{ background: '#18181B' }}>
+      <Helmet>
+        <title>Centre d'aide — Splitzy</title>
+        <meta name="description" content="Guides, tutoriels et réponses pour bien démarrer avec Splitzy. Installation, QR codes, paiements : on vous accompagne pas à pas." />
+      </Helmet>
       <Navbar />
       <HeroSection />
       <FAQSection />

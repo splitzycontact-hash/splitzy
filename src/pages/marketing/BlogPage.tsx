@@ -1,6 +1,8 @@
+import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
+import { BLOG_ARTICLES, type Article } from './blogData'
 
 // ── Cover background helpers ─────────────────────────────────────────────────
 const COVERS: Record<string, React.CSSProperties> = {
@@ -13,111 +15,38 @@ const COVERS: Record<string, React.CSSProperties> = {
   'dot-dark':     { backgroundColor: '#0A0A0A', backgroundImage: 'radial-gradient(#27272A 1.2px, transparent 1.2px)', backgroundSize: '16px 16px' },
   'grid-cream':   { backgroundColor: '#FAFAFA', backgroundImage: 'linear-gradient(#E4E4E7 1px, transparent 1px), linear-gradient(90deg, #E4E4E7 1px, transparent 1px)', backgroundSize: '28px 28px' },
   'stars-grad':   { background: 'linear-gradient(135deg, #FFF4E5 0%, #E8920A 100%)' },
+  'tech-qr':      { background: '#0A0A0A', backgroundImage: 'radial-gradient(circle at 20% 50%, #1a1a2e 0%, #0A0A0A 60%)' },
+  'gestion-clock': { background: '#F0FDF4', backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 24px, #D1FAE5 24px, #D1FAE5 25px), repeating-linear-gradient(90deg, transparent, transparent 24px, #D1FAE5 24px, #D1FAE5 25px)' },
+  'reputation-stars': { background: '#FFF7ED', backgroundImage: 'radial-gradient(ellipse at 80% 20%, #FED7AA 0%, transparent 60%)' },
+  'xp-split':     { background: '#EFF6FF', backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 20px, #DBEAFE 20px, #DBEAFE 21px)' },
+  'conseils-check': { background: '#18181B', backgroundImage: 'radial-gradient(circle at 80% 80%, #27272A 0%, #18181B 60%)' },
+  'guide-compass': { background: '#FFFBEB', backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 20px, #FEF3C7 20px, #FEF3C7 21px)' },
 }
 
 // ── Data ─────────────────────────────────────────────────────────────────────
-const ARTICLES = [
-  /* HIDDEN — comparatif Sunday/Pleez/Obypay (données fictives, 6 mois d'usage non réels)
-  {
-    id: 1, slug: 'comparatif-sunday-pleez-obypay', cover: 'stripes-warm',
-    category: 'Comparatif', catStyle: { color: '#7A4D05', background: 'rgba(255,255,255,0.8)' } as React.CSSProperties,
-    date: '14 mai', readTime: '8 min',
-    title: 'Sunday, Pleez, Obypay : on a comparé honnêtement.',
-    excerpt: "Frais cachés, expérience client, qualité du dashboard. Le verdict après 6 mois d'usage des 3 outils en parallèle.",
-    author: { initials: 'TJ', name: 'Théo Jamous', bg: '#0A0A0A' },
-    dark: false,
-    bigLabel: null as string | null,
-  },
-  */
-  /* HIDDEN — 38 000 avis / 21h43 (données fictives non vérifiées)
-  {
-    id: 2, slug: 'quelle-heure-avis-google-ecrits', cover: 'stripes-dark',
-    category: 'Data', catStyle: { color: 'white', background: 'rgba(255,255,255,0.15)' } as React.CSSProperties,
-    date: '07 mai', readTime: '4 min',
-    title: 'À quelle heure les avis Google sont vraiment écrits ?',
-    excerpt: "On a analysé 38 000 avis sur restaurants parisiens. Le pic se situe à 21h43 — et ce n'est pas un hasard.",
-    author: { initials: 'YG', name: 'Yann Grigoriev', bg: '#E8920A' },
-    dark: false,
-    bigLabel: '21:43',
-  },
-  */
-  /* HIDDEN — 3 patrons parisiens / avis 1 étoile (témoignages fictifs)
-  {
-    id: 3, slug: 'repondre-avis-1-etoile', cover: 'grid-cream',
-    category: 'Opinion', catStyle: { color: '#0A0A0A', background: 'white' } as React.CSSProperties,
-    date: '29 avril', readTime: '6 min',
-    title: "Restaurateurs : comment répondre à un avis 1 étoile sans s'humilier.",
-    excerpt: "3 patrons parisiens nous racontent leur méthode. Aucun ne supplie. Aucun n'ignore. Voici le bon milieu.",
-    author: { initials: 'TJ', name: 'Théo Jamous', bg: '#0A0A0A' },
-    dark: false,
+function getCatStyle(cover: string): React.CSSProperties {
+  if (cover === 'stripes-dark' || cover === 'dot-dark') return { color: 'white', background: 'rgba(255,255,255,0.15)' }
+  if (cover === 'stripes-cool' || cover === 'dot-light' || cover === 'grid-cream') return { color: '#0A0A0A', background: 'white' }
+  if (cover === 'stars-grad') return { color: '#7A4D05', background: 'rgba(255,255,255,0.85)' }
+  if (cover === 'dark-editorial') return {}
+  if (cover === 'tech-qr' || cover === 'conseils-check') return { color: 'white', background: 'rgba(255,255,255,0.15)' }
+  if (cover === 'gestion-clock') return { color: '#065F46', background: 'rgba(209,250,229,0.9)' }
+  if (cover === 'reputation-stars') return { color: '#92400E', background: 'rgba(254,215,170,0.9)' }
+  if (cover === 'xp-split') return { color: '#1E40AF', background: 'rgba(219,234,254,0.9)' }
+  if (cover === 'guide-compass') return { color: '#92400E', background: 'rgba(254,243,199,0.9)' }
+  return { color: '#7A4D05', background: 'rgba(255,255,255,0.8)' }
+}
+
+type DisplayArticle = Article & { catStyle: React.CSSProperties; dark: boolean; bigLabel: string | null }
+
+const ARTICLES: DisplayArticle[] = [...BLOG_ARTICLES]
+  .sort((a, b) => b.id - a.id)
+  .map(article => ({
+    ...article,
+    catStyle: getCatStyle(article.cover),
+    dark: article.cover === 'dark-editorial',
     bigLabel: null,
-  },
-  */
-  {
-    id: 4, slug: 'guide-pourboire-france-2026', cover: 'cream-block',
-    category: 'Guide', catStyle: { color: '#7A4D05', background: 'rgba(255,255,255,0.8)' } as React.CSSProperties,
-    date: '22 avril', readTime: '12 min',
-    title: 'Le guide complet du pourboire en France en 2026.',
-    excerpt: 'Cash, sans contact, partagé en cuisine. Ce que dit la loi, ce que disent vos clients, et ce que vous devriez faire.',
-    author: { initials: 'YG', name: 'Yann Grigoriev', bg: '#E8920A' },
-    dark: false,
-    bigLabel: null,
-  },
-  {
-    id: 5, slug: 'pourquoi-clients-abandonnent-paiement', cover: 'dot-light',
-    category: 'UX', catStyle: { color: '#0A0A0A', background: 'white' } as React.CSSProperties,
-    date: '15 avril', readTime: '7 min',
-    title: 'Pourquoi vos clients abandonnent au moment de payer.',
-    excerpt: '14 frictions identifiées sur les pages de paiement de 60 outils restaurant. Combien votre solution en cumule ?',
-    author: { initials: 'TJ', name: 'Théo Jamous', bg: '#0A0A0A' },
-    dark: false,
-    bigLabel: null,
-  },
-  /* HIDDEN — installation 100 restos (chiffre fictif, pas encore atteint)
-  {
-    id: 6, slug: 'installation-100-restaurants', cover: 'dot-dark',
-    category: 'Backstage', catStyle: { color: 'white', background: 'rgba(255,255,255,0.15)' } as React.CSSProperties,
-    date: '02 avril', readTime: '9 min',
-    title: "On a installé Splitzy chez 100 restos. Voici ce qu'on a appris.",
-    excerpt: "L'imprimante qui ne marche pas, le wifi en sous-sol, le serveur qui refuse de scanner. Le terrain bat les slides.",
-    author: { initials: 'YG', name: 'Yann Grigoriev', bg: '#E8920A' },
-    dark: false,
-    bigLabel: null,
-  },
-  */
-  {
-    id: 7, slug: 'premium-qui-veut-dire-cher', cover: 'dark-editorial',
-    category: 'Opinion', catStyle: {} as React.CSSProperties,
-    date: '26 mars', readTime: '5 min',
-    title: null,
-    excerpt: "Pourquoi tant d'outils restaurants vendent 200€/mois ce qu'on peut faire mieux à 59€. Et pourquoi ils continueront — tant qu'on accepte de payer.",
-    author: { initials: 'YG', name: 'Yann Grigoriev', bg: '#E8920A' },
-    dark: true,
-    bigLabel: null,
-  },
-  {
-    id: 8, slug: 'tva-partage-addition-loi', cover: 'stripes-cool',
-    category: 'Juridique', catStyle: { color: '#0A0A0A', background: 'white' } as React.CSSProperties,
-    date: '19 mars', readTime: '11 min',
-    title: "TVA et partage d'addition : ce que dit vraiment la loi.",
-    excerpt: "Un comptable, un avocat fiscaliste et nous. On a démêlé les règles. Spoiler : c'est plus simple qu'on pense.",
-    author: { initials: 'TJ', name: 'Théo Jamous', bg: '#0A0A0A' },
-    dark: false,
-    bigLabel: null,
-  },
-  /* HIDDEN — L'Ardoise +0,3 étoiles (cas client fictif)
-  {
-    id: 9, slug: 'lardoise-plus-03-etoiles-3-mois', cover: 'stars-grad',
-    category: 'Étude de cas', catStyle: { color: '#7A4D05', background: 'rgba(255,255,255,0.85)' } as React.CSSProperties,
-    date: '12 mars', readTime: '8 min',
-    title: "L'Ardoise : comment ils ont récupéré 0,3 étoiles en 3 mois.",
-    excerpt: 'Brasserie lyonnaise, 80 couverts/soir. Le récit de leur stratégie de feedback privé, semaine par semaine.',
-    author: { initials: 'YG', name: 'Yann Grigoriev', bg: '#E8920A' },
-    dark: false,
-    bigLabel: null,
-  },
-  */
-]
+  }))
 
 const SERIES = [
   {
@@ -166,7 +95,7 @@ const CheckIcon = () => (
 )
 
 // ── Cover renderer ────────────────────────────────────────────────────────────
-function ArticleCover({ article }: { article: typeof ARTICLES[0] }) {
+function ArticleCover({ article }: { article: DisplayArticle }) {
   const baseClass = 'relative overflow-hidden aspect-[16/10]'
 
   if (article.cover === 'dark-editorial') return null
@@ -273,6 +202,96 @@ function ArticleCover({ article }: { article: typeof ARTICLES[0] }) {
     )
   }
 
+  if (article.cover === 'tech-qr') {
+    return (
+      <div className={baseClass} style={COVERS['tech-qr']}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div style={{ width: 80, height: 80, border: '8px solid #E8920A', borderRadius: 8, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 28, height: 28, background: '#E8920A', borderRadius: 4 }} />
+            <div style={{ position: 'absolute', top: -16, right: -16, width: 20, height: 20, border: '4px solid #E8920A', borderRadius: 2 }} />
+            <div style={{ position: 'absolute', bottom: -16, left: -16, width: 20, height: 20, border: '4px solid #E8920A', borderRadius: 2 }} />
+          </div>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 p-5">
+          <span className="text-[10.5px] tracking-[0.16em] uppercase font-semibold px-2.5 py-1 rounded-full backdrop-blur" style={article.catStyle}>{article.category}</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (article.cover === 'gestion-clock') {
+    return (
+      <div className={baseClass} style={COVERS['gestion-clock']}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span style={{ fontSize: 120, lineHeight: 1, userSelect: 'none' }}>⏱</span>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 p-5">
+          <span className="text-[10.5px] tracking-[0.16em] uppercase font-semibold px-2.5 py-1 rounded-full" style={article.catStyle}>{article.category}</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (article.cover === 'reputation-stars') {
+    return (
+      <div className={baseClass} style={COVERS['reputation-stars']}>
+        <div className="absolute inset-0 flex items-center justify-center gap-1">
+          {[1,2,3,4,5].map(i => (
+            <span key={i} style={{ fontSize: 52, color: i <= 4 ? '#F59E0B' : '#FCD34D', userSelect: 'none' }}>★</span>
+          ))}
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 p-5">
+          <span className="text-[10.5px] tracking-[0.16em] uppercase font-semibold px-2.5 py-1 rounded-full" style={article.catStyle}>{article.category}</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (article.cover === 'xp-split') {
+    return (
+      <div className={baseClass} style={COVERS['xp-split']}>
+        <div className="absolute inset-0 flex items-center justify-center gap-4">
+          {['👤','➗','👤','👤'].map((e, i) => (
+            <span key={i} style={{ fontSize: i === 1 ? 40 : 56, userSelect: 'none', opacity: i === 1 ? 0.6 : 1 }}>{e}</span>
+          ))}
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 p-5">
+          <span className="text-[10.5px] tracking-[0.16em] uppercase font-semibold px-2.5 py-1 rounded-full" style={article.catStyle}>{article.category}</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (article.cover === 'conseils-check') {
+    return (
+      <div className={baseClass} style={COVERS['conseils-check']}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {['✗ PDF lent', '✗ Trop petit', '✓ Mobile-first'].map((t, i) => (
+              <div key={i} style={{ fontSize: 18, fontWeight: 700, color: i < 2 ? '#EF4444' : '#22C55E', letterSpacing: '-0.01em', userSelect: 'none' }}>{t}</div>
+            ))}
+          </div>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 p-5">
+          <span className="text-[10.5px] tracking-[0.16em] uppercase font-semibold px-2.5 py-1 rounded-full backdrop-blur" style={article.catStyle}>{article.category}</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (article.cover === 'guide-compass') {
+    return (
+      <div className={baseClass} style={COVERS['guide-compass']}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span style={{ fontSize: 130, lineHeight: 1, userSelect: 'none' }}>🧭</span>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 p-5">
+          <span className="text-[10.5px] tracking-[0.16em] uppercase font-semibold px-2.5 py-1 rounded-full" style={article.catStyle}>{article.category}</span>
+        </div>
+      </div>
+    )
+  }
+
   // default: stripes-warm
   return (
     <div className={baseClass} style={COVERS['stripes-warm']}>
@@ -287,6 +306,10 @@ function ArticleCover({ article }: { article: typeof ARTICLES[0] }) {
 export function BlogPage() {
   return (
     <div className="w-full min-h-screen" style={{ background: '#0A0A0A', color: 'white' }}>
+      <Helmet>
+        <title>Blog — Splitzy</title>
+        <meta name="description" content="Conseils et ressources pour restaurateurs : augmentez vos pourboires, simplifiez vos encaissements, fidélisez vos clients." />
+      </Helmet>
       <style>{`
         @keyframes scrollx { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         .blog-marquee { display: flex; gap: 2rem; width: max-content; animation: scrollx 40s linear infinite; }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { m } from 'framer-motion'
 import { toast } from 'sonner'
 import { Navbar } from './Navbar'
@@ -546,6 +547,10 @@ function ContactSection() {
 export function PressePage() {
   return (
     <div className="w-full min-h-screen" style={{ background: '#18181B' }}>
+      <Helmet>
+        <title>Presse — Splitzy</title>
+        <meta name="description" content="Kit presse, visuels et contacts pour les journalistes. Tout ce qu'il faut pour parler de Splitzy dans vos articles." />
+      </Helmet>
       <Navbar />
       <HeroSection />
       <ChiffresSection />

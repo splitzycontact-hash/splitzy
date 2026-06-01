@@ -1,3 +1,4 @@
+import { Helmet } from 'react-helmet-async'
 import { m } from 'framer-motion'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
@@ -636,6 +637,10 @@ function ContactSection() {
 export function SecuritePage() {
   return (
     <div className="w-full min-h-screen" style={{ background: '#18181B' }}>
+      <Helmet>
+        <title>Sécurité — Splitzy</title>
+        <meta name="description" content="Paiements chiffrés, certifiés PCI DSS niveau 1 via Stripe. Vos clients paient en toute sécurité, vos données restent privées." />
+      </Helmet>
       <Navbar />
       <HeroSection />
       <StandardsSection />

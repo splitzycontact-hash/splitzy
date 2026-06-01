@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { m } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { Navbar } from './Navbar'
@@ -442,6 +443,10 @@ const DASHBOARD_FEATURES = [
 export function FonctionnalitesPage() {
   return (
     <div className="w-full min-h-screen" style={{ background: '#FAFAFA' }}>
+      <Helmet>
+        <title>Fonctionnalités — Splitzy</title>
+        <meta name="description" content="QR code par table, paiement sans contact, dashboard temps réel, intégration Square. Tout ce qu'il faut pour moderniser votre salle en 30 minutes." />
+      </Helmet>
       <Navbar />
 
       <FonctionnalitesHero />
