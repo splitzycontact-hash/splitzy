@@ -5,6 +5,7 @@ import { StarRating } from '../components/features/StarRating'
 import { pageVariants } from '../utils/animations'
 import { httpMutation } from '../utils/convexHttp'
 import { FEEDBACK_TAGS } from '../data/session'
+import { PrivacyFooterLink } from '../components/ui/PrivacyFooterLink'
 
 const FEEDBACK_CHIP_DOTS: Record<string, string> = {
   'Super ambiance': '#F59E0B',
@@ -232,6 +233,8 @@ export function Feedback() {
         >
           Passer
         </button>
+
+        <PrivacyFooterLink />
       </div>
     </m.div>
   )

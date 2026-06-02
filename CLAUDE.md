@@ -314,10 +314,31 @@ Single global context: `src/context/SessionContext.tsx` — `useReducer` with `S
 
 Auth: `RestaurantGuard` fetches restaurant by `clerkUserId` (production) or by `VITE_RESTAURANT_SLUG` env var (dev without Clerk).
 
-Key pages:
-- `Overview` — KPIs (CA du jour, tables actives, note moy., pourboires), tables live grid, revenus semaine, activité récente
-- `Tables` — live table grid with status filter, table detail modal, **"Simuler commande" (TEST)** button
-- `Feedbacks`, `Factures`, `Settings` (POS config, menu sync, QR codes, table setup)
+Routing (`RestaurantApp.tsx`) — toutes les routes sont sous `/restaurant/*`, layout commun `RestaurantLayout` (Sidebar desktop / bottom-nav mobile) :
+
+| Route | Page | Rôle |
+|---|---|---|
+| `/restaurant` | `Overview` | KPIs (CA du jour, tables actives, note moy., pourboires), tables live grid, revenus semaine, activité récente |
+| `/restaurant/tables` | `Tables` | Grille tables live + filtre statut, modal détail, **"Simuler commande" (TEST)** |
+| `/restaurant/reputation` | `Reputation` | Feedbacks + répartition pos/neu/neg, badge "nouveau". `negCount = stars ≤ 2`, `neuCount = 3★` (ne pas re-compter les 3★) |
+| `/restaurant/analytics` | `Analytics` | Graphe CA SVG (Bezier) par période today/week/month/year/custom, boutons Simuler/Nettoyer |
+| `/restaurant/menu` | `MenuPage` | Carte / menu (sync Square) |
+| `/restaurant/clients` | `Clients` | Clients dérivés des `payments` + `feedbacks` réels (identités fixes indexées par `tableNumber` 1-10), statut vip/régulier/insatisfait/nouveau |
+| `/restaurant/factures` | `Factures` | Factures |
+| `/restaurant/integrations` | `Integrations` | Intégrations POS / tierces |
+| `/restaurant/settings` | `Settings` | POS config, menu sync, QR codes, table setup |
+| `/restaurant/onboarding` | `RestaurantOnboarding` | Flow création restaurant (hors layout) |
+| `/restaurant/sign-in` | `RestaurantSignIn` | Connexion gérant (hors layout) |
+
+`/restaurant/feedbacks` redirige (301 client) vers `/restaurant/reputation`. La sidebar desktop (`layout/Sidebar.tsx`) groupe ces pages en deux sections : **Pilotage** (Vue d'ensemble, Tables, Réputation, Analytics) et **Restaurant** (Menu, Clients, Factures, Intégrations, Paramètres). La bottom-nav mobile (`RestaurantLayout.tsx`) n'expose que 5 entrées : Accueil, Tables, Réputation, Factures, Réglages.
+
+### Analytics — graphe CA (`Analytics.tsx`)
+
+`buildChartDays(period)` pré-remplit **tous** les slots de la fenêtre à 0 avant d'injecter les paiements (sinon les jours/mois vides manquent et la courbe Bezier saute). `year` génère Jan → mois courant ; `custom` boucle de `windowStart` à `windowEnd` (+86400000/itération). La légende affiche un `currentPeriodLabel` dynamique (Aujourd'hui / Cette semaine / nom du mois / année / plage custom), pas un label hardcodé.
+
+### Clients — données réelles (`Clients.tsx`)
+
+Plus de tableau `CUSTOMERS` statique : `useQuery(api.payments.list)` (filtré `status === 'Encaissé'`) + `useQuery(api.feedbacks.list)`, agrégés par `tableNumber` dans un `useMemo`. Statut dérivé : `vip` (visits ≥ 10 ou total ≥ 500€), `insatisfait` (0 < avgRating < 3), `regulier` (visits ≥ 3), sinon `nouveau`. Tables sans paiement filtrées, tri par total décroissant. Les KPIs header sont calculés depuis cet agrégat (plus de valeurs en dur).
 
 ### "Simuler commande" (test feature)
 

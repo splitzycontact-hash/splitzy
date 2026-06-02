@@ -94,6 +94,7 @@ export function TableEntry() {
     navigated.current = false
     setLoadState('loading')
     let cancelled = false
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
 
     const handleCtx = (ctx: HttpCtx) => {
       if (cancelled || navigated.current) return
@@ -172,7 +173,7 @@ export function TableEntry() {
             ctx = await fetchTableContext(slug!, tableNumberInt)
           } catch (err1) {
             console.warn('[TableEntry] 1st fetch failed, retrying', err1)
-            await new Promise(r => setTimeout(r, 1000))
+            await new Promise<void>(resolve => { retryTimer = setTimeout(resolve, 1000) })
             if (cancelled) return
             ctx = await fetchTableContext(slug!, tableNumberInt)
           }
@@ -187,7 +188,7 @@ export function TableEntry() {
 
     void run()
 
-    return () => { cancelled = true }
+    return () => { cancelled = true; clearTimeout(retryTimer) }
   }, [retryKey, paramsValid, slug, rawTableNumber, tableNumberInt, dispatch, navigate])
 
   function handleRetry() {

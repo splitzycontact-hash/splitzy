@@ -3,6 +3,7 @@ import { m } from 'framer-motion'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { NAME_SUGGESTIONS } from '../data/session'
+import { PrivacyFooterLink } from '../components/ui/PrivacyFooterLink'
 
 const AVATARS = [
   { id: 0, emoji: '🦊', bg: '#E8920A', label: 'Léo' },
@@ -251,6 +252,8 @@ export function Profile() {
               <path d="M6.75 3.75L11.25 9L6.75 14.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </m.button>
+
+          <PrivacyFooterLink />
         </div>
       </div>
     </m.div>

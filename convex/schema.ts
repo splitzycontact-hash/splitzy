@@ -125,4 +125,20 @@ export default defineSchema({
     tags: v.optional(v.array(v.string())),
     allergenes: v.optional(v.string()),
   }).index("by_restaurant", ["restaurantId"]),
+
+  // Profils clients (CRM) — coordonnées laissées volontairement par le client
+  // sur l'écran de confirmation pour recevoir les offres du restaurant.
+  customers: defineTable({
+    restaurantId: v.id("restaurants"),
+    tableNumber: v.optional(v.number()),
+    firstName: v.optional(v.string()),
+    avatarIndex: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    marketingConsent: v.optional(v.boolean()),
+    consentAt: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_restaurant", ["restaurantId"])
+    .index("by_restaurant_phone", ["restaurantId", "phone"])
+    .index("by_restaurant_email", ["restaurantId", "email"]),
 })

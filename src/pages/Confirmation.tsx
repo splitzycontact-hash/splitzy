@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { useSession } from '../context/SessionContext'
@@ -6,21 +6,40 @@ import { pageVariants } from '../utils/animations'
 import { MENU_ITEMS } from '../data/menu'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
+import { httpMutation } from '../utils/convexHttp'
+import { PrivacyFooterLink } from '../components/ui/PrivacyFooterLink'
 
 export function Confirmation() {
   const { state } = useSession()
   const navigate = useNavigate()
   const { subtotal, tipAmount, splitzyFee, total } = useSessionCalcs()
-  const [countdown, setCountdown] = useState(8)
 
-  useEffect(() => {
-    if (countdown <= 0) {
-      navigate('/feedback')
-      return
+  // CRM optionnel — coordonnées laissées par le client pour recevoir les offres
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [consent, setConsent] = useState(false)
+
+  const validPhone = phone.trim().length >= 4
+  const validEmail = /\S+@\S+\.\S+/.test(email.trim())
+  const hasAnyValue = validPhone || validEmail
+  const canSave = hasAnyValue && consent && !saved
+
+  const saveContact = () => {
+    if (!canSave) return
+    if (state.convexRestaurantId) {
+      httpMutation<string | null>('customers:saveContact', {
+        restaurantId: state.convexRestaurantId,
+        tableNumber: state.tableNumber,
+        firstName: state.userName || undefined,
+        avatarIndex: state.userAvatarIndex,
+        marketingConsent: true,
+        ...(validPhone ? { phone: phone.trim() } : {}),
+        ...(validEmail ? { email: email.trim().toLowerCase() } : {}),
+      }).catch(() => {})
     }
-    const t = setTimeout(() => setCountdown(v => v - 1), 1000)
-    return () => clearTimeout(t)
-  }, [countdown, navigate])
+    setSaved(true)
+  }
 
   const selectedMenuItems = state.selectedItems.map(sel => {
     const item = MENU_ITEMS.find(m => m.id === sel.menuItemId)
@@ -184,68 +203,164 @@ export function Confirmation() {
         </div>
       </div>
 
-      {/* Feedback teaser */}
+      {/* CRM optionnel */}
       <div style={{ padding: '14px 20px 0' }}>
-        <button
-          type="button"
-          onClick={() => navigate('/feedback')}
-          style={{
-            width: '100%', padding: 16, borderRadius: 16,
-            border: '1px solid rgba(232,146,10,0.2)', background: '#FFF4E5',
-            display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left',
-          }}
+        <m.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          style={{ background: '#fff', borderRadius: 16, border: '1px solid #E4E4E7', padding: '16px 16px 14px' }}
         >
-          <div style={{
-            width: 38, height: 38, borderRadius: 11, background: '#E8920A',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M9 2L10.9 6.5L16 7.3L12.5 10.7L13.4 15.8L9 13.4L4.6 15.8L5.5 10.7L2 7.3L7.1 6.5L9 2Z" fill="white" />
-            </svg>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0A0A0A', letterSpacing: '-0.005em' }}>
+            Recevoir tes prochaines offres ?
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0A0A0A', letterSpacing: '-0.005em' }}>
-              Comment s'est passée la soirée ?
-            </div>
-            <div style={{ fontSize: 11.5, color: '#52525B', marginTop: 2 }}>
-              Ton avis est <strong style={{ color: '#0A0A0A', fontWeight: 700 }}>100 % privé</strong> · 30 secondes
-            </div>
-            {/* Progress bar */}
-            <div style={{
-              height: 4, borderRadius: 2, background: 'rgba(232,146,10,0.18)',
-              marginTop: 10, overflow: 'hidden',
-            }}>
-              <div style={{
-                height: '100%', background: '#E8920A', borderRadius: 2,
-                width: `${((8 - countdown) / 8) * 100}%`,
-                transition: 'width 1s linear',
-              }} />
-            </div>
-            <div style={{ fontSize: 10.5, color: '#A1A1AA', marginTop: 4, fontStyle: 'italic' }}>
-              Redirection dans {countdown} seconde{countdown > 1 ? 's' : ''}…
-            </div>
+          <div style={{ fontSize: 11.5, color: '#52525B', marginTop: 2 }}>
+            Les bons plans{state.restaurantName ? ` de ${state.restaurantName}` : ''}, sans spam.
           </div>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-            <path d="M6 3L10 8L6 13" stroke="#E8920A" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-        </button>
+
+          {/* Deux champs toujours visibles — téléphone + email */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && canSave) saveContact() }}
+              placeholder="06 12 34 56 78"
+              style={{
+                width: '100%', height: 44, padding: '0 14px', borderRadius: 11,
+                border: '1px solid #E4E4E7', background: '#fff', color: '#0A0A0A',
+                fontSize: 16, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+                transition: 'border-color 0.15s',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#E8920A')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#E4E4E7')}
+            />
+            <input
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && canSave) saveContact() }}
+              placeholder="ton@email.com"
+              style={{
+                width: '100%', height: 44, padding: '0 14px', borderRadius: 11,
+                border: '1px solid #E4E4E7', background: '#fff', color: '#0A0A0A',
+                fontSize: 16, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+                transition: 'border-color 0.15s',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#E8920A')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#E4E4E7')}
+            />
+          </div>
+
+          {/* Consentement unique — apparaît dès qu'un champ contient quelque chose. Jamais pré-coché. */}
+          {(phone.trim() !== '' || email.trim() !== '') && (
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 12, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={e => setConsent(e.target.checked)}
+                style={{ width: 18, height: 18, marginTop: 1, accentColor: '#E8920A', flexShrink: 0, cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: 11.5, color: '#52525B', lineHeight: 1.45 }}>
+                J'accepte de recevoir les offres de{' '}
+                <strong style={{ color: '#0A0A0A', fontWeight: 700 }}>{state.restaurantName || 'ce restaurant'}</strong>.{' '}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  style={{ color: '#E8920A', fontWeight: 600, textDecoration: 'underline' }}
+                >
+                  Politique de confidentialité
+                </a>
+              </span>
+            </label>
+          )}
+
+          {/* Bouton unique Enregistrer → Enregistré ✓ */}
+          <button
+            type="button"
+            onClick={saveContact}
+            disabled={!canSave}
+            style={{
+              width: '100%', height: 44, marginTop: 12, borderRadius: 11, border: 0,
+              background: saved ? '#10B981' : canSave ? '#E8920A' : '#E5E7EB',
+              color: saved || canSave ? '#fff' : '#9CA3AF',
+              fontSize: 14, fontWeight: 700,
+              cursor: canSave ? 'pointer' : 'default',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              transition: 'background 0.15s, color 0.15s',
+            }}
+          >
+            {saved ? (
+              <>
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Enregistré
+              </>
+            ) : 'Enregistrer'}
+          </button>
+
+          {/* Mention */}
+          <div style={{ fontSize: 10.5, color: '#A1A1AA', marginTop: 10, textAlign: 'center' }}>
+            Optionnel · Jamais partagé
+          </div>
+        </m.div>
       </div>
 
-      <div style={{ flex: 1 }} />
+      <div style={{ flex: 1, minHeight: 16 }} />
 
-      <div style={{ padding: '14px 20px', paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))', textAlign: 'center' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <span style={{
-            width: 16, height: 16, borderRadius: 4, background: '#0A0A0A',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 3, gap: 1,
-          }}>
-            <span style={{ flex: 1, height: '100%', background: '#fff', borderRadius: 1 }} />
-            <span style={{ flex: 1, height: '100%', background: '#E8920A', borderRadius: 1 }} />
+      {/* Bloc feedback */}
+      <div style={{ padding: '14px 20px', paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))' }}>
+        <m.button
+          type="button"
+          whileTap={{ scale: 0.985 }}
+          onClick={() => navigate('/feedback')}
+          style={{
+            width: '100%', height: 56, borderRadius: 16, border: 0,
+            background: '#E8920A', color: '#fff',
+            fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em', cursor: 'pointer',
+            boxShadow: '0 10px 28px -8px rgba(232,146,10,0.55), inset 0 0 0 1px rgba(255,255,255,0.12)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
+            <path d="M9 2L10.9 6.5L16 7.3L12.5 10.7L13.4 15.8L9 13.4L4.6 15.8L5.5 10.7L2 7.3L7.1 6.5L9 2Z" fill="white" />
+          </svg>
+          Laisser un avis
+        </m.button>
+        <button
+          type="button"
+          onClick={() => navigate('/feedback/sent')}
+          style={{
+            width: '100%', background: 'transparent', border: 0, color: '#52525B',
+            fontSize: 13.5, fontWeight: 600, cursor: 'pointer', padding: '12px 0 0',
+          }}
+        >
+          Passer
+        </button>
+
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span style={{
+              width: 16, height: 16, borderRadius: 4, background: '#0A0A0A',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 3, gap: 1,
+            }}>
+              <span style={{ flex: 1, height: '100%', background: '#fff', borderRadius: 1 }} />
+              <span style={{ flex: 1, height: '100%', background: '#E8920A', borderRadius: 1 }} />
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#52525B', letterSpacing: '-0.01em' }}>
+              Split<span style={{ color: '#E8920A' }}>zy</span>
+            </span>
           </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#52525B', letterSpacing: '-0.01em' }}>
-            Split<span style={{ color: '#E8920A' }}>zy</span>
-          </span>
-        </span>
+        </div>
+
+        <PrivacyFooterLink />
       </div>
     </m.div>
   )

@@ -9,6 +9,8 @@
  */
 
 import type * as actions_generateInsights from "../actions/generateInsights.js";
+import type * as campaigns from "../campaigns.js";
+import type * as customers from "../customers.js";
 import type * as dependencyStatus from "../dependencyStatus.js";
 import type * as feedbacks from "../feedbacks.js";
 import type * as insights from "../insights.js";
@@ -28,6 +30,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "actions/generateInsights": typeof actions_generateInsights;
+  campaigns: typeof campaigns;
+  customers: typeof customers;
   dependencyStatus: typeof dependencyStatus;
   feedbacks: typeof feedbacks;
   insights: typeof insights;

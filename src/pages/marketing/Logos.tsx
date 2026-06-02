@@ -31,6 +31,7 @@ function LogoWordmark({ logo }: { logo: typeof RESTAURANT_LOGOS[number] }) {
 
 export function Logos() {
   const { ref, inView } = useFadeInView()
+  const prefersReduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   return (
     <section
@@ -76,8 +77,8 @@ export function Logos() {
           <m.div
             className="flex items-center gap-x-12"
             style={{ width: 'max-content' }}
-            animate={{ x: ['0%', '-50%'] }}
-            transition={{ duration: 28, ease: 'linear', repeat: Infinity }}
+            animate={prefersReduced ? {} : { x: ['0%', '-50%'] }}
+            transition={prefersReduced ? {} : { duration: 28, ease: 'linear', repeat: Infinity }}
           >
             {[...RESTAURANT_LOGOS, ...RESTAURANT_LOGOS].map((logo, i) => (
               <div key={i} className="opacity-40 shrink-0">

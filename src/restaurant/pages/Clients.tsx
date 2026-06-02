@@ -1,14 +1,24 @@
 import { useState, useMemo } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
-import { useQuery } from 'convex/react'
+import { toast } from 'sonner'
+import { useQuery, useMutation, useAction } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
-import { useRestaurantId } from '../context/RestaurantContext'
+import type { Id } from '../../../convex/_generated/dataModel'
+import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
-import { Users, Star, TrendingUp, Search, X, Send, Mail, Crown, Sparkles, ChevronRight, Printer, Download } from 'lucide-react'
+import { Users, Star, TrendingUp, Search, X, Send, Mail, Crown, Sparkles, ChevronRight, Printer, Download, Phone, Check } from 'lucide-react'
 
 type Status = 'vip' | 'regulier' | 'nouveau' | 'insatisfait'
 type FilterKey = 'all' | Status
+// Segments ciblables par une campagne email (pas de VIP dédié ici — couvert par "Tous").
+type CampaignSegment = 'all' | 'regulier' | 'nouveau' | 'insatisfait'
+const CAMPAIGN_SEGMENTS: { key: CampaignSegment; label: string }[] = [
+  { key: 'all',         label: 'Tous'         },
+  { key: 'regulier',    label: 'Réguliers'    },
+  { key: 'nouveau',     label: 'Nouveaux'     },
+  { key: 'insatisfait', label: 'Insatisfaits' },
+]
 
 const STATUS_LABEL: Record<Status, string> = {
   vip: 'VIP', regulier: 'Régulier', nouveau: 'Nouveau', insatisfait: 'Insatisfait',
@@ -27,6 +37,9 @@ interface Customer {
   rating: number; status: Status
   phone: string; split: string
   color: string; text: string
+  customerId?: Id<'customers'>; realContact: boolean
+  // Campagne email : id de la row consentante (email + marketingConsent) si éligible.
+  consent: boolean; marketingId?: Id<'customers'>
 }
 
 const IDENTITIES: Record<number, { first: string; last: string; email: string; phone: string; split: string; color: string; text: string }> = {
@@ -49,7 +62,8 @@ function formatTimeAgo(ts: number): string {
   return `il y a ${days}j`
 }
 
-function initials(c: Customer) { return (c.first[0] + c.last[0]).toUpperCase() }
+function initials(c: Customer) { return ((c.first[0] ?? '') + (c.last[0] ?? '')).toUpperCase() }
+function fullName(c: { first: string; last: string }) { return [c.first, c.last].filter(Boolean).join(' ') }
 
 function StarRating({ rating, size = 13 }: { rating: number; size?: number }) {
   return (
@@ -66,7 +80,34 @@ function StarRating({ rating, size = 13 }: { rating: number; size?: number }) {
   )
 }
 
-function CustomerDrawer({ customer, onClose }: { customer: Customer; onClose: () => void }) {
+function CustomerDrawer({ customer, restaurantId, onClose }: { customer: Customer; restaurantId: Id<'restaurants'>; onClose: () => void }) {
+  const updateContact = useMutation(api.customers.updateContact)
+  const [cid, setCid]       = useState<Id<'customers'> | undefined>(customer.customerId)
+  const [phone, setPhone]   = useState(customer.phone ?? '')
+  const [email, setEmail]   = useState(customer.email ?? '')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved]   = useState(false)
+  const dirty = phone !== (customer.phone ?? '') || email !== (customer.email ?? '')
+
+  const saveContact = async () => {
+    setSaving(true)
+    try {
+      const id = await updateContact({
+        customerId: cid,
+        restaurantId,
+        tableNumber: customer.id,
+        firstName: customer.first,
+        phone,
+        email,
+      })
+      setCid(id as Id<'customers'>)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const visits = [
     { date:'27/05', line1:'Table 4 · 2 convives', line2:'Lundi 19h42 · Par article · Pourboire 10%', amount:'54,20€' },
     { date:'18/05', line1:'Table 7 · 4 convives', line2:'Dimanche 13h12 · Parts égales · Pourboire 12%', amount:'42,80€' },
@@ -101,8 +142,9 @@ function CustomerDrawer({ customer, onClose }: { customer: Customer; onClose: ()
               {initials(customer)}
             </div>
             <div>
-              <div className="font-bold text-[16px] ds-text-primary">{customer.first} {customer.last}</div>
-              <div className="text-[12.5px] ds-text-tertiary">{customer.email}</div>
+              <div className="font-bold text-[16px] ds-text-primary">{fullName(customer)}</div>
+              {email && <div className="text-[12.5px] ds-text-tertiary">{email}</div>}
+              {phone && <div className="text-[12.5px] ds-text-tertiary">{phone}</div>}
               <div className="flex items-center gap-2 mt-2">
                 <span
                   className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-[3px] rounded-full"
@@ -121,6 +163,52 @@ function CustomerDrawer({ customer, onClose }: { customer: Customer; onClose: ()
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+          {/* Coordonnées (CRM) */}
+          <div>
+            <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-3">Coordonnées</h4>
+            <div className="rounded-[10px] border p-3.5 space-y-3" style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}>
+              <label className="block">
+                <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] ds-text-tertiary">
+                  <Phone size={11} /> Téléphone
+                </span>
+                <input
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder="06 12 34 56 78"
+                  type="tel"
+                  className="w-full mt-1.5 h-9 px-3 rounded-[8px] border outline-none focus:border-[#E8920A]"
+                  style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                />
+              </label>
+              <label className="block">
+                <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] ds-text-tertiary">
+                  <Mail size={11} /> Email
+                </span>
+                <input
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="client@email.com"
+                  type="email"
+                  className="w-full mt-1.5 h-9 px-3 rounded-[8px] border outline-none focus:border-[#E8920A]"
+                  style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                />
+              </label>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={saveContact}
+                  disabled={saving || !dirty}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[8px] text-[13px] font-semibold text-white disabled:opacity-50"
+                  style={{ background: '#E8920A' }}
+                >
+                  {saved ? <><Check size={13} /> Enregistré</> : saving ? 'Enregistrement…' : 'Enregistrer'}
+                </button>
+                {!customer.realContact && (
+                  <span className="text-[11.5px] ds-text-tertiary">Aucune coordonnée laissée — vous pouvez en ajouter.</span>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Vue rapide */}
           <div>
             <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-3">Vue rapide</h4>
@@ -271,9 +359,19 @@ export function Clients() {
   const [selected, setSelected]     = useState<Customer | null>(null)
   const [emailModal, setEmailModal] = useState(false)
 
+  // Campagne email
+  const [segment, setSegment]           = useState<CampaignSegment>('all')
+  const [subject, setSubject]           = useState('')
+  const [campaignBody, setCampaignBody] = useState('')
+  const [preview, setPreview]           = useState(false)
+  const [sending, setSending]           = useState(false)
+
   const restaurantId = useRestaurantId()
+  const restaurant   = useRestaurant()
+  const sendCampaign = useAction(api.campaigns.sendCampaign)
   const payments  = (useQuery(api.payments.list,  restaurantId ? { restaurantId } : 'skip') ?? []).filter(p => p.status === 'Encaissé')
   const feedbacks =  useQuery(api.feedbacks.list, restaurantId ? { restaurantId } : 'skip') ?? []
+  const crmCustomers = useQuery(api.customers.getByRestaurant, restaurantId ? { restaurantId } : 'skip')
 
   const customers = useMemo<Customer[]>(() => {
     const list: Customer[] = []
@@ -292,26 +390,81 @@ export function Clients() {
       else if (avgRating > 0 && avgRating < 3) status = 'insatisfait'
       else if (visits >= 3) status = 'regulier'
       else status = 'nouveau'
+      // Join CRM : on MERGE toutes les rows customers de cette table (join par
+      // tableNumber, ou par email démo). saveContact peut avoir créé des rows
+      // séparées (phone d'un côté, email de l'autre) — on prend le phone ET
+      // l'email les plus récents non vides (rows triées createdAt desc).
+      const crmRows = (crmCustomers ?? []).filter(cc =>
+        cc.tableNumber === n ||
+        (cc.email && cc.email.toLowerCase() === ident.email.toLowerCase())
+      )
+      const crmEmail     = crmRows.find(r => r.email)?.email
+      const crmPhone     = crmRows.find(r => r.phone)?.phone
+      const crmFirstName = crmRows.find(r => r.firstName)?.firstName
+      const hasCrm = crmRows.length > 0
+      // Éligibilité campagne : row avec email ET marketingConsent actif (RGPD).
+      const consentRow = crmRows.find(r => r.marketingConsent === true && !!r.email)
+      // Nom : prénom réel saisi sur /profile (customers.firstName) en priorité.
+      // Vrai contact sans prénom → "Client anonyme". Aucun contact CRM → identité démo.
+      const first = hasCrm ? (crmFirstName || 'Client') : ident.first
+      const last  = hasCrm ? (crmFirstName ? '' : 'anonyme') : ident.last
       list.push({
         id: n,
-        first: ident.first, last: ident.last, email: ident.email,
+        first, last,
+        // Pour un vrai client : uniquement ses coordonnées réelles (pas de fake démo).
+        email: hasCrm ? (crmEmail ?? '') : ident.email,
         visits, avg, total,
         lastVisit: formatTimeAgo(lastTs),
         lastIso: new Date(lastTs).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }),
         rating: avgRating,
         status,
-        phone: ident.phone, split: ident.split,
+        phone: hasCrm ? (crmPhone ?? '') : ident.phone, split: ident.split,
         color: ident.color, text: ident.text,
+        customerId: crmRows[0]?._id, realContact: hasCrm,
+        consent: !!consentRow, marketingId: consentRow?._id,
       })
     }
     return list.sort((a, b) => b.total - a.total)
-  }, [payments, feedbacks])
+  }, [payments, feedbacks, crmCustomers])
 
   const maxVisits        = Math.max(1, ...customers.map(c => c.visits))
   const regularCount     = customers.filter(c => c.status === 'regulier').length
   const vipCount         = customers.filter(c => c.status === 'vip').length
   const nouveauCount     = customers.filter(c => c.status === 'nouveau').length
   const insatisfaitCount = customers.filter(c => c.status === 'insatisfait').length
+
+  // Destinataires campagne : email renseigné + marketingConsent actif, par segment.
+  const eligibleFor = (seg: CampaignSegment) =>
+    customers.filter(c => (seg === 'all' || c.status === seg) && c.consent && !!c.marketingId)
+  const recipientIds = eligibleFor(segment)
+    .map(c => c.marketingId)
+    .filter((id): id is Id<'customers'> => !!id)
+  const canSendCampaign = !sending && subject.trim() !== '' && campaignBody.trim() !== '' && recipientIds.length > 0
+
+  async function handleSendCampaign() {
+    if (!canSendCampaign || !restaurantId) return
+    setSending(true)
+    try {
+      const res = await sendCampaign({
+        restaurantId,
+        customerIds: recipientIds,
+        subject: subject.trim(),
+        body: campaignBody,
+        restaurantName: restaurant?.name ?? 'le restaurant',
+      })
+      if (res.sent > 0) {
+        toast.success(`${res.sent} email${res.sent > 1 ? 's' : ''} envoyé${res.sent > 1 ? 's' : ''}${res.failed > 0 ? ` · ${res.failed} échec${res.failed > 1 ? 's' : ''}` : ''}`)
+      } else {
+        toast.error(`Aucun email envoyé${res.failed > 0 ? ` (${res.failed} échec${res.failed > 1 ? 's' : ''})` : ''}`)
+      }
+      setEmailModal(false)
+      setSubject(''); setCampaignBody(''); setPreview(false); setSegment('all')
+    } catch {
+      toast.error("Échec de l'envoi de la campagne")
+    } finally {
+      setSending(false)
+    }
+  }
 
   const ratedCustomers = customers.filter(c => c.rating > 0)
   const avgRating = ratedCustomers.length > 0
@@ -441,7 +594,7 @@ export function Clients() {
             <Sparkles size={14} style={{ color: '#E8920A' }} />
           </div>
           <p className="flex-1 text-[13px] ds-text-primary leading-[1.55]">
-            <strong>{customers[0].first} {customers[0].last}</strong> et <strong>{customers[1].first} {customers[1].last}</strong> sont vos meilleurs clients ({customers[0].total.toFixed(0)}€ et {customers[1].total.toFixed(0)}€ dépensés). Lancez une campagne de fidélité ciblée pour maximiser leur rétention.
+            <strong>{fullName(customers[0])}</strong> et <strong>{fullName(customers[1])}</strong> sont vos meilleurs clients ({customers[0].total.toFixed(0)}€ et {customers[1].total.toFixed(0)}€ dépensés). Lancez une campagne de fidélité ciblée pour maximiser leur rétention.
           </p>
           <button className="text-[12px] font-semibold flex-shrink-0 ds-text-accent hover:ds-text-accent-strong transition-colors">
             Créer la campagne →
@@ -532,8 +685,13 @@ export function Clients() {
                     {initials(c)}
                   </div>
                   <div className="min-w-0">
-                    <div className="font-semibold text-[13px] ds-text-primary truncate">{c.first} {c.last}</div>
-                    <div className="text-[11.5px] ds-text-tertiary truncate">{c.email}</div>
+                    <div className="font-semibold text-[13px] ds-text-primary truncate">{fullName(c)}</div>
+                    {c.email && <div className="text-[11.5px] ds-text-tertiary truncate">{c.email}</div>}
+                    {c.realContact && c.phone && (
+                      <div className="flex items-center gap-1 text-[11.5px] ds-text-tertiary truncate">
+                        <Phone size={10} className="flex-shrink-0" />{c.phone}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* Status */}
@@ -594,34 +752,111 @@ export function Clients() {
       <AnimatePresence>
         {emailModal && (
           <m.div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={e => { if (e.target === e.currentTarget) setEmailModal(false) }}>
-            <m.div className="rounded-2xl overflow-hidden w-[400px] max-w-full" style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }} initial={{ scale: 0.95, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 12 }} transition={{ type: 'spring', stiffness: 300, damping: 28 }}>
+            <m.div className="rounded-2xl overflow-hidden w-[460px] max-w-full" style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }} initial={{ scale: 0.95, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 12 }} transition={{ type: 'spring', stiffness: 300, damping: 28 }}>
               <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
                 <span className="font-bold text-[15px] ds-text-primary">Campagne email</span>
                 <button onClick={() => setEmailModal(false)} className="ds-text-tertiary hover:ds-text-primary"><X size={16} /></button>
               </div>
-              <div className="px-5 py-8 flex flex-col items-center gap-3 text-center">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--ds-accent-soft)' }}>
-                  <Mail size={22} style={{ color: '#E8920A' }} />
+              <div className="px-5 py-5 space-y-4 max-h-[68vh] overflow-y-auto">
+                {/* Segment */}
+                <div>
+                  <label className="block text-[11px] font-semibold ds-text-secondary mb-2 uppercase tracking-wide">Cible</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {CAMPAIGN_SEGMENTS.map(s => {
+                      const count = eligibleFor(s.key).length
+                      const active = segment === s.key
+                      return (
+                        <button
+                          key={s.key}
+                          type="button"
+                          onClick={() => setSegment(s.key)}
+                          className="flex items-center justify-between px-3 py-2.5 rounded-xl border text-[13px] font-medium transition-colors"
+                          style={{
+                            borderColor: active ? '#E8920A' : 'var(--ds-border)',
+                            background: active ? 'var(--ds-accent-soft)' : 'var(--ds-bg-surface)',
+                            color: active ? '#B8730A' : 'var(--ds-text-primary)',
+                          }}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span className="w-3.5 h-3.5 rounded-full border flex items-center justify-center" style={{ borderColor: active ? '#E8920A' : 'var(--ds-border-strong)' }}>
+                              {active && <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#E8920A' }} />}
+                            </span>
+                            {s.label}
+                          </span>
+                          <span className="text-[12px] ds-text-tertiary">{count}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <p className="text-[11.5px] ds-text-tertiary mt-2">
+                    {recipientIds.length} client{recipientIds.length > 1 ? 's' : ''} éligible{recipientIds.length > 1 ? 's' : ''} — email renseigné + consentement marketing.
+                  </p>
                 </div>
-                <p className="font-semibold text-[14px] ds-text-primary">Phase 2 — Bientôt disponible</p>
-                <p className="text-[13px] ds-text-secondary leading-[1.6] max-w-[300px]">
-                  Les campagnes email arriveront avec l'intégration Mailgun. Ciblez vos VIP, envoyez des offres personnalisées et mesurez les taux d'ouverture directement depuis Splitzy.
-                </p>
-                <div className="flex flex-wrap gap-2 justify-center mt-1">
-                  {['Segmentation VIP / Réguliers', 'Templates personnalisables', 'Stats ouverture + clics'].map(tag => (
-                    <span key={tag} className="text-[11.5px] px-2.5 py-1 rounded-full border ds-text-secondary" style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}>{tag}</span>
-                  ))}
+
+                {/* Sujet */}
+                <div>
+                  <label className="block text-[11px] font-semibold ds-text-secondary mb-1.5 uppercase tracking-wide">Sujet</label>
+                  <input
+                    value={subject}
+                    onChange={e => setSubject(e.target.value)}
+                    placeholder="Une offre rien que pour vous 🎁"
+                    className="w-full h-10 px-3 rounded-xl border text-[14px] outline-none focus:border-[#E8920A]"
+                    style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
+                  />
                 </div>
+
+                {/* Corps */}
+                <div>
+                  <label className="block text-[11px] font-semibold ds-text-secondary mb-1.5 uppercase tracking-wide">Message</label>
+                  <textarea
+                    value={campaignBody}
+                    onChange={e => setCampaignBody(e.target.value)}
+                    rows={5}
+                    placeholder={"Bonjour,\n\nCette semaine, profitez de…\n\nÀ très vite !"}
+                    className="w-full px-3 py-2.5 rounded-xl border text-[14px] outline-none resize-none leading-[1.6] focus:border-[#E8920A]"
+                    style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
+                  />
+                </div>
+
+                {/* Toggle aperçu */}
+                <button type="button" onClick={() => setPreview(p => !p)} className="text-[13px] font-semibold" style={{ color: '#E8920A' }}>
+                  {preview ? "Masquer l'aperçu" : "Afficher l'aperçu"}
+                </button>
+
+                {preview && (
+                  <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'var(--ds-border)' }}>
+                    <div style={{ background: '#0A0A0A', padding: '16px 18px', color: '#fff', fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>
+                      {restaurant?.name ?? 'Votre restaurant'}
+                    </div>
+                    <div style={{ padding: '16px 18px', color: '#18181B', fontSize: 13.5, lineHeight: 1.65, whiteSpace: 'pre-wrap', background: '#fff' }}>
+                      {campaignBody.trim() || 'Votre message apparaîtra ici.'}
+                    </div>
+                    <div style={{ padding: '12px 18px 16px', borderTop: '1px solid #E5E7EB', color: '#6B7280', fontSize: 11, lineHeight: 1.5, background: '#fff' }}>
+                      Vous recevez cet email car vous avez accepté les offres de {restaurant?.name ?? 'ce restaurant'} via Splitzy.<br />
+                      <span style={{ textDecoration: 'underline' }}>Se désabonner</span>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="px-5 pb-5">
-                <button onClick={() => setEmailModal(false)} className="w-full rounded-xl text-sm font-semibold py-2.5" style={{ background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-secondary)' }}>Fermer</button>
+
+              <div className="px-5 pb-5 pt-1">
+                <button
+                  onClick={handleSendCampaign}
+                  disabled={!canSendCampaign}
+                  className="w-full rounded-xl text-sm font-semibold py-2.5 flex items-center justify-center gap-2 text-white transition-opacity"
+                  style={{ background: '#E8920A', opacity: canSendCampaign ? 1 : 0.5, cursor: canSendCampaign ? 'pointer' : 'not-allowed' }}
+                >
+                  {sending
+                    ? 'Envoi en cours…'
+                    : <><Send size={14} /> Envoyer à {recipientIds.length} client{recipientIds.length > 1 ? 's' : ''}</>}
+                </button>
               </div>
             </m.div>
           </m.div>
         )}
       </AnimatePresence>
 
-      {selected && <CustomerDrawer customer={selected} onClose={() => setSelected(null)} />}
+      {selected && restaurantId && <CustomerDrawer customer={selected} restaurantId={restaurantId} onClose={() => setSelected(null)} />}
     </RestaurantLayout>
   )
 }

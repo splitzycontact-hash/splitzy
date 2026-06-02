@@ -12,15 +12,12 @@ export const fadeInUp = {
 export function useFadeInView(options: { rootMargin?: string; threshold?: number } = {}) {
   const { rootMargin = '0px 0px -10% 0px', threshold = 0.15 } = options
   const ref = useRef<HTMLDivElement>(null)
-  const [inView, setInView] = useState(false)
+  const [inView, setInView] = useState(() => typeof IntersectionObserver === 'undefined')
 
   useEffect(() => {
     const node = ref.current
     if (!node) return
-    if (typeof IntersectionObserver === 'undefined') {
-      setInView(true)
-      return
-    }
+    if (typeof IntersectionObserver === 'undefined') return
     const obs = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -47,6 +44,8 @@ export function useCountUp(
   const [val, setVal] = useState(0)
   useEffect(() => {
     if (!inView) return
+    const prefersReduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (prefersReduced) { setVal(target); return }
     let raf: number
     const start = performance.now()
     const tick = (now: number) => {
