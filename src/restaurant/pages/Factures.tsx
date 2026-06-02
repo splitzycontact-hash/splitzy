@@ -259,7 +259,7 @@ export function Factures() {
   const rawPayments = useQuery(api.payments.list, restaurantId ? { restaurantId } : 'skip')
 
   // Map Convex payments or use demo rows
-  const rows: LocalRow[] = rawPayments && rawPayments.length > 0
+  const rows: LocalRow[] = rawPayments != null
     ? (rawPayments as ConvexPayment[]).map((p, i) => ({
         d: p.dateLabel,
         time: new Date(p.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),

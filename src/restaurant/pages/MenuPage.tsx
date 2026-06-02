@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { AnimatePresence, m } from 'framer-motion'
@@ -519,6 +519,13 @@ export function MenuPage() {
 
   const restaurantId = useRestaurantId()
   const rawItems   = useQuery(api.menuItems.listByRestaurant, restaurantId ? { restaurantId } : 'skip')
+  const rawPayments = useQuery(api.payments.list, restaurantId ? { restaurantId } : 'skip')
+  const ca28 = useMemo(() => {
+    const cutoff = Date.now() - 28 * 24 * 60 * 60 * 1000
+    return ((rawPayments ?? []) as { totalCents: number; createdAt: number; status: string }[])
+      .filter(p => p.status === 'Encaissé' && p.createdAt >= cutoff)
+      .reduce((s, p) => s + p.totalCents, 0) / 100
+  }, [rawPayments])
   const addItemMut = useMutation(api.menuItems.addItem)
   const updateItem = useMutation(api.menuItems.updateItem)
   const deleteItem = useMutation(api.menuItems.deleteItem)
@@ -798,7 +805,7 @@ export function MenuPage() {
         >
           {[
             { icon: Clock,       label: 'Articles disponibles',   value: String(okCount || demoTotal),           sub: hasLive ? `${convexItems.length} au total` : 'données démo', accent: false },
-            { icon: BarChart3,   label: 'CA généré par la carte', value: '3 842€',                               sub: '28 derniers jours', accent: true },
+            { icon: BarChart3,   label: 'CA généré par la carte', value: ca28 > 0 ? `${ca28.toFixed(2).replace('.', ',')}€` : '0€', sub: '28 derniers jours', accent: true },
             { icon: AlertCircle, label: 'Articles en rupture',    value: String(outCount),                       sub: outCount > 0 ? `${outCount} non dispo.` : 'Tous disponibles', error: outCount > 0 },
             { icon: Check,       label: 'Catégories actives',     value: String(hasLive ? displayCategories.filter(c => byCategory[c]?.length).length : DEMO_ITEMS.length), sub: 'dans la carte' },
           ].map((cell, i) => (

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
@@ -19,21 +19,11 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
 
 // Heatmap data: 12 hours × 7 days, intensity 0-5
 const HEAT_HOURS = ['11','12','13','14','15','16','17','18','19','20','21','22']
-const HEAT_DATA = [
-  [0,0,0,0,0,1,1],[2,2,2,3,3,4,3],[3,3,3,3,4,4,3],[1,2,1,2,2,3,2],
-  [0,0,0,0,1,1,1],[0,0,0,0,0,1,0],[0,0,0,0,0,1,1],[1,1,1,1,2,2,1],
-  [2,2,2,3,3,4,2],[3,3,3,3,4,5,3],[2,2,2,3,4,4,2],[1,1,1,2,3,3,1],
-]
 const HEAT_COLORS = ['#F4F4F5','#FFEAC2','#FFCF85','#F5A435','#D9810E','#A8650B']
-const BASKET_TABLES = [
-  { t:'T2', pct:88, amt:'32,40€' }, { t:'T7', pct:76, amt:'28,10€' },
-  { t:'T4', pct:67, amt:'24,80€' }, { t:'T1', pct:61, amt:'22,50€' },
-  { t:'T3', pct:52, amt:'19,30€' }, { t:'T5', pct:42, amt:'15,70€' },
-]
 
 type ConvexPayment = {
   totalCents: number; tipCents: number; subtotalCents: number;
-  createdAt: number; status: string; guests: number
+  createdAt: number; status: string; guests: number; tableNumber: number
 }
 
 function Sparkline({ path, color = '#E8920A' }: { path: string; color?: string }) {
@@ -59,6 +49,119 @@ function formatRel(ts: number): string {
   if (h < 1) return "il y a moins d'1h"
   if (h < 24) return `il y a ${h}h`
   const d = Math.floor(h / 24); return `il y a ${d}j`
+}
+
+function buildChartDays(
+  pmts: ConvexPayment[],
+  periodKey: PeriodKey,
+  windowStart: number,
+  windowEnd: number,
+): Array<{ day: string; total: number }> {
+  if (periodKey === 'today') {
+    const slots: Array<{ day: string; total: number }> = []
+    const keyToIdx = new Map<string, number>()
+    for (let h = 11; h <= 23; h++) {
+      const key = `${String(h).padStart(2, '0')}h`
+      keyToIdx.set(key, slots.length)
+      slots.push({ day: key, total: 0 })
+    }
+    pmts.forEach(p => {
+      const h = new Date(p.createdAt).getHours()
+      const key = `${String(h).padStart(2, '0')}h`
+      const idx = keyToIdx.get(key)
+      if (idx !== undefined) slots[idx].total += p.totalCents / 100
+    })
+    return slots
+  }
+  if (periodKey === 'week') {
+    const slots: Array<{ day: string; total: number }> = []
+    const keyToIdx = new Map<string, number>()
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(windowStart + i * 86400000)
+      const key = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+      keyToIdx.set(key, slots.length)
+      slots.push({ day: key, total: 0 })
+    }
+    pmts.forEach(p => {
+      const d = new Date(p.createdAt)
+      const key = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+      const idx = keyToIdx.get(key)
+      if (idx !== undefined) slots[idx].total += p.totalCents / 100
+    })
+    return slots
+  }
+  if (periodKey === 'month') {
+    const slots: Array<{ day: string; total: number }> = []
+    const keyToIdx = new Map<string, number>()
+    let cursor = windowStart
+    while (cursor <= windowEnd) {
+      const d = new Date(cursor)
+      const key = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+      keyToIdx.set(key, slots.length)
+      slots.push({ day: key, total: 0 })
+      cursor += 86400000
+    }
+    pmts.forEach(p => {
+      const d = new Date(p.createdAt)
+      const key = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+      const idx = keyToIdx.get(key)
+      if (idx !== undefined) slots[idx].total += p.totalCents / 100
+    })
+    return slots
+  }
+  if (periodKey === 'year') {
+    const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+    const lastMonth = new Date(windowEnd).getMonth()
+    const slots: Array<{ day: string; total: number }> = []
+    for (let m = 0; m <= lastMonth; m++) {
+      slots.push({ day: months[m], total: 0 })
+    }
+    pmts.forEach(p => {
+      const m = new Date(p.createdAt).getMonth()
+      if (m <= lastMonth) slots[m].total += p.totalCents / 100
+    })
+    return slots
+  }
+  // custom: pre-fill every day in the window, then inject payments
+  const slots: Array<{ day: string; total: number }> = []
+  const keyToIdx = new Map<string, number>()
+  let cursor = windowStart
+  while (cursor <= windowEnd) {
+    const d = new Date(cursor)
+    const key = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+    keyToIdx.set(key, slots.length)
+    slots.push({ day: key, total: 0 })
+    cursor += 86400000
+  }
+  pmts.forEach(p => {
+    const d = new Date(p.createdAt)
+    const key = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+    const idx = keyToIdx.get(key)
+    if (idx !== undefined) slots[idx].total += p.totalCents / 100
+  })
+  return slots
+}
+
+function smoothLinePath(pts: { x: number; y: number }[]): string {
+  if (pts.length === 0) return ''
+  if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`
+  let d = `M ${pts[0].x} ${pts[0].y}`
+  for (let i = 1; i < pts.length; i++) {
+    const tension = 0.35
+    const cp1x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) * tension
+    const cp1y = pts[i - 1].y
+    const cp2x = pts[i].x - (pts[i].x - pts[i - 1].x) * tension
+    const cp2y = pts[i].y
+    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${pts[i].x} ${pts[i].y}`
+  }
+  return d
+}
+
+function smoothAreaPath(pts: { x: number; y: number }[], baseY: number): string {
+  if (pts.length === 0) return ''
+  return `M ${pts[0].x} ${baseY} L ${pts[0].x} ${pts[0].y}` +
+    smoothLinePath(pts).replace(/^M [0-9.]+ [0-9.]+/, '') +
+    ` L ${pts[pts.length - 1].x} ${baseY} Z`
 }
 
 function AnalyticsInsightCard({ insight }: { insight: Insight }) {
@@ -133,13 +236,16 @@ export function Analytics() {
   const [period, setPeriod]           = useState<PeriodKey>('month')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd]     = useState('')
+  const [hovered, setHovered]         = useState<{ x: number; y: number; day: string; total: number } | null>(null)
   const restaurantId   = useRestaurantId()
   const restaurant     = useRestaurant()
   const rawPayments    = useQuery(api.payments.list,              restaurantId ? { restaurantId } : 'skip')
+  const rawFeedbacks   = useQuery(api.feedbacks.list,             restaurantId ? { restaurantId } : 'skip')
   const latestInsights = useQuery(api.insights.getLatestInsights, restaurantId ? { restaurantId } : 'skip')
   const isPro          = restaurant?.plan === 'pro'
 
   const payments = (rawPayments ?? []) as ConvexPayment[]
+  const allFeedbacks = (rawFeedbacks ?? []) as { stars: number }[]
 
   const now = new Date()
   const periodStart: number = (() => {
@@ -172,13 +278,192 @@ export function Analytics() {
 
   const filtered = payments.filter(p => p.createdAt >= periodStart && p.createdAt <= periodEnd)
   const encaisse = filtered.filter(p => p.status === 'Encaissé')
+
+  const now28 = Date.now() - 28 * 24 * 60 * 60 * 1000
+  const allEncaisse = payments.filter(p => p.status === 'Encaissé')
+  const last28 = allEncaisse.filter(p => p.createdAt >= now28)
+
+  const basketByTable = useMemo(() => {
+    if (last28.length === 0) return []
+    const map: Record<number, { sum: number; count: number }> = {}
+    for (const p of last28) {
+      if (!map[p.tableNumber]) map[p.tableNumber] = { sum: 0, count: 0 }
+      map[p.tableNumber].sum += p.subtotalCents
+      map[p.tableNumber].count++
+    }
+    const rows = Object.entries(map)
+      .map(([t, { sum, count }]) => ({ t: `T${t}`, avg: sum / count / 100 }))
+      .sort((a, b) => b.avg - a.avg).slice(0, 6)
+    const maxAvg = rows[0]?.avg ?? 1
+    return rows.map(r => ({ t: r.t, pct: Math.round((r.avg / maxAvg) * 100), amt: `${r.avg.toFixed(2).replace('.', ',')}€` }))
+  }, [last28])
+
+  const heatData = useMemo(() => {
+    const grid: number[][] = Array.from({ length: 12 }, () => Array(7).fill(0))
+    const toDay = (d: number) => d === 0 ? 6 : d - 1
+    for (const p of last28) {
+      const d = new Date(p.createdAt)
+      const hi = d.getHours() - 11
+      if (hi >= 0 && hi <= 11) grid[hi][toDay(d.getDay())]++
+    }
+    const mx = Math.max(...grid.flat(), 1)
+    return grid.map(row => row.map(v => Math.round((v / mx) * 5)))
+  }, [last28])
+
+  const pctTip = encaisse.length > 0 ? Math.round(encaisse.filter(p => p.tipCents > 0).length / encaisse.length * 100) : 0
+  const sortedTip = encaisse.map(p => p.subtotalCents > 0 ? p.tipCents / p.subtotalCents * 100 : 0).sort((a, b) => a - b)
+  const medianTip = sortedTip.length > 0 ? sortedTip[Math.floor(sortedTip.length / 2)].toFixed(0) : '0'
+  const tipByTable: Record<number, { tips: number; sub: number }> = {}
+  for (const p of encaisse) {
+    if (!tipByTable[p.tableNumber]) tipByTable[p.tableNumber] = { tips: 0, sub: 0 }
+    tipByTable[p.tableNumber].tips += p.tipCents
+    tipByTable[p.tableNumber].sub += p.subtotalCents
+  }
+  const bestT = Object.entries(tipByTable).filter(([, { sub }]) => sub > 0).map(([t, { tips, sub }]) => ({ t, pct: tips / sub * 100 })).sort((a, b) => b.pct - a.pct)[0]
+  const bestTableLabel = bestT ? `T${bestT.t} · ${bestT.pct.toFixed(0)}%` : '—'
+
+  // Période précédente (pour fallback graphique quand période courante vide)
+  const prevPeriodRange = (() => {
+    if (period === 'today') {
+      const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+      const yStart = yd.getTime(), yEnd = yd.getTime() + 86399999
+      const yData = payments.filter(p => p.createdAt >= yStart && p.createdAt <= yEnd && p.status === 'Encaissé')
+      if (yData.length > 0) return { start: yStart, end: yEnd }
+      const wd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
+      return { start: wd.getTime(), end: wd.getTime() + 86399999 }
+    }
+    if (period === 'week') return { start: periodStart - 7 * 86400000, end: periodStart - 1 }
+    if (period === 'month') {
+      const s = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime()
+      return { start: s, end: periodStart - 1 }
+    }
+    if (period === 'year') {
+      const s = new Date(now.getFullYear() - 1, 0, 1).getTime()
+      return { start: s, end: new Date(now.getFullYear(), 0, 1).getTime() - 1 }
+    }
+    return { start: 0, end: 0 }
+  })()
+
+  const prevEncaisse = payments
+    .filter(p => p.createdAt >= prevPeriodRange.start && p.createdAt <= prevPeriodRange.end && p.status === 'Encaissé') as ConvexPayment[]
+
+  const currentChartDays = buildChartDays(encaisse, period, periodStart, periodEnd)
+  const fallbackChartDays = buildChartDays(prevEncaisse, period, prevPeriodRange.start, prevPeriodRange.end)
+  const isShowingPrev = currentChartDays.length === 0 && fallbackChartDays.length > 0
+  const chartDays = isShowingPrev ? fallbackChartDays : currentChartDays
+  const chartMax = Math.max(...chartDays.map(d => d.total), 1)
+  const chartPic = chartDays.reduce((m, d) => d.total > m.total ? d : m, { day: '—', total: 0 })
+  const chartAvg = chartDays.length > 0 ? chartDays.reduce((s, d) => s + d.total, 0) / chartDays.length : 0
+  const chartPts = chartDays.map((d, i) => ({
+    x: Math.round(40 + (i / Math.max(chartDays.length - 1, 1)) * 860),
+    y: Math.round(210 - (d.total / chartMax) * 170),
+  }))
+  const chartLinePath = smoothLinePath(chartPts)
+  const chartAreaPath = smoothAreaPath(chartPts, 210)
+  const MONTH_NAMES_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
+  const MONTH_NAMES_SHORT = ['Jan.','Fév.','Mars','Avr.','Mai','Juin','Juil.','Août','Sep.','Oct.','Nov.','Déc.']
+
+  const prevPeriodLabel = (() => {
+    if (period === 'today') {
+      const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+      const yStart = yd.getTime()
+      const hasYesterday = payments.some(p => p.createdAt >= yStart && p.createdAt <= yStart + 86399999 && p.status === 'Encaissé')
+      return hasYesterday ? 'hier' : 'il y a 7 jours'
+    }
+    if (period === 'week') return 'la semaine précédente'
+    if (period === 'month') return MONTH_NAMES_FR[now.getMonth() === 0 ? 11 : now.getMonth() - 1]
+    if (period === 'year') return String(now.getFullYear() - 1)
+    return 'la période précédente'
+  })()
+
+  const prevPeriodLabelShort = (() => {
+    if (period === 'today') {
+      const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+      const yStart = yd.getTime()
+      const hasYesterday = payments.some(p => p.createdAt >= yStart && p.createdAt <= yStart + 86399999 && p.status === 'Encaissé')
+      return hasYesterday ? 'Hier' : 'Il y a 7j'
+    }
+    if (period === 'week') return 'Sem. préc.'
+    if (period === 'month') return MONTH_NAMES_SHORT[now.getMonth() === 0 ? 11 : now.getMonth() - 1]
+    if (period === 'year') return String(now.getFullYear() - 1)
+    return 'Préc.'
+  })()
+
+  const currentPeriodLabel = (() => {
+    if (period === 'today') return "Aujourd'hui"
+    if (period === 'week') return 'Cette semaine'
+    if (period === 'month') return MONTH_NAMES_SHORT[now.getMonth()]
+    if (period === 'year') return String(now.getFullYear())
+    if (period === 'custom' && customStart && customEnd) return `${customStart} — ${customEnd}`
+    return 'Période'
+  })()
+
+  const chartSubtitle = (() => {
+    if (isShowingPrev) return `Pas encore de données — affichage de ${prevPeriodLabel}`
+    if (period === 'today') return "Comparaison aujourd'hui vs. hier"
+    if (period === 'week') return 'Comparaison cette semaine vs. semaine précédente'
+    if (period === 'month') {
+      const curr = MONTH_NAMES_FR[now.getMonth()]
+      const prev = MONTH_NAMES_FR[now.getMonth() === 0 ? 11 : now.getMonth() - 1]
+      return `Comparaison ce mois (${curr}) vs. mois précédent (${prev})`
+    }
+    if (period === 'year') return `Comparaison ${now.getFullYear()} vs. ${now.getFullYear() - 1}`
+    return 'Évolution de la période sélectionnée'
+  })()
+  const tooltipX = hovered ? Math.min(Math.max(hovered.x, 50), 870) : 0
+  const tooltipY = hovered ? Math.max(hovered.y - 42, 8) : 0
+
   const weekTotal = encaisse.reduce((s, p) => s + p.totalCents, 0)
   const tipsTotal = encaisse.reduce((s, p) => s + p.tipCents, 0)
   const totalTickets = encaisse.length
   const avgBasket = totalTickets > 0
     ? encaisse.reduce((s, p) => s + p.subtotalCents, 0) / totalTickets / 100
-    : 20.66
-  const avgTipPct = weekTotal > 0 ? ((tipsTotal / (weekTotal - tipsTotal)) * 100).toFixed(1) : '9,8'
+    : 0
+  const avgTipPct = weekTotal > 0 ? ((tipsTotal / (weekTotal - tipsTotal)) * 100).toFixed(1) : '0'
+
+  const peakSlot = useMemo(() => {
+    if (!last28.length) return null
+    let mx = 0, bh = 0, bd = 0
+    for (let h = 0; h < 12; h++) for (let d = 0; d < 7; d++) if (heatData[h][d] > mx) { mx = heatData[h][d]; bh = h; bd = d }
+    return ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'][bd] + ' ' + (11 + bh) + '-' + (12 + bh) + 'h'
+  }, [heatData, last28.length])
+
+  const tipWkly = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+    const e = Date.now() - (11 - i) * 604800000, s = e - 604800000
+    const w = allEncaisse.filter(p => p.createdAt >= s && p.createdAt < e)
+    const sub = w.reduce((a, p) => a + p.subtotalCents, 0)
+    return sub > 0 ? w.reduce((a, p) => a + p.tipCents, 0) / sub * 100 : 0
+  }), [allEncaisse])
+  const twMax = Math.max(...tipWkly, 0.1)
+  const twPath = tipWkly.map((v, i) => (i ? 'L' : 'M') + (i / 11 * 300).toFixed(1) + ' ' + (65 - v / twMax * 55).toFixed(1)).join(' ')
+
+  const tipVsBase = tipsTotal > 0 ? Math.round((parseFloat(avgTipPct) - 6.2) / 6.2 * 100) : 0
+
+  const moSince = Math.max(1, Math.round((Date.now() - new Date('2025-10-01').getTime()) / (30.5 * 86400000)))
+  const invest = moSince * 99
+  const aSub = allEncaisse.reduce((s, p) => s + p.subtotalCents, 0)
+  const aTips = allEncaisse.reduce((s, p) => s + p.tipCents, 0)
+  const aTot = allEncaisse.reduce((s, p) => s + p.totalCents, 0)
+  const extraTip = Math.max(0, aTips - aSub * 0.062) / 100
+  const rotGain = aTot * 0.10 / 100
+  const posAvis = allFeedbacks.filter(f => f.stars >= 4).length
+  const googGain = posAvis * 30
+  const roi = extraTip + rotGain + googGain
+  const roiMult = invest > 0 && roi > 0 ? (roi / invest).toFixed(1) : '0'
+  const fmtR = (n: number) => Math.round(n).toLocaleString('fr-FR') + '€'
+
+  const prevWeekTotal    = prevEncaisse.reduce((s, p) => s + p.totalCents, 0)
+  const prevTotalTickets = prevEncaisse.length
+  const prevAvgBasket    = prevTotalTickets > 0
+    ? prevEncaisse.reduce((s, p) => s + p.subtotalCents, 0) / prevTotalTickets / 100
+    : 0
+  const caDelta = prevWeekTotal > 0
+    ? ((weekTotal - prevWeekTotal) / prevWeekTotal * 100)
+    : null
+  const ticketsDelta = prevTotalTickets > 0 ? (totalTickets - prevTotalTickets) : null
+  const basketDelta  = prevAvgBasket > 0
+    ? ((avgBasket - prevAvgBasket) / prevAvgBasket * 100)
+    : null
 
   return (
     <RestaurantLayout>
@@ -265,22 +550,28 @@ export function Analytics() {
           {[
             {
               label: 'CA encaissé', accent: true,
-              value: weekTotal > 0 ? formatEur(weekTotal) : '3 842,60€',
-              delta: '+18,4%', up: true, vs: 'vs. 3 245€',
+              value: formatEur(weekTotal),
+              delta: caDelta !== null ? `${caDelta > 0 ? '+' : ''}${caDelta.toFixed(1)}%` : '—',
+              up: caDelta !== null ? caDelta >= 0 : true,
+              vs: prevWeekTotal > 0 ? `vs. ${formatEur(prevWeekTotal)}` : '',
               spark: 'M0 16 L8 14 L16 17 L24 11 L32 13 L40 8 L48 9 L60 4',
               sparkColor: '#E8920A',
             },
             {
               label: 'Tickets payés', accent: false,
-              value: totalTickets > 0 ? String(totalTickets) : '186',
-              delta: '+12 tickets', up: true, vs: 'vs. 174',
+              value: String(totalTickets),
+              delta: ticketsDelta !== null ? `${ticketsDelta > 0 ? '+' : ''}${ticketsDelta} tickets` : '—',
+              up: ticketsDelta !== null ? ticketsDelta >= 0 : true,
+              vs: prevTotalTickets > 0 ? `vs. ${prevTotalTickets}` : '',
               spark: 'M0 14 L8 16 L16 13 L24 14 L32 11 L40 12 L48 8 L60 9',
               sparkColor: 'var(--ds-text-primary)',
             },
             {
               label: 'Panier moyen', accent: false,
-              value: avgBasket > 0 ? `${avgBasket.toFixed(2).replace('.', ',')}€` : '20,66€',
-              delta: '+5,7%', up: true, vs: 'vs. 19,55€',
+              value: totalTickets > 0 ? `${avgBasket.toFixed(2).replace('.', ',')}€` : '—',
+              delta: basketDelta !== null ? `${basketDelta > 0 ? '+' : ''}${basketDelta.toFixed(1)}%` : '—',
+              up: basketDelta !== null ? basketDelta >= 0 : true,
+              vs: prevAvgBasket > 0 ? `vs. ${prevAvgBasket.toFixed(2).replace('.', ',')}€` : '',
               spark: 'M0 12 L8 15 L16 11 L24 13 L32 9 L40 11 L48 7 L60 8',
               sparkColor: 'var(--ds-text-primary)',
             },
@@ -333,78 +624,146 @@ export function Analytics() {
                 Évolution du chiffre d'affaires
               </div>
               <div className="text-[12px] ds-text-tertiary mt-0.5">
-                Comparaison ce mois (mai) vs. mois précédent (avril)
+                {chartSubtitle}
               </div>
             </div>
             <div className="flex items-center gap-4 text-[12px] ds-text-secondary flex-shrink-0">
               {/* Chart stats */}
               <div className="hidden md:flex items-center gap-6">
-                <div><div className="text-[10.5px] ds-text-tertiary uppercase tracking-[0.07em]">Pic</div><div className="font-semibold text-[13px] ds-text-primary">312€ <span className="text-[11px] ds-text-tertiary font-normal">· Sam. 17 mai</span></div></div>
-                <div><div className="text-[10.5px] ds-text-tertiary uppercase tracking-[0.07em]">Jour moyen</div><div className="font-semibold text-[13px] ds-text-primary">137,24€</div></div>
+                <div><div className="text-[10.5px] ds-text-tertiary uppercase tracking-[0.07em]">Pic</div><div className="font-semibold text-[13px] ds-text-primary">{chartPic.total.toFixed(2)}€ <span className="text-[11px] ds-text-tertiary font-normal">· {chartPic.day}</span></div></div>
+                <div><div className="text-[10.5px] ds-text-tertiary uppercase tracking-[0.07em]">Jour moyen</div><div className="font-semibold text-[13px] ds-text-primary">{chartAvg.toFixed(2)}€</div></div>
                 <div><div className="text-[10.5px] ds-text-tertiary uppercase tracking-[0.07em]">Tendance</div><div className="font-semibold text-[13px]" style={{ color: 'var(--ds-success-strong)' }}>+18,4%</div></div>
               </div>
               {/* Legend */}
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-4 h-[2px] rounded-full inline-block" style={{ background: '#E8920A' }} />
-                  <span className="text-[11.5px] ds-text-secondary">Ce mois</span>
+                  <span className="w-4 h-[2px] rounded-full inline-block" style={{ background: isShowingPrev ? '#A1A1AA' : '#E8920A' }} />
+                  <span className="text-[11.5px] ds-text-secondary">
+                    {isShowingPrev ? prevPeriodLabelShort : currentPeriodLabel}
+                  </span>
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-4 h-[2px] rounded-full inline-block" style={{ background: '#A1A1AA', borderTop: '1px dashed #A1A1AA', display: 'block', height: 0 }} />
-                  <span className="text-[11.5px] ds-text-secondary">Avril</span>
-                </span>
+                {isShowingPrev && (
+                  <span
+                    className="text-[11px] font-medium px-2 py-[2px] rounded-full"
+                    style={{ background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-tertiary)' }}
+                  >
+                    Période précédente
+                  </span>
+                )}
               </div>
             </div>
           </div>
           <div className="p-5 pb-2">
-            <svg viewBox="0 0 920 260" preserveAspectRatio="none" style={{ width: '100%', height: '220px', display: 'block' }}>
+            <svg
+              viewBox="0 0 920 260"
+              preserveAspectRatio="none"
+              style={{ width: '100%', height: '220px', display: 'block' }}
+              onMouseLeave={() => setHovered(null)}
+            >
               <defs>
                 <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#E8920A" stopOpacity="0.18" />
                   <stop offset="100%" stopColor="#E8920A" stopOpacity="0" />
                 </linearGradient>
+                <linearGradient id="chartFillPrev" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#71717A" stopOpacity="0.10" />
+                  <stop offset="100%" stopColor="#71717A" stopOpacity="0" />
+                </linearGradient>
                 <pattern id="analyticsGrid" width="40" height="40" patternUnits="userSpaceOnUse">
                   <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--ds-bg-subtle)" strokeWidth="1" />
                 </pattern>
+                <filter id="lineGlow">
+                  <feGaussianBlur stdDeviation="2" result="blur"/>
+                  <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
               </defs>
-              {/* Grid */}
               <rect width="920" height="220" y="10" fill="url(#analyticsGrid)" />
-              {/* Y-axis labels */}
-              <g fontFamily="Inter" fontSize="10.5" fill="var(--ds-text-tertiary)">
-                <text x="8" y="22">320€</text>
-                <text x="8" y="70">240€</text>
-                <text x="8" y="118">160€</text>
-                <text x="8" y="166">80€</text>
-                <text x="8" y="214">0€</text>
-              </g>
-              {/* Baseline */}
-              <line x1="46" y1="210" x2="920" y2="210" stroke="var(--ds-border)" strokeWidth="1" />
-              {/* Previous month dashed */}
-              <path d="M50 178 L80 168 L110 175 L140 158 L170 162 L200 148 L230 152 L260 138 L290 145 L320 130 L350 138 L380 122 L410 135 L440 118 L470 128 L500 110 L530 122 L560 105 L590 118 L620 100 L650 112 L680 96 L710 108 L740 92 L770 104 L800 90 L830 95 L860 88 L890 92 L910 90"
-                stroke="#A1A1AA" strokeWidth="1.5" fill="none" strokeDasharray="4 4" strokeLinecap="round" />
-              {/* Current month area */}
-              <path d="M50 188 L80 175 L110 165 L140 170 L170 142 L200 152 L230 132 L260 140 L290 118 L320 125 L350 95 L380 110 L410 85 L440 100 L470 72 L500 88 L530 60 L560 75 L590 50 L620 65 L650 38 L680 55 L710 30 L740 48 L770 25 L800 42 L830 18 L860 35 L890 28 L910 22 L910 210 L50 210 Z"
-                fill="url(#chartFill)" />
-              {/* Current month line */}
-              <path d="M50 188 L80 175 L110 165 L140 170 L170 142 L200 152 L230 132 L260 140 L290 118 L320 125 L350 95 L380 110 L410 85 L440 100 L470 72 L500 88 L530 60 L560 75 L590 50 L620 65 L650 38 L680 55 L710 30 L740 48 L770 25 L800 42 L830 18 L860 35 L890 28 L910 22"
-                stroke="#E8920A" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              {/* Peak marker */}
-              <circle cx="830" cy="18" r="4.5" fill="white" stroke="#E8920A" strokeWidth="2" />
-              <line x1="830" y1="22" x2="830" y2="210" stroke="#E8920A" strokeWidth="1" strokeDasharray="2 3" opacity="0.5" />
-              {/* Today indicator */}
-              <line x1="910" y1="10" x2="910" y2="210" stroke="var(--ds-text-primary)" strokeWidth="1" strokeDasharray="2 3" opacity="0.2" />
-              <text x="900" y="9" fontFamily="monospace" fontSize="9" fill="var(--ds-text-primary)" textAnchor="end" letterSpacing="0.04em" opacity="0.5">AUJ.</text>
-              {/* X-axis labels */}
-              <g fontFamily="Inter" fontSize="10" fill="var(--ds-text-tertiary)">
-                <text x="50" y="232" textAnchor="middle">1</text>
-                <text x="200" y="232" textAnchor="middle">5</text>
-                <text x="350" y="232" textAnchor="middle">10</text>
-                <text x="500" y="232" textAnchor="middle">15</text>
-                <text x="650" y="232" textAnchor="middle">20</text>
-                <text x="800" y="232" textAnchor="middle">25</text>
-                <text x="910" y="232" textAnchor="middle">29</text>
-              </g>
-              <text x="465" y="252" textAnchor="middle" fontFamily="Inter" fontSize="10.5" fill="var(--ds-text-tertiary)" letterSpacing="0.08em" fontWeight="600">MAI 2026</text>
+              {chartDays.length > 0 && (
+                <g fontFamily="Inter" fontSize="10.5" fill="var(--ds-text-tertiary)">
+                  {[1, 0.75, 0.5, 0.25, 0].map((f, i) => {
+                    const val = chartMax * f
+                    const y = Math.round(210 - f * 170) + 4
+                    const label = val >= 1000 ? `${(val / 1000).toFixed(1)}k€` : `${Math.round(val)}€`
+                    return <text key={i} x="8" y={y}>{label}</text>
+                  })}
+                </g>
+              )}
+              <line x1="40" y1="210" x2="900" y2="210" stroke="var(--ds-border)" strokeWidth="1" />
+              {chartDays.length === 0 ? (
+                <g>
+                  <circle cx="460" cy="105" r="28" fill="var(--ds-bg-subtle)" />
+                  <text x="460" y="101" textAnchor="middle" fontFamily="Inter" fontSize="18" fill="var(--ds-border-strong)">📊</text>
+                  <text x="460" y="130" textAnchor="middle" fontFamily="Inter" fontSize="13" fontWeight="600" fill="var(--ds-text-secondary)">
+                    Aucune donnée pour cette période
+                  </text>
+                  <text x="460" y="148" textAnchor="middle" fontFamily="Inter" fontSize="11" fill="var(--ds-text-tertiary)">
+                    Les données apparaîtront au fil des paiements
+                  </text>
+                </g>
+              ) : (
+                <>
+                  <path d={chartAreaPath} fill={isShowingPrev ? 'url(#chartFillPrev)' : 'url(#chartFill)'} />
+                  <path
+                    d={chartLinePath}
+                    stroke={isShowingPrev ? '#71717A' : '#E8920A'}
+                    strokeWidth={isShowingPrev ? 1.8 : 2.5}
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray={isShowingPrev ? '6 3' : undefined}
+                    filter={isShowingPrev ? undefined : 'url(#lineGlow)'}
+                  />
+                  {chartPts.map((pt, i) => (
+                    <circle
+                      key={`dot-${i}`}
+                      cx={pt.x} cy={pt.y} r="3"
+                      fill={isShowingPrev ? '#52525B' : '#E8920A'}
+                      opacity="0.6"
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  ))}
+                  {chartPts.map((pt, i) => (
+                    <circle
+                      key={`hover-${i}`}
+                      cx={pt.x} cy={pt.y} r="12"
+                      fill="transparent"
+                      onMouseEnter={() => setHovered({ x: pt.x, y: pt.y, day: chartDays[i].day, total: chartDays[i].total })}
+                    />
+                  ))}
+                  {hovered && (
+                    <>
+                      <circle cx={hovered.x} cy={hovered.y} r="5" fill="white" stroke={isShowingPrev ? '#71717A' : '#E8920A'} strokeWidth="2.5" />
+                      <line x1={hovered.x} y1={hovered.y + 7} x2={hovered.x} y2="210"
+                        stroke={isShowingPrev ? '#71717A' : '#E8920A'} strokeWidth="1" strokeDasharray="3 3" opacity="0.4" />
+                      <rect x={tooltipX - 44} y={tooltipY} width="88" height="36" rx="8"
+                        fill="#18181B" stroke={isShowingPrev ? '#3F3F46' : '#E8920A'} strokeWidth="1" opacity="0.95" />
+                      <text x={tooltipX} y={tooltipY + 14} textAnchor="middle"
+                        fontFamily="Inter" fontSize="12" fontWeight="700"
+                        fill={isShowingPrev ? '#A1A1AA' : '#E8920A'}>
+                        {hovered.total.toFixed(2)}€
+                      </text>
+                      <text x={tooltipX} y={tooltipY + 27} textAnchor="middle"
+                        fontFamily="Inter" fontSize="10" fill="#71717A">
+                        {hovered.day}
+                      </text>
+                    </>
+                  )}
+                  <g fontFamily="Inter" fontSize="10" fill="var(--ds-text-tertiary)">
+                    {chartPts.map((pt, i) => {
+                      const step = Math.max(1, Math.ceil(chartDays.length / 7))
+                      if (i % step !== 0 && i !== chartPts.length - 1) return null
+                      return (
+                        <text key={i} x={pt.x} y="232" textAnchor="middle">
+                          {chartDays[i].day.split('/')[0]}
+                        </text>
+                      )
+                    })}
+                  </g>
+                </>
+              )}
             </svg>
           </div>
         </div>
@@ -424,7 +783,7 @@ export function Analytics() {
               </button>
             </div>
             <div className="px-5 py-4 space-y-2.5">
-              {BASKET_TABLES.map(row => (
+              {basketByTable.length > 0 ? basketByTable.map(row => (
                 <div key={row.t} className="flex items-center gap-3">
                   <span
                     className="font-bold text-[11.5px] w-7 text-center rounded-[5px] py-[2px] flex-shrink-0"
@@ -440,7 +799,7 @@ export function Analytics() {
                   </div>
                   <span className="font-semibold text-[13px] ds-text-primary tabular-nums w-14 text-right">{row.amt}</span>
                 </div>
-              ))}
+              )) : <div className="text-[12px] ds-text-tertiary py-4 text-center">Aucune donnée</div>}
             </div>
             <div
               className="flex items-center justify-between px-5 py-3 border-t text-[12.5px]"
@@ -448,7 +807,7 @@ export function Analytics() {
             >
               <span className="ds-text-secondary">Panier moyen restaurant</span>
               <span className="font-semibold ds-text-primary tabular-nums">
-                {avgBasket > 0 ? `${avgBasket.toFixed(2).replace('.', ',')}€` : '20,66€'}
+                {avgBasket > 0 ? `${avgBasket.toFixed(2).replace('.', ',')}€` : '—'}
                 <span className="ml-1.5 text-[11.5px] font-semibold" style={{ color: 'var(--ds-success-strong)' }}>+5,7%</span>
               </span>
             </div>
@@ -466,7 +825,7 @@ export function Analytics() {
                 style={{ color: 'var(--ds-warning)' }}
               >
                 <span className="w-2 h-2 rounded-full inline-block" style={{ background: 'var(--ds-warning)' }} />
-                Sam. 20-21h
+                {peakSlot ?? '—'}
               </span>
             </div>
             <div className="px-4 pt-3 pb-2">
@@ -490,8 +849,8 @@ export function Analytics() {
                         className="rounded-[2px]"
                         style={{
                           height: '18px',
-                          background: HEAT_COLORS[HEAT_DATA[hi][di]] ?? '#F4F4F5',
-                          border: HEAT_DATA[hi][di] === 5 ? '1px solid rgba(168,101,11,0.4)' : 'none',
+                          background: HEAT_COLORS[heatData[hi][di]] ?? '#F4F4F5',
+                          border: heatData[hi][di] === 5 ? '1px solid rgba(168,101,11,0.4)' : 'none',
                         }}
                         title={`${['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][di]} ${HEAT_HOURS[hi]}h`}
                       />
@@ -523,8 +882,12 @@ export function Analytics() {
                 <div className="text-[12px] ds-text-tertiary mt-0.5">Taux moyen · vs. moyenne du secteur (6,2%)</div>
               </div>
               <span className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: 'var(--ds-success-strong)' }}>
-                <TrendingUp size={9} />
-                +2,3 pts
+                {tipsTotal > 0 ? (
+                  <>
+                    <TrendingUp size={9} />
+                    +2,3 pts
+                  </>
+                ) : '—'}
               </span>
             </div>
             <div className="px-5 py-4">
@@ -538,9 +901,9 @@ export function Analytics() {
                     {avgTipPct}%
                   </div>
                   <div className="text-[12px] ds-text-secondary mt-1.5 leading-[1.5]">
-                    {formatEur(tipsTotal > 0 ? tipsTotal : 37890)} collectés
+                    {formatEur(tipsTotal)} collectés
                     <br />
-                    <span className="ds-text-tertiary">+58% vs. avant Splitzy</span>
+                    <span className="ds-text-tertiary">{tipVsBase > 0 ? '+' + tipVsBase + '%' : '—'} vs. avant Splitzy</span>
                   </div>
                 </div>
                 <div className="flex-1">
@@ -553,18 +916,18 @@ export function Analytics() {
                     </defs>
                     <line x1="0" y1="55" x2="300" y2="55" stroke="var(--ds-border)" strokeWidth="1" strokeDasharray="2 3" />
                     <text x="300" y="52" fontFamily="Inter" fontSize="9.5" fill="var(--ds-text-tertiary)" textAnchor="end">secteur 6,2%</text>
-                    <path d="M0 50 L30 48 L60 52 L90 40 L120 42 L150 35 L180 38 L210 25 L240 30 L270 20 L300 22 L300 80 L0 80 Z" fill="url(#tipsFill)" />
-                    <path d="M0 50 L30 48 L60 52 L90 40 L120 42 L150 35 L180 38 L210 25 L240 30 L270 20 L300 22" stroke="#E8920A" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="300" cy="22" r="3.5" fill="white" stroke="#E8920A" strokeWidth="2" />
+                    <path d={twPath + ' L300 80 L0 80 Z'} fill="url(#tipsFill)" />
+                    <path d={twPath} stroke="#E8920A" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="300" cy={String((65 - tipWkly[11] / twMax * 55).toFixed(1))} r="3.5" fill="white" stroke="#E8920A" strokeWidth="2" />
                   </svg>
                 </div>
               </div>
               {/* Stats rows */}
               <div className="mt-4 space-y-2.5 border-t pt-3" style={{ borderColor: 'var(--ds-border)' }}>
                 {[
-                  { label: 'Médiane', value: '10%' },
-                  { label: '% tickets avec pourboire', value: '68%' },
-                  { label: 'Meilleure table', value: 'T2 · 14%' },
+                  { label: 'Médiane', value: `${medianTip}%` },
+                  { label: '% tickets avec pourboire', value: `${pctTip}%` },
+                  { label: 'Meilleure table', value: bestTableLabel },
                 ].map(row => (
                   <div key={row.label} className="flex items-center justify-between">
                     <span className="text-[12.5px] ds-text-secondary">{row.label}</span>
@@ -591,23 +954,23 @@ export function Analytics() {
                   className="text-[10.5px] font-semibold px-2 py-[3px] rounded-full"
                   style={{ background: 'rgba(232,146,10,0.15)', color: '#F5A030' }}
                 >
-                  ROI · 8 mois
+                  {'ROI · ' + moSince + ' mois'}
                 </span>
               </div>
               <div
                 className="font-extrabold tracking-[-0.04em] leading-none tabular-nums"
                 style={{ fontSize: '48px', color: 'white', fontFamily: 'Inter, sans-serif' }}
               >
-                + <span>14 287€</span>
+                {allEncaisse.length > 0 ? fmtR(roi) : '0€'}
               </div>
               <div className="text-[12px] mt-2" style={{ color: '#71717A' }}>
-                Activation le 1<sup>er</sup> oct. 2025 · 4,2× l'investissement
+                Activation le 1<sup>er</sup> oct. 2025 · {roiMult}× l'investissement
               </div>
               <div className="mt-5 space-y-2.5 border-t pt-4" style={{ borderColor: '#27272A' }}>
                 {[
-                  { label: 'Pourboires additionnels',       value: '+1 842€'  },
-                  { label: 'Rotation de table accélérée',   value: '+8 920€'  },
-                  { label: 'Avis Google sauvés (×27)',       value: '+3 525€'  },
+                  { label: 'Pourboires additionnels',       value: '+' + fmtR(extraTip)  },
+                  { label: 'Rotation de table accélérée',   value: '+' + fmtR(rotGain)  },
+                  { label: 'Avis Google sauvés (×' + posAvis + ')',       value: '+' + fmtR(googGain)  },
                 ].map(row => (
                   <div key={row.label} className="flex items-center justify-between text-[12.5px]">
                     <span style={{ color: '#71717A' }}>{row.label}</span>

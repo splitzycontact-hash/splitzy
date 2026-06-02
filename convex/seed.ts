@@ -111,6 +111,145 @@ export const seedLeComptoir = mutation({
   },
 })
 
+export const seedScenarioComplet = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const restaurant = await ctx.db
+      .query("restaurants")
+      .filter(q => q.eq(q.field("name"), "Snack Momo"))
+      .first()
+    if (!restaurant) throw new Error("Restaurant 'Snack Momo' introuvable")
+
+    const tables = await ctx.db
+      .query("tables")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurant._id))
+      .collect()
+    if (!tables.length) throw new Error("Aucune table trouvée pour Snack Momo")
+
+    const now = Date.now()
+    const DAY = 86400000
+    const methods = ["card", "card", "applepay", "googlepay"] as const
+
+    const paymentRows: Array<{
+      createdAt: number; tableNumber: number; guests: number
+      subtotalCents: number; tipCents: number; totalCents: number
+      paymentMethod: string; dateLabel: string
+    }> = []
+
+    for (let i = 0; i < 25; i++) {
+      const offsetDays = Math.floor(Math.random() * 30)
+      const createdAt = now - offsetDays * DAY
+      const table = tables[i % tables.length]
+      const subtotalCents = 2800 + Math.floor(Math.random() * (14500 - 2800 + 1))
+      const tipCents = Math.round(subtotalCents * (0.06 + Math.random() * 0.06))
+      const commissionCents = Math.round(subtotalCents * 0.015)
+      const totalCents = subtotalCents + tipCents
+      const guests = 2 + Math.floor(Math.random() * 5)
+      const d = new Date(createdAt)
+      const dateLabel = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`
+      await ctx.db.insert("payments", {
+        restaurantId: restaurant._id,
+        tableId: table._id,
+        tableNumber: table.number,
+        guests,
+        subtotalCents,
+        tipCents,
+        commissionCents,
+        totalCents,
+        paymentMethod: methods[i % 4],
+        status: "Encaissé",
+        createdAt,
+        dateLabel,
+      })
+      paymentRows.push({ createdAt, tableNumber: table.number, guests, subtotalCents, tipCents, totalCents, paymentMethod: methods[i % 4], dateLabel })
+    }
+
+    const templates = [
+      { stars: 5, tags: ["😊 Super ambiance", "✨ On reviendra !"],  text: "Super rapport qualité-prix, les momos sont délicieux !" },
+      { stars: 5, tags: ["😋 Délicieux", "⚡ Service rapide"],        text: "Les momos au porc sont à tomber. Service ultra rapide." },
+      { stars: 5, tags: ["😊 Super ambiance", "🍜 Carte alléchante"], text: "Endroit chaleureux, on s'y sent bien. Les bouillons sont excellents." },
+      { stars: 5, tags: ["✨ On reviendra !"],                         text: "On est revenus deux fois cette semaine tellement c'est bon !" },
+      { stars: 5, tags: ["😋 Délicieux", "✨ On reviendra !"],         text: "Meilleur snack du quartier. Les momos frits sont incroyables." },
+      { stars: 5, tags: ["😊 Super ambiance", "⚡ Service rapide"],    text: "Accueil parfait, cuisine généreuse, prix doux." },
+      { stars: 5, tags: ["😋 Délicieux"],                              text: "Portions généreuses, saveurs authentiques. Je recommande à tous mes amis." },
+      { stars: 5, tags: ["✨ On reviendra !", "😊 Super ambiance"],    text: "Vraiment top, l'atmosphère est sympa et la nourriture délicieuse." },
+      { stars: 5, tags: ["😋 Délicieux", "🍜 Carte alléchante"],       text: "Une pépite cachée. Les momos vapeur fondent en bouche." },
+      { stars: 5, tags: ["😊 Super ambiance"],                         text: "Super expérience dès la première visite. Personnel adorable." },
+      { stars: 4, tags: ["😊 Super ambiance"],   text: "Très bon dans l'ensemble, juste un peu d'attente à l'entrée." },
+      { stars: 4, tags: ["😋 Délicieux"],         text: "Bonne cuisine, service efficace. Reviendrai." },
+      { stars: 4, tags: ["✨ On reviendra !"],    text: "Momos excellents, légèrement moins chauds qu'espéré mais sinon parfait." },
+      { stars: 4, tags: ["⚡ Service rapide"],    text: "Rapide et savoureux. Juste les desserts un peu limités." },
+      { stars: 4, tags: ["😊 Super ambiance"],   text: "Bonne ambiance, cuisine solide. On prend plaisir à y revenir." },
+      { stars: 3, tags: ["📢 Trop bruyant"],                     text: "Bruyant aux heures de pointe, mais les momos valent le déplacement." },
+      { stars: 3, tags: ["⏱ Service lent"],                      text: "Attente un peu longue pour deux commandes simples." },
+      { stars: 3, tags: ["📢 Trop bruyant", "⏱ Service lent"],   text: "Savoureux mais service inégal selon les jours." },
+      { stars: 3, tags: ["💸 Erreur addition"],                   text: "Addition à vérifier, une boisson en trop sur notre commande." },
+      { stars: 2, tags: ["⏱ Service lent", "🥘 Plat froid"],     text: "Momos arrivés froids, commande oubliée pendant 20 minutes." },
+      { stars: 2, tags: ["🥘 Plat froid"],                         text: "Plat tiède, dommage pour la qualité habituelle." },
+      { stars: 2, tags: ["⏱ Service lent", "💸 Erreur addition"], text: "Service désorganisé ce soir-là, addition incorrecte." },
+      { stars: 2, tags: ["📢 Trop bruyant"],                       text: "Trop bruyant pour avoir une conversation, difficile de profiter." },
+      { stars: 1, tags: ["🥘 Plat froid", "⏱ Service lent"],       text: "Commande perdue, long délai d'attente, plat froid à l'arrivée. Très déçu." },
+      { stars: 1, tags: ["💸 Erreur addition", "⏱ Service lent"],  text: "Mauvaise expérience : addition erronée et serveur peu aimable." },
+    ]
+
+    const feedbackRows: Array<{
+      createdAt: number; tableNumber: number; stars: number
+      tags: string[]; text: string; timeLabel: string
+    }> = []
+
+    for (let i = 0; i < templates.length; i++) {
+      const tmpl = templates[i]
+      const offsetDays = Math.floor(Math.random() * 14)
+      const createdAt = now - offsetDays * DAY
+      const table = tables[i % tables.length]
+      const timeLabel = offsetDays === 0 ? "aujourd'hui" : offsetDays === 1 ? "hier" : `il y a ${offsetDays} jours`
+      await ctx.db.insert("feedbacks", {
+        restaurantId: restaurant._id,
+        tableId: table._id,
+        tableNumber: table.number,
+        stars: tmpl.stars,
+        tags: tmpl.tags,
+        text: tmpl.text,
+        isNew: offsetDays <= 7,
+        createdAt,
+        timeLabel,
+      })
+      feedbackRows.push({ createdAt, tableNumber: table.number, stars: tmpl.stars, tags: tmpl.tags, text: tmpl.text, timeLabel })
+    }
+
+    return {
+      restaurantName: restaurant.name,
+      payments: paymentRows,
+      feedbacks: feedbackRows,
+    }
+  },
+})
+
+export const clearSnackMomoFull = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const restaurant = await ctx.db
+      .query("restaurants")
+      .filter(q => q.eq(q.field("name"), "Snack Momo"))
+      .first()
+    if (!restaurant) throw new Error("Restaurant 'Snack Momo' introuvable")
+
+    const fbs = await ctx.db
+      .query("feedbacks")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurant._id))
+      .collect()
+    for (const fb of fbs) await ctx.db.delete(fb._id)
+
+    const pmts = await ctx.db
+      .query("payments")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurant._id))
+      .collect()
+    for (const p of pmts) await ctx.db.delete(p._id)
+
+    return { message: `Snack Momo nettoyé : ${fbs.length} feedbacks, ${pmts.length} paiements supprimés` }
+  },
+})
+
 export const simulateClient = mutation({
   args: {},
   handler: async (ctx) => {

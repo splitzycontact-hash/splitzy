@@ -76,7 +76,7 @@ export function Reputation() {
 
   const total = feedbacks.length
   const avg = total > 0 ? feedbacks.reduce((s, f) => s + f.stars, 0) / total : 0
-  const negCount = feedbacks.filter(f => f.stars <= 3).length
+  const negCount = feedbacks.filter(f => f.stars <= 2).length
   const posCount = feedbacks.filter(f => f.stars >= 4).length
   const neuCount = feedbacks.filter(f => f.stars === 3).length
   const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
@@ -91,7 +91,7 @@ export function Reputation() {
   ]
 
   const filtered = (() => {
-    if (filter === 'neg')  return feedbacks.filter(f => f.stars <= 3)
+    if (filter === 'neg')  return feedbacks.filter(f => f.stars <= 2)
     if (filter === 'pos')  return feedbacks.filter(f => f.stars >= 4)
     if (filter === 'neu')  return feedbacks.filter(f => f.stars === 3)
     if (filter === 'week') return feedbacks.filter(f => f.createdAt >= oneWeekAgo)
@@ -145,7 +145,7 @@ export function Reputation() {
               >
                 {negCount}
               </span>
-              <span className="text-[14px] font-medium ds-text-tertiary">≤ 3 étoiles</span>
+              <span className="text-[14px] font-medium ds-text-tertiary">≤ 2 étoiles</span>
             </div>
             <div className="text-[12px] ds-text-tertiary">
               {posCount} positif{posCount !== 1 ? 's' : ''} · {neuCount} neutre{neuCount !== 1 ? 's' : ''}

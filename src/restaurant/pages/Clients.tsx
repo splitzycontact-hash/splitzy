@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
+import { useQuery } from 'convex/react'
+import { api } from '../../../convex/_generated/api'
+import { useRestaurantId } from '../context/RestaurantContext'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { Users, Star, TrendingUp, Search, X, Send, Mail, Crown, Sparkles, ChevronRight, Printer, Download } from 'lucide-react'
@@ -26,24 +29,25 @@ interface Customer {
   color: string; text: string
 }
 
-const CUSTOMERS: Customer[] = [
-  { id:1,  first:'Sophie',    last:'Martin',   email:'sophie.martin@gmail.com',   visits:15, avg:52.40, total:786,  lastVisit:'il y a 2 jours', lastIso:'27 mai', rating:4.8, status:'vip',        phone:'06 12 34 56 78', split:'Par article',  color:'#FFEFD9', text:'#B8730A' },
-  { id:2,  first:'Alexandre', last:'Dubois',   email:'alex.dubois@outlook.fr',    visits:12, avg:48.20, total:578,  lastVisit:'il y a 3 jours', lastIso:'26 mai', rating:4.9, status:'vip',        phone:'06 78 12 34 56', split:'Parts égales', color:'#E0F2FE', text:'#0369A1' },
-  { id:3,  first:'Camille',   last:'Lefebvre', email:'camille.lf@gmail.com',      visits:8,  avg:31.50, total:252,  lastVisit:'hier',            lastIso:'28 mai', rating:4.6, status:'regulier',   phone:'07 22 11 88 99', split:'Par article',  color:'#FCE7F3', text:'#BE185D' },
-  { id:4,  first:'Manon',     last:'Bonnet',   email:'manon.b@yahoo.fr',          visits:9,  avg:41.10, total:370,  lastVisit:'il y a 4 jours', lastIso:'25 mai', rating:4.8, status:'regulier',   phone:'06 55 44 33 22', split:'Par article',  color:'#DCFCE7', text:'#15803D' },
-  { id:5,  first:'Thomas',    last:'Bernard',  email:'thomas.bernard@me.com',     visits:7,  avg:28.30, total:198,  lastVisit:'il y a 5 jours', lastIso:'24 mai', rating:4.4, status:'regulier',   phone:'07 89 65 43 21', split:'Parts égales', color:'#EDE9FE', text:'#6D28D9' },
-  { id:6,  first:'Léa',       last:'Moreau',   email:'lea.moreau@protonmail.com', visits:4,  avg:22.80, total:91,   lastVisit:'il y a 1 sem.',  lastIso:'22 mai', rating:4.2, status:'regulier',   phone:'06 33 22 11 00', split:'Par article',  color:'#FEF3C7', text:'#B45309' },
-  { id:7,  first:'Emma',      last:'Roux',     email:'emma.roux@gmail.com',       visits:6,  avg:34.60, total:208,  lastVisit:'il y a 4 jours', lastIso:'25 mai', rating:4.7, status:'regulier',   phone:'07 11 22 33 44', split:'Par article',  color:'#FCE7F3', text:'#BE185D' },
-  { id:8,  first:'Lucas',     last:'Fournier', email:'lfournier@gmail.com',       visits:1,  avg:89.00, total:89,   lastVisit:'il y a 5 jours', lastIso:'24 mai', rating:5.0, status:'vip',        phone:'06 91 82 73 64', split:'Tout payer',   color:'#FEE2E2', text:'#B91C1C' },
-  { id:9,  first:'Chloé',     last:'Girard',   email:'chloe.girard@hey.com',      visits:3,  avg:26.40, total:79,   lastVisit:'il y a 6 jours', lastIso:'23 mai', rating:4.3, status:'regulier',   phone:'07 65 54 43 32', split:'Parts égales', color:'#E0E7FF', text:'#4338CA' },
-  { id:10, first:'Antoine',   last:'Mercier',  email:'a.mercier@orange.fr',       visits:1,  avg:14.50, total:14.5, lastVisit:'hier',            lastIso:'28 mai', rating:2.0, status:'insatisfait', phone:'06 47 58 69 70', split:'Tout payer',   color:'#FEE2E2', text:'#B91C1C' },
-  { id:11, first:'Nathan',    last:'Blanc',    email:'nathan.blanc@gmail.com',    visits:5,  avg:31.20, total:156,  lastVisit:'il y a 12 jours',lastIso:'17 mai', rating:4.5, status:'regulier',   phone:'07 81 92 03 14', split:'Par article',  color:'#DBEAFE', text:'#1D4ED8' },
-  { id:12, first:'Inès',      last:'Garcia',   email:'ines.garcia@icloud.com',    visits:2,  avg:18.50, total:37,   lastVisit:'il y a 9 jours', lastIso:'20 mai', rating:4.0, status:'nouveau',    phone:'06 14 25 36 47', split:'Parts égales', color:'#F3E8FF', text:'#7C3AED' },
-  { id:13, first:'Hugo',      last:'Petit',    email:'hugo.p@gmail.com',          visits:2,  avg:21.00, total:42,   lastVisit:'il y a 15 jours',lastIso:'14 mai', rating:3.5, status:'nouveau',    phone:'07 28 39 40 51', split:'Tout payer',   color:'#FEF3C7', text:'#B45309' },
-  { id:14, first:'Sarah',     last:'Robert',   email:'sarah.robert@me.com',       visits:1,  avg:27.30, total:27.3, lastVisit:'il y a 2 jours', lastIso:'27 mai', rating:5.0, status:'nouveau',    phone:'06 92 81 70 69', split:'Par article',  color:'#DCFCE7', text:'#15803D' },
-]
+const IDENTITIES: Record<number, { first: string; last: string; email: string; phone: string; split: string; color: string; text: string }> = {
+  1:  { first: 'Sophie',    last: 'Martin',   email: 'sophie.martin@gmail.com',   phone: '06 12 34 56 78', split: 'Par article',  color: '#FFEFD9', text: '#B8730A' },
+  2:  { first: 'Alexandre', last: 'Dubois',   email: 'alex.dubois@outlook.fr',    phone: '06 78 12 34 56', split: 'Parts égales', color: '#E0F2FE', text: '#0369A1' },
+  3:  { first: 'Camille',   last: 'Lefebvre', email: 'camille.lf@gmail.com',      phone: '07 22 11 88 99', split: 'Par article',  color: '#FCE7F3', text: '#BE185D' },
+  4:  { first: 'Manon',     last: 'Bonnet',   email: 'manon.b@yahoo.fr',          phone: '06 55 44 33 22', split: 'Par article',  color: '#DCFCE7', text: '#15803D' },
+  5:  { first: 'Thomas',    last: 'Bernard',  email: 'thomas.bernard@me.com',     phone: '07 89 65 43 21', split: 'Parts égales', color: '#EDE9FE', text: '#6D28D9' },
+  6:  { first: 'Léa',       last: 'Moreau',   email: 'lea.moreau@protonmail.com', phone: '06 33 22 11 00', split: 'Par article',  color: '#FEF3C7', text: '#B45309' },
+  7:  { first: 'Emma',      last: 'Roux',     email: 'emma.roux@gmail.com',       phone: '07 11 22 33 44', split: 'Par article',  color: '#FCE7F3', text: '#BE185D' },
+  8:  { first: 'Lucas',     last: 'Fournier', email: 'lfournier@gmail.com',       phone: '06 91 82 73 64', split: 'Tout payer',   color: '#FEE2E2', text: '#B91C1C' },
+  9:  { first: 'Chloé',     last: 'Girard',   email: 'chloe.girard@hey.com',      phone: '07 65 54 43 32', split: 'Parts égales', color: '#E0E7FF', text: '#4338CA' },
+  10: { first: 'Antoine',   last: 'Mercier',  email: 'a.mercier@orange.fr',       phone: '06 47 58 69 70', split: 'Tout payer',   color: '#FEE2E2', text: '#B91C1C' },
+}
 
-const maxVisits = Math.max(...CUSTOMERS.map(c => c.visits))
+function formatTimeAgo(ts: number): string {
+  const days = Math.floor((Date.now() - ts) / 86400000)
+  if (days <= 0) return "aujourd'hui"
+  if (days === 1) return 'hier'
+  return `il y a ${days}j`
+}
 
 function initials(c: Customer) { return (c.first[0] + c.last[0]).toUpperCase() }
 
@@ -267,9 +271,59 @@ export function Clients() {
   const [selected, setSelected]     = useState<Customer | null>(null)
   const [emailModal, setEmailModal] = useState(false)
 
+  const restaurantId = useRestaurantId()
+  const payments  = (useQuery(api.payments.list,  restaurantId ? { restaurantId } : 'skip') ?? []).filter(p => p.status === 'Encaissé')
+  const feedbacks =  useQuery(api.feedbacks.list, restaurantId ? { restaurantId } : 'skip') ?? []
+
+  const customers = useMemo<Customer[]>(() => {
+    const list: Customer[] = []
+    for (let n = 1; n <= 10; n++) {
+      const ident = IDENTITIES[n]
+      const pmts = payments.filter(p => p.tableNumber === n)
+      if (pmts.length === 0) continue
+      const fbs = feedbacks.filter(f => f.tableNumber === n)
+      const visits = pmts.length
+      const total = pmts.reduce((s, p) => s + p.totalCents, 0) / 100
+      const avg = total / visits
+      const avgRating = fbs.length > 0 ? fbs.reduce((s, f) => s + f.stars, 0) / fbs.length : 0
+      const lastTs = pmts.reduce((mx, p) => Math.max(mx, p.createdAt), 0)
+      let status: Status
+      if (visits >= 10 || total >= 500) status = 'vip'
+      else if (avgRating > 0 && avgRating < 3) status = 'insatisfait'
+      else if (visits >= 3) status = 'regulier'
+      else status = 'nouveau'
+      list.push({
+        id: n,
+        first: ident.first, last: ident.last, email: ident.email,
+        visits, avg, total,
+        lastVisit: formatTimeAgo(lastTs),
+        lastIso: new Date(lastTs).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }),
+        rating: avgRating,
+        status,
+        phone: ident.phone, split: ident.split,
+        color: ident.color, text: ident.text,
+      })
+    }
+    return list.sort((a, b) => b.total - a.total)
+  }, [payments, feedbacks])
+
+  const maxVisits        = Math.max(1, ...customers.map(c => c.visits))
+  const regularCount     = customers.filter(c => c.status === 'regulier').length
+  const vipCount         = customers.filter(c => c.status === 'vip').length
+  const nouveauCount     = customers.filter(c => c.status === 'nouveau').length
+  const insatisfaitCount = customers.filter(c => c.status === 'insatisfait').length
+
+  const ratedCustomers = customers.filter(c => c.rating > 0)
+  const avgRating = ratedCustomers.length > 0
+    ? (ratedCustomers.reduce((s, c) => s + c.rating, 0) / ratedCustomers.length).toFixed(1)
+    : '—'
+  const avgBasket = customers.length > 0
+    ? (customers.reduce((s, c) => s + c.avg, 0) / customers.length).toFixed(2).replace('.', ',')
+    : '—'
+
   function exportCsv() {
     const header = ['Prénom','Nom','Email','Statut','Visites','Panier moy (€)','Total (€)','Dernière visite','Note']
-    const rows = CUSTOMERS.map(c => [
+    const rows = customers.map(c => [
       c.first, c.last, c.email, STATUS_LABEL[c.status],
       c.visits, c.avg.toFixed(2).replace('.', ','), c.total.toFixed(2).replace('.', ','),
       c.lastIso, c.rating.toFixed(1),
@@ -283,21 +337,18 @@ export function Clients() {
   }
 
   const FILTERS: { key: FilterKey; label: string; count: number }[] = [
-    { key: 'all',        label: 'Tous',        count: CUSTOMERS.length },
-    { key: 'regulier',   label: 'Réguliers',   count: CUSTOMERS.filter(c => c.status === 'regulier').length },
-    { key: 'vip',        label: 'VIP',         count: CUSTOMERS.filter(c => c.status === 'vip').length },
-    { key: 'nouveau',    label: 'Nouveaux',    count: CUSTOMERS.filter(c => c.status === 'nouveau').length },
-    { key: 'insatisfait',label: 'Insatisfaits',count: CUSTOMERS.filter(c => c.status === 'insatisfait').length },
+    { key: 'all',        label: 'Tous',        count: customers.length },
+    { key: 'regulier',   label: 'Réguliers',   count: regularCount },
+    { key: 'vip',        label: 'VIP',         count: vipCount },
+    { key: 'nouveau',    label: 'Nouveaux',    count: nouveauCount },
+    { key: 'insatisfait',label: 'Insatisfaits',count: insatisfaitCount },
   ]
 
-  const visible = CUSTOMERS.filter(c => {
+  const visible = customers.filter(c => {
     const matchFilter = filter === 'all' || c.status === filter
     const matchSearch = !search || `${c.first} ${c.last} ${c.email}`.toLowerCase().includes(search.toLowerCase())
     return matchFilter && matchSearch
   })
-
-  const avgRating = (CUSTOMERS.reduce((s, c) => s + c.rating, 0) / CUSTOMERS.length).toFixed(1)
-  const avgBasket = (CUSTOMERS.reduce((s, c) => s + c.avg, 0) / CUSTOMERS.length).toFixed(2).replace('.', ',')
 
   return (
     <RestaurantLayout>
@@ -305,7 +356,7 @@ export function Clients() {
         title="Clients"
         subtitle={
           <span>
-            {CUSTOMERS.length} clients · {CUSTOMERS.filter(c => c.status === 'regulier').length} réguliers · {CUSTOMERS.filter(c => c.status === 'vip').length} VIP · {CUSTOMERS.filter(c => c.status === 'nouveau').length} nouveaux
+            {customers.length} clients · {regularCount} réguliers · {vipCount} VIP · {nouveauCount} nouveaux
           </span>
         }
         actions={
@@ -346,10 +397,10 @@ export function Clients() {
           style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
         >
           {[
-            { icon: Users,     label: 'Total clients',        value: String(CUSTOMERS.length), sub: '+14 ce mois', up: true },
-            { icon: Users,     label: 'Clients réguliers',    value: '23', sub: '+3 · 18% de la base', up: true },
-            { icon: TrendingUp, label: 'Panier moyen',        value: `${avgBasket}€`, sub: '+2,40€ vs mois dernier', up: true, accent: true },
-            { icon: Star,      label: 'Note moyenne donnée',  value: `${avgRating} ★`, sub: `+0,2 sur ${CUSTOMERS.reduce((s,c)=>s+Math.min(c.visits,8),0)} feedbacks`, up: true },
+            { icon: Users,      label: 'Total clients',       value: String(customers.length), sub: `${vipCount} VIP · ${regularCount} réguliers` },
+            { icon: Users,      label: 'Clients réguliers',   value: String(regularCount), sub: customers.length > 0 ? `${Math.round(regularCount / customers.length * 100)}% de la base` : '—' },
+            { icon: TrendingUp, label: 'Panier moyen',        value: `${avgBasket}€`, sub: `sur ${payments.length} paiements`, accent: true },
+            { icon: Star,       label: 'Note moyenne donnée', value: `${avgRating} ★`, sub: `${feedbacks.length} feedback${feedbacks.length !== 1 ? 's' : ''}` },
           ].map((kpi, i) => (
             <div
               key={i}
@@ -366,15 +417,13 @@ export function Clients() {
               >
                 {kpi.value}
               </div>
-              <div className="text-[11.5px] flex items-center gap-1">
-                <span className="font-semibold" style={{ color: 'var(--ds-success-strong)' }}>↑ {kpi.sub.split(' ')[0]}</span>
-                <span className="ds-text-tertiary">{kpi.sub.split(' ').slice(1).join(' ')}</span>
-              </div>
+              <div className="text-[11.5px] ds-text-tertiary">{kpi.sub}</div>
             </div>
           ))}
         </section>
 
         {/* Insight strip */}
+        {customers.length >= 2 && (
         <div
           className="flex items-start gap-3 px-5 py-4 rounded-[10px] border-l-[3px]"
           style={{
@@ -392,12 +441,13 @@ export function Clients() {
             <Sparkles size={14} style={{ color: '#E8920A' }} />
           </div>
           <p className="flex-1 text-[13px] ds-text-primary leading-[1.55]">
-            <strong>Sophie Martin</strong> et <strong>Alexandre Dubois</strong> ont chacun dépensé plus de 500€ ce mois. Lancez une campagne de fidélité ciblée pour maximiser leur rétention.
+            <strong>{customers[0].first} {customers[0].last}</strong> et <strong>{customers[1].first} {customers[1].last}</strong> sont vos meilleurs clients ({customers[0].total.toFixed(0)}€ et {customers[1].total.toFixed(0)}€ dépensés). Lancez une campagne de fidélité ciblée pour maximiser leur rétention.
           </p>
           <button className="text-[12px] font-semibold flex-shrink-0 ds-text-accent hover:ds-text-accent-strong transition-colors">
             Créer la campagne →
           </button>
         </div>
+        )}
 
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
