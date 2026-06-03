@@ -1,10 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
-import { useQuery } from 'convex/react'
+import { useQuery, useMutation, useAction } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
+import type { Id } from '../../../convex/_generated/dataModel'
+import { toast } from 'sonner'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
-import { useRestaurantId } from '../context/RestaurantContext'
+import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import {
   Printer, Search, SlidersHorizontal, LayoutGrid, List,
   X, ChevronLeft, ChevronRight, Euro, HandCoins, Percent, CreditCard, CheckCircle, Clock, RotateCcw, AlertCircle, FileText, Mail, Trash2, Check, Info, Download,
@@ -54,6 +56,8 @@ type LocalRow = {
   d: string; time: string; table: string; guests: number; method: PayMethod
   ref: string; amount: number; tip: number; fee: number; status: RowStatus
   partialPaid?: number
+  paymentId?: string
+  tableNumber?: number
 }
 
 const METHOD_LABELS: Record<PayMethod, { ic: string; name: string; cls: string }> = {
@@ -90,6 +94,7 @@ const DEMO_ROWS: LocalRow[] = [
 ]
 
 type ConvexPayment = {
+  _id: string
   dateLabel: string; tableNumber: number; guests: number;
   totalCents: number; tipCents: number; commissionCents: number;
   subtotalCents: number; paymentMethod: string;
@@ -115,49 +120,164 @@ function StatusBadge({ status }: { status: RowStatus }) {
   )
 }
 
-function Drawer({ row, onClose }: { row: LocalRow; onClose: () => void }) {
-  const ttc = row.amount
-  const tip = row.tip
-  const ht = ttc - tip
-  const tva = (ht * 0.1) / 1.1
+function Drawer({ row, restaurantId, restaurantName, onClose }: {
+  row: LocalRow
+  restaurantId: Id<'restaurants'> | null
+  restaurantName: string
+  onClose: () => void
+}) {
+  const updateStatusMut = useMutation(api.payments.updateStatus)
+  const sendCampaignAction = useAction(api.campaigns.sendCampaign)
+  const crmCustomers = useQuery(api.customers.getByRestaurant, restaurantId ? { restaurantId } : 'skip') ?? []
+
+  const [refundModal, setRefundModal] = useState(false)
+  const [emailModal, setEmailModal]   = useState(false)
+  const [refunding, setRefunding]     = useState(false)
+  const [emailing, setEmailing]       = useState(false)
+
+  const ttc  = row.amount
+  const tip  = row.tip
+  const ht   = ttc - tip
+  const tva  = (ht * 0.1) / 1.1
   const htNet = ht - tva
-  const m = METHOD_LABELS[row.method]
+  const meth = METHOD_LABELS[row.method]
+
+  // Client CRM avec email + consentement, sur cette table
+  const clientRow = row.tableNumber != null
+    ? crmCustomers.find(c => c.tableNumber === row.tableNumber && !!c.email && c.marketingConsent === true)
+    : undefined
+
+  const handlePDF = async () => {
+    const { jsPDF: JsPDF } = await import('jspdf')
+    const doc = new JsPDF({ unit: 'mm', format: 'a4' })
+    const net = ttc - row.fee
+
+    doc.setFillColor(10, 10, 10)
+    doc.rect(0, 0, 210, 30, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(13); doc.setFont('helvetica', 'bold')
+    doc.text('SPLITZY', 15, 12)
+    doc.setFontSize(8.5); doc.setFont('helvetica', 'normal')
+    doc.text('Justificatif de transaction', 15, 20)
+    doc.setTextColor(160, 160, 160); doc.setFontSize(8)
+    doc.text(`${row.d} · ${row.time}`, 15, 27)
+    doc.setTextColor(255, 255, 255); doc.setFontSize(9)
+    doc.text(restaurantName, 195, 12, { align: 'right' })
+
+    doc.setTextColor(30, 30, 30)
+    let y = 45
+    const refBlock: [string, string][] = [
+      ['Référence', row.ref],
+      ['Table', row.table],
+      ['Date / Heure', `${row.d} · ${row.time}`],
+    ]
+    refBlock.forEach(([k, v]) => {
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
+      doc.text(k, 15, y)
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 30)
+      doc.text(v, 90, y)
+      y += 7
+    })
+    y += 5
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9)
+    doc.text('Détail du paiement', 15, y); y += 6
+    const payRows: [string, string, boolean][] = [
+      ['Sous-total HT', `${fmt(htNet)} €`, false],
+      ['TVA 10%', `${fmt(tva)} €`, false],
+      ['Pourboire', `+ ${fmt(tip)} €`, false],
+      ['Total encaissé', `${fmt(ttc)} €`, true],
+    ]
+    payRows.forEach(([label, value, bold], i) => {
+      const rowY = y + i * 9
+      doc.setFillColor(i % 2 === 0 ? 248 : 252, i % 2 === 0 ? 248 : 252, i % 2 === 0 ? 248 : 252)
+      doc.rect(15, rowY - 5, 180, 9, 'F')
+      doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setTextColor(30, 30, 30); doc.setFontSize(8.5)
+      doc.text(label, 20, rowY)
+      doc.text(value, 192, rowY, { align: 'right' })
+    })
+    y += payRows.length * 9 + 8
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9)
+    doc.text('Informations', 15, y); y += 6
+    const infoRows: [string, string][] = [
+      ['Méthode de paiement', meth.name],
+      [`Convives`, `${row.guests} personne${row.guests > 1 ? 's' : ''}`],
+      ['Commission Splitzy', `${fmt(row.fee)} €`],
+      ['Net restaurant', `${fmt(net)} €`],
+    ]
+    infoRows.forEach(([k, v]) => {
+      doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
+      doc.text(k, 15, y)
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 30)
+      doc.text(v, 192, y, { align: 'right' })
+      y += 7
+    })
+
+    doc.setFontSize(7.5); doc.setTextColor(160, 160, 160)
+    doc.text('Document généré par Splitzy · splitzy.fr', 105, 285, { align: 'center' })
+    doc.save(`justificatif-${row.ref}-${row.d.replace('/', '-')}.pdf`)
+  }
+
+  const handleEmailClick = () => {
+    if (!clientRow?.email) {
+      toast.warning('Aucun email client disponible pour cette transaction')
+      return
+    }
+    setEmailModal(true)
+  }
+
+  const doSendEmail = async () => {
+    if (!clientRow || !restaurantId) return
+    setEmailing(true)
+    try {
+      const body = `Bonjour,\n\nVoici le résumé de votre transaction du ${row.d} à ${row.time}.\n\nTable : ${row.table}\nMontant total : ${fmt(ttc)} €\nPourboire : ${fmt(tip)} €\n\nMerci de votre visite !\n\nL'équipe ${restaurantName}`
+      await sendCampaignAction({ restaurantId, customerIds: [clientRow._id], subject: `Votre reçu - ${restaurantName}`, body, restaurantName })
+      toast.success('Reçu envoyé')
+      setEmailModal(false)
+    } catch {
+      toast.error("Erreur lors de l'envoi")
+    } finally {
+      setEmailing(false)
+    }
+  }
+
+  const doRefund = async () => {
+    if (!row.paymentId) {
+      toast.error('Identifiant de paiement manquant — transaction démo.')
+      return
+    }
+    setRefunding(true)
+    try {
+      await updateStatusMut({ paymentId: row.paymentId as Id<'payments'>, status: 'Remboursé' as const })
+      toast.success("Statut mis à jour — pensez à effectuer le remboursement via votre PSP")
+      setRefundModal(false)
+      onClose()
+    } catch {
+      toast.error('Erreur lors de la mise à jour du statut')
+    } finally {
+      setRefunding(false)
+    }
+  }
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-40"
-        style={{ background: 'rgba(0,0,0,0.4)' }}
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={onClose} />
       <aside
         className="fixed right-0 top-0 bottom-0 z-50 flex flex-col overflow-hidden border-l"
-        style={{
-          width: '420px',
-          background: 'var(--ds-bg-surface)',
-          borderColor: 'var(--ds-border)',
-          boxShadow: '-8px 0 32px rgba(0,0,0,0.12)',
-        }}
+        style={{ width: '420px', background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: '-8px 0 32px rgba(0,0,0,0.12)' }}
       >
-        {/* Header */}
         <div className="flex items-start justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
           <div>
             <div className="font-bold text-[15px] ds-text-primary">Transaction · {row.table}</div>
             <div className="text-[11.5px] ds-text-tertiary mt-0.5 font-mono">{row.ref}</div>
           </div>
-          <button onClick={onClose} className="ds-text-tertiary hover:ds-text-primary transition-colors mt-0.5">
-            <X size={16} />
-          </button>
+          <button onClick={onClose} className="ds-text-tertiary hover:ds-text-primary transition-colors mt-0.5"><X size={16} /></button>
         </div>
 
-        {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
-          {/* Amount */}
           <div>
-            <div
-              className="font-extrabold tabular-nums tracking-[-0.04em] leading-none"
-              style={{ fontSize: '48px', color: 'var(--ds-text-primary)', fontFamily: 'Inter, sans-serif' }}
-            >
+            <div className="font-extrabold tabular-nums tracking-[-0.04em] leading-none" style={{ fontSize: '48px', color: 'var(--ds-text-primary)', fontFamily: 'Inter, sans-serif' }}>
               {fmt(row.amount).split(',')[0]}<span className="text-[24px] ds-text-tertiary">,{fmt(row.amount).split(',')[1]} €</span>
             </div>
             <div className="flex items-center gap-2 mt-2">
@@ -166,86 +286,103 @@ function Drawer({ row, onClose }: { row: LocalRow; onClose: () => void }) {
             </div>
           </div>
 
-          {/* Payment detail */}
           <div>
             <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-3">Détail du paiement</h4>
             <div className="rounded-[10px] border overflow-hidden" style={{ borderColor: 'var(--ds-border)' }}>
               {[
-                { k: 'Sous-total HT', v: `${fmt(htNet)} €`, color: undefined },
-                { k: 'TVA 10%',       v: `${fmt(tva)} €`,   color: undefined },
-                { k: 'Pourboire',     v: `+ ${fmt(tip)} €`, color: 'var(--ds-success)' },
-                { k: 'Total encaissé', v: `${fmt(row.amount)} €`, bold: true },
+                { k: 'Sous-total HT', v: `${fmt(htNet)} €`, color: undefined, bold: false },
+                { k: 'TVA 10%',       v: `${fmt(tva)} €`,   color: undefined, bold: false },
+                { k: 'Pourboire',     v: `+ ${fmt(tip)} €`, color: 'var(--ds-success)' as string, bold: false },
+                { k: 'Total encaissé', v: `${fmt(row.amount)} €`, color: undefined, bold: true },
               ].map((r, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between px-4 py-2.5 text-[13px]"
-                  style={{
-                    borderBottom: i < 3 ? `1px solid var(--ds-border)` : 'none',
-                    background: r.bold ? 'var(--ds-bg-base)' : 'var(--ds-bg-surface)',
-                  }}
-                >
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-[13px]" style={{ borderBottom: i < 3 ? `1px solid var(--ds-border)` : 'none', background: r.bold ? 'var(--ds-bg-base)' : 'var(--ds-bg-surface)' }}>
                   <span className={r.bold ? 'font-semibold ds-text-primary' : 'ds-text-secondary'}>{r.k}</span>
-                  <span
-                    className={`font-semibold tabular-nums ${r.bold ? 'ds-text-primary' : 'ds-text-secondary'}`}
-                    style={{ color: r.color ?? undefined }}
-                  >
-                    {r.v}
-                  </span>
+                  <span className={`font-semibold tabular-nums ${r.bold ? 'ds-text-primary' : 'ds-text-secondary'}`} style={{ color: r.color ?? undefined }}>{r.v}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Info */}
           <div>
             <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-3">Informations</h4>
             <div className="space-y-2">
               {[
-                { k: 'Table', v: row.table },
-                { k: 'Convives', v: `${row.guests} personnes · partage par article` },
-                { k: 'Méthode', v: m.name },
-                { k: 'Commission Splitzy', v: `${fmt(row.fee)} € (1,5% + 0,15 €)` },
+                { k: 'Table', v: row.table, highlight: false },
+                { k: 'Convives', v: `${row.guests} personne${row.guests > 1 ? 's' : ''} · partage par article`, highlight: false },
+                { k: 'Méthode', v: meth.name, highlight: false },
+                { k: 'Commission Splitzy', v: `${fmt(row.fee)} € (1,5% + 0,15 €)`, highlight: false },
                 { k: 'Net pour le restaurant', v: `${fmt(row.amount - row.fee)} €`, highlight: true },
-              ].map(row => (
-                <div key={row.k} className="flex items-center justify-between text-[13px]">
-                  <span className="ds-text-secondary">{row.k}</span>
-                  <span
-                    className="font-semibold tabular-nums"
-                    style={{ color: row.highlight ? 'var(--ds-success-strong)' : 'var(--ds-text-primary)' }}
-                  >
-                    {row.v}
-                  </span>
+              ].map(r => (
+                <div key={r.k} className="flex items-center justify-between text-[13px]">
+                  <span className="ds-text-secondary">{r.k}</span>
+                  <span className="font-semibold tabular-nums" style={{ color: r.highlight ? 'var(--ds-success-strong)' : 'var(--ds-text-primary)' }}>{r.v}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Actions */}
           <div>
             <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-3">Actions</h4>
             <div className="flex flex-col gap-2">
-              {[
-                { icon: FileText, label: 'Télécharger le justificatif PDF', danger: false },
-                { icon: Mail,     label: 'Envoyer le reçu par email',        danger: false },
-                { icon: Trash2,   label: 'Initier un remboursement',          danger: true  },
-              ].map(({ icon: Icon, label, danger }) => (
-                <button
-                  key={label}
-                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-[9px] border text-[13px] font-medium transition-colors"
-                  style={{
-                    background: danger ? 'var(--ds-error-soft)' : 'var(--ds-bg-surface)',
-                    borderColor: danger ? 'var(--ds-error-soft)' : 'var(--ds-border)',
-                    color: danger ? 'var(--ds-error)' : 'var(--ds-text-primary)',
-                  }}
-                >
-                  <Icon size={14} />
-                  {label}
+              <button onClick={handlePDF} className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-[9px] border text-[13px] font-medium transition-colors" style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}>
+                <FileText size={14} /> Télécharger le justificatif PDF
+              </button>
+              <button onClick={handleEmailClick} className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-[9px] border text-[13px] font-medium transition-colors" style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}>
+                <Mail size={14} /> Envoyer le reçu par email
+              </button>
+              {row.status !== 'Remboursé' && (
+                <button onClick={() => setRefundModal(true)} className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-[9px] border text-[13px] font-medium transition-colors" style={{ background: 'var(--ds-error-soft)', borderColor: 'var(--ds-error-soft)', color: 'var(--ds-error)' }}>
+                  <Trash2 size={14} /> Initier un remboursement
                 </button>
-              ))}
+              )}
             </div>
           </div>
         </div>
       </aside>
+
+      <AnimatePresence>
+        {emailModal && (
+          <m.div key="email-modal" className="fixed inset-0 flex items-center justify-center z-[60] p-4" style={{ background: 'rgba(0,0,0,0.5)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={e => { if (e.target === e.currentTarget) setEmailModal(false) }}>
+            <m.div className="rounded-2xl overflow-hidden w-[400px] max-w-full" style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }} initial={{ scale: 0.95, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 12 }} transition={{ type: 'spring', stiffness: 300, damping: 28 }}>
+              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+                <span className="font-bold text-[15px] ds-text-primary">Envoyer le reçu</span>
+                <button onClick={() => setEmailModal(false)} className="ds-text-tertiary hover:ds-text-primary"><X size={16} /></button>
+              </div>
+              <div className="px-5 py-5">
+                <p className="text-[13.5px] ds-text-primary leading-[1.6]">Envoyer le reçu à <strong>{clientRow?.email}</strong> ?</p>
+                <p className="text-[12px] ds-text-tertiary mt-1">Transaction {row.ref} · {fmt(row.amount)} €</p>
+              </div>
+              <div className="px-5 pb-5 flex gap-2">
+                <button onClick={() => setEmailModal(false)} className="flex-1 rounded-xl text-sm font-medium py-2.5 border" style={{ borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}>Annuler</button>
+                <button onClick={doSendEmail} disabled={emailing} className="flex-1 rounded-xl text-sm font-semibold py-2.5 text-white" style={{ background: '#E8920A', opacity: emailing ? 0.6 : 1 }}>{emailing ? 'Envoi…' : 'Envoyer'}</button>
+              </div>
+            </m.div>
+          </m.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {refundModal && (
+          <m.div key="refund-modal" className="fixed inset-0 flex items-center justify-center z-[60] p-4" style={{ background: 'rgba(0,0,0,0.5)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={e => { if (e.target === e.currentTarget) setRefundModal(false) }}>
+            <m.div className="rounded-2xl overflow-hidden w-[420px] max-w-full" style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }} initial={{ scale: 0.95, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 12 }} transition={{ type: 'spring', stiffness: 300, damping: 28 }}>
+              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)', background: 'var(--ds-error-soft)' }}>
+                <span className="font-bold text-[15px]" style={{ color: 'var(--ds-error)' }}>Initier un remboursement</span>
+                <button onClick={() => setRefundModal(false)} style={{ color: 'var(--ds-error)' }}><X size={16} /></button>
+              </div>
+              <div className="px-5 py-5">
+                <p className="text-[13.5px] ds-text-primary leading-[1.6]">Confirmer le remboursement de <strong>{fmt(row.amount)} €</strong> pour la transaction <strong>{row.ref}</strong> ?</p>
+                <div className="mt-3 px-3 py-2.5 rounded-[8px] text-[12px] ds-text-secondary" style={{ background: 'var(--ds-bg-base)', borderLeft: '3px solid var(--ds-warning)' }}>
+                  Le remboursement devra être effectué manuellement via votre PSP.
+                </div>
+              </div>
+              <div className="px-5 pb-5 flex gap-2">
+                <button onClick={() => setRefundModal(false)} className="flex-1 rounded-xl text-sm font-medium py-2.5 border" style={{ borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}>Annuler</button>
+                <button onClick={doRefund} disabled={refunding} className="flex-1 rounded-xl text-sm font-semibold py-2.5 text-white" style={{ background: 'var(--ds-error)', opacity: refunding ? 0.6 : 1 }}>{refunding ? 'Traitement…' : 'Confirmer le remboursement'}</button>
+              </div>
+            </m.div>
+          </m.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }
@@ -432,6 +569,7 @@ export function Factures() {
   const [amountMax, setAmountMax]       = useState('')
   const dropdownRef                     = useRef<HTMLDivElement>(null)
   const restaurantId = useRestaurantId()
+  const restaurant   = useRestaurant()
 
   useEffect(() => {
     if (!openDropdown) return
@@ -456,6 +594,8 @@ export function Factures() {
         tip: p.tipCents / 100,
         fee: p.commissionCents / 100,
         status: p.status as RowStatus,
+        paymentId: p._id,
+        tableNumber: p.tableNumber,
       }))
     : DEMO_ROWS
 
@@ -979,7 +1119,14 @@ export function Factures() {
       </AnimatePresence>
 
       {/* Drawer */}
-      {drawerRow && <Drawer row={drawerRow} onClose={() => setDrawerRow(null)} />}
+      {drawerRow && (
+        <Drawer
+          row={drawerRow}
+          restaurantId={restaurantId}
+          restaurantName={restaurant?.name ?? ''}
+          onClose={() => setDrawerRow(null)}
+        />
+      )}
     </RestaurantLayout>
   )
 }

@@ -76,6 +76,13 @@ export const create = mutation({
   },
 })
 
+export const updateStatus = mutation({
+  args: { paymentId: v.id('payments'), status: v.union(v.literal('Encaissé'), v.literal('En attente'), v.literal('Remboursé')) },
+  handler: async (ctx, { paymentId, status }) => {
+    await ctx.db.patch(paymentId, { status })
+  },
+})
+
 export const getOverviewStats = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {

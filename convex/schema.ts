@@ -143,6 +143,7 @@ export default defineSchema({
     email: v.optional(v.string()),
     marketingConsent: v.optional(v.boolean()),
     consentAt: v.optional(v.number()),
+    manualVip: v.optional(v.boolean()),
     // Paiement associé (dernier en date) — lie le contact CRM à un paiement précis.
     paymentId: v.optional(v.id("payments")),
     createdAt: v.number(),

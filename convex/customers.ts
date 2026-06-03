@@ -25,6 +25,13 @@ export const unsubscribe = mutation({
   },
 })
 
+export const setManualVip = mutation({
+  args: { customerId: v.id('customers'), isVip: v.boolean() },
+  handler: async (ctx, { customerId, isVip }) => {
+    await ctx.db.patch(customerId, { manualVip: isVip })
+  },
+})
+
 export const list = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {

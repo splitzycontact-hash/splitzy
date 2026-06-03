@@ -42,6 +42,7 @@ interface Customer {
   phone: string; split: string; methodPct: number
   color: string; text: string
   customerId?: Id<'customers'>; realContact: boolean
+  manualVip: boolean
   // Campagne email : id de la row consentante (email + marketingConsent) si éligible.
   consent: boolean; marketingId?: Id<'customers'>
   // Données réelles du groupe pour le panneau détail.
@@ -84,12 +85,25 @@ function StarRating({ rating, size = 13 }: { rating: number; size?: number }) {
 
 function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks, onClose }: { customer: Customer; restaurantId: Id<'restaurants'>; tablePayments: Doc<'payments'>[]; tableFeedbacks: Doc<'feedbacks'>[]; onClose: () => void }) {
   const updateContact = useMutation(api.customers.updateContact)
-  const [cid, setCid]       = useState<Id<'customers'> | undefined>(customer.customerId)
-  const [phone, setPhone]   = useState(customer.phone ?? '')
-  const [email, setEmail]   = useState(customer.email ?? '')
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved]   = useState(false)
-  const dirty = phone !== (customer.phone ?? '') || email !== (customer.email ?? '')
+  const setManualVipMutation = useMutation(api.customers.setManualVip)
+  const sendCampaignAction = useAction(api.campaigns.sendCampaign)
+  const restaurant = useRestaurant()
+  const [cid, setCid]         = useState<Id<'customers'> | undefined>(customer.customerId)
+  const [phone, setPhone]     = useState(customer.phone ?? '')
+  const [email, setEmail]     = useState(customer.email ?? '')
+  const [basePh, setBasePh]   = useState(customer.phone ?? '')
+  const [baseEm, setBaseEm]   = useState(customer.email ?? '')
+  const [saving, setSaving]   = useState(false)
+  const [saved, setSaved]     = useState(false)
+  const [copied, setCopied]   = useState(false)
+  const [vipLoading, setVipLoading] = useState(false)
+  const [msgModal, setMsgModal]     = useState(false)
+  const [msgSubject, setMsgSubject] = useState('')
+  const [msgBody, setMsgBody]       = useState('')
+  const [msgPreview, setMsgPreview] = useState(false)
+  const [msgSending, setMsgSending] = useState(false)
+  const dirty = phone !== basePh || email !== baseEm
+  const [showAllVisits, setShowAllVisits] = useState(false)
 
   const saveContact = async () => {
     setSaving(true)
@@ -103,17 +117,20 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
         email,
       })
       setCid(id as Id<'customers'>)
+      setBasePh(phone)
+      setBaseEm(email)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
+    } catch {
+      toast.error("Erreur lors de l'enregistrement")
     } finally {
       setSaving(false)
     }
   }
 
-  // Historique réel : paiements de cette table, plus récents d'abord.
-  const visits = [...tablePayments]
+  // Historique : tous les paiements du client, récent → ancien.
+  const allVisits = [...tablePayments]
     .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, 5)
     .map(p => {
       const d = new Date(p.createdAt)
       const date = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -125,20 +142,31 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
         amount: formatEur(p.totalCents),
       }
     })
+  const visitsToShow = showAllVisits ? allVisits : allVisits.slice(0, 3)
 
-  // Feedbacks réels de cette table (privés — jamais publiés sur Google).
-  const feedbacks = [...tableFeedbacks]
+  // Feedbacks : filtrés par tableNumber + ±24h d'un paiement du client.
+  const DAY = 86400000
+  const matchedFeedbacks = [...tableFeedbacks]
+    .filter(f => tablePayments.some(p =>
+      p.tableNumber === f.tableNumber &&
+      Math.abs((f.createdAt ?? 0) - p.createdAt) <= DAY
+    ))
     .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
-    .slice(0, 5)
-    .map(f => ({ rating: f.stars, text: f.text, date: f.timeLabel ?? '' }))
+  const avgRating = matchedFeedbacks.length > 0
+    ? matchedFeedbacks.reduce((s, f) => s + f.stars, 0) / matchedFeedbacks.length
+    : 0
+
+  // Totaux calculés depuis les paiements réels du client (cents).
+  const totalCents = tablePayments.reduce((s, p) => s + p.totalCents, 0)
+  const avgCents = tablePayments.length > 0 ? Math.round(totalCents / tablePayments.length) : 0
 
   // "Client depuis" = date du 1er paiement réel.
   const sinceLabel = tablePayments.length
     ? new Date(Math.min(...tablePayments.map(p => p.createdAt))).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })
     : ''
 
-  // Fréquence réelle : nb de paiements par semaine sur les 4 dernières semaines.
-  const WEEK = 7 * 86400000
+  // Fréquence : paiements par semaine sur les 4 dernières semaines.
+  const WEEK = 7 * DAY
   const nowTs = Date.now()
   const weekBars = [3, 2, 1, 0].map(off => {
     const end = nowTs - off * WEEK
@@ -223,7 +251,7 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
                   onClick={saveContact}
                   disabled={saving || !dirty}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[8px] text-[13px] font-semibold text-white disabled:opacity-50"
-                  style={{ background: '#E8920A' }}
+                  style={{ background: saved ? '#22C55E' : '#E8920A' }}
                 >
                   {saved ? <><Check size={13} /> Enregistré</> : saving ? 'Enregistrement…' : 'Enregistrer'}
                 </button>
@@ -239,9 +267,9 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
             <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-3">Vue rapide</h4>
             <div className="grid grid-cols-2 gap-2.5">
               {[
-                { label: 'Visites', value: String(customer.visits), sub: sinceLabel ? `depuis ${sinceLabel}` : `${customer.visits} paiement${customer.visits > 1 ? 's' : ''}` },
-                { label: 'Total dépensé', value: `${customer.total.toFixed(0)}€`, sub: `panier moy. ${customer.avg.toFixed(2).replace('.', ',')}€`, accent: true },
-                { label: 'Note moyenne', value: customer.rating > 0 ? `${customer.rating.toFixed(1)} ★` : '—', sub: `sur ${tableFeedbacks.length} feedback${tableFeedbacks.length > 1 ? 's' : ''}` },
+                { label: 'Visites', value: String(tablePayments.length), sub: sinceLabel ? `depuis ${sinceLabel}` : `${tablePayments.length} paiement${tablePayments.length > 1 ? 's' : ''}` },
+                { label: 'Total dépensé', value: formatEur(totalCents), sub: `panier moy. ${formatEur(avgCents)}`, accent: true },
+                { label: 'Note moyenne', value: avgRating > 0 ? `${avgRating.toFixed(1)} ★` : '—', sub: `sur ${matchedFeedbacks.length} feedback${matchedFeedbacks.length !== 1 ? 's' : ''}` },
                 { label: 'Moyen préféré', value: customer.split, sub: customer.methodPct > 0 ? `${customer.methodPct}% des paiements` : '—' },
               ].map(tile => (
                 <div
@@ -270,7 +298,7 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
               </h4>
               <div className="rounded-[10px] border p-3.5" style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}>
                 <div className="flex items-end justify-between mb-2">
-                  <span className="text-[11.5px] ds-text-tertiary">Total : {last4} visite{last4 > 1 ? 's' : ''}</span>
+                  <span className="text-[11.5px] ds-text-tertiary">Total : {tablePayments.length} visite{tablePayments.length > 1 ? 's' : ''}</span>
                   {deltaPct !== null && (
                     <span
                       className="text-[13px] font-semibold"
@@ -280,15 +308,22 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
                     </span>
                   )}
                 </div>
-                <div className="flex items-end gap-1.5 h-12">
+                <div className="flex items-end gap-1.5" style={{ height: '48px' }}>
                   {weekBars.map((v, i) => (
-                    <div key={i} className="flex-1 relative">
-                      <div className="rounded-[3px]" style={{ height: `${(v / maxBar) * 100}%`, background: '#E8920A', minHeight: v > 0 ? '4px' : '0' }} />
-                      <span className="block text-center text-[10px] ds-text-tertiary mt-1">{v}</span>
+                    <div key={i} className="flex-1 flex flex-col justify-end h-full">
+                      <div
+                        className="rounded-[3px] w-full"
+                        style={{ height: v > 0 ? `${Math.max(4, Math.round((v / maxBar) * 44))}px` : '0', background: '#E8920A' }}
+                      />
                     </div>
                   ))}
                 </div>
                 <div className="flex gap-1.5 mt-1">
+                  {weekBars.map((v, i) => (
+                    <div key={i} className="flex-1 text-center text-[10px] ds-text-tertiary">{v}</div>
+                  ))}
+                </div>
+                <div className="flex gap-1.5 mt-0.5">
                   {['S-3', 'S-2', 'S-1', 'Cette sem.'].map(l => (
                     <div key={l} className="flex-1 text-center text-[10px] ds-text-tertiary">{l}</div>
                   ))}
@@ -300,7 +335,7 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
           {/* Historique visites */}
           <div>
             <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-2">Historique des visites</h4>
-            {visits.map((v, i) => (
+            {visitsToShow.map((v, i) => (
               <div key={i} className="flex items-center gap-3 py-3 border-b last:border-b-0" style={{ borderColor: 'var(--ds-border)' }}>
                 <div className="text-[11.5px] ds-text-tertiary w-14 flex-shrink-0 font-mono">{v.date}</div>
                 <div className="flex-1 min-w-0">
@@ -310,23 +345,30 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
                 <div className="font-semibold text-[14px] ds-text-primary tabular-nums">{v.amount}</div>
               </div>
             ))}
-            <button className="flex items-center gap-1 mt-2 text-[12.5px] font-medium ds-text-secondary hover:ds-text-primary transition-colors">
-              Voir les {customer.visits} visites <ChevronRight size={12} />
-            </button>
+            {allVisits.length > 3 && (
+              <button
+                onClick={() => setShowAllVisits(v => !v)}
+                className="flex items-center gap-1 mt-2 text-[12.5px] font-medium ds-text-secondary hover:ds-text-primary transition-colors"
+              >
+                {showAllVisits
+                  ? <>Réduire <ChevronRight size={12} style={{ transform: 'rotate(90deg)' }} /></>
+                  : <>Voir les {allVisits.length} visites <ChevronRight size={12} /></>}
+              </button>
+            )}
           </div>
 
           {/* Feedbacks */}
           <div>
             <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-2">Feedbacks laissés</h4>
             <div className="space-y-2">
-              {feedbacks.map((f, i) => (
+              {matchedFeedbacks.map((f, i) => (
                 <div
                   key={i}
                   className="rounded-[10px] border p-3.5"
                   style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <StarRating rating={f.rating} />
+                    <StarRating rating={f.stars} />
                     <span
                       className="text-[10.5px] font-semibold px-1.5 py-[2px] rounded-[4px]"
                       style={{ background: 'var(--ds-accent-soft)', color: '#B45309' }}
@@ -334,11 +376,18 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
                       Privé
                     </span>
                   </div>
+                  {f.tags && f.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1.5">
+                      {f.tags.map((tag, j) => (
+                        <span key={j} className="text-[10.5px] px-1.5 py-[2px] rounded-[4px] ds-text-secondary" style={{ background: 'var(--ds-bg-subtle)' }}>{tag}</span>
+                      ))}
+                    </div>
+                  )}
                   {f.text && <p className="text-[13px] ds-text-primary leading-[1.5]">"{f.text}"</p>}
-                  {f.date && <div className="text-[11px] ds-text-tertiary mt-1.5">{f.date}</div>}
+                  {f.timeLabel && <div className="text-[11px] ds-text-tertiary mt-1.5">{f.timeLabel}</div>}
                 </div>
               ))}
-              {feedbacks.length === 0 && (
+              {matchedFeedbacks.length === 0 && (
                 <div className="text-[12.5px] ds-text-tertiary">Aucun feedback laissé.</div>
               )}
             </div>
@@ -349,31 +398,155 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
             <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-3">Actions</h4>
             <div className="flex flex-wrap gap-2">
               <button
+                onClick={() => {
+                  if (!customer.marketingId) return
+                  setMsgSubject(`Un message de ${restaurant?.name ?? 'votre restaurant'}`)
+                  setMsgModal(true)
+                }}
+                disabled={!customer.marketingId}
+                title={!customer.marketingId ? "Ce client n'a pas donné son consentement email" : undefined}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[8px] text-[13px] font-semibold text-white"
-                style={{ background: '#E8920A' }}
+                style={{ background: '#E8920A', opacity: customer.marketingId ? 1 : 0.4, cursor: customer.marketingId ? 'pointer' : 'not-allowed' }}
               >
                 <Send size={13} />
                 Envoyer un message
               </button>
               <button
+                onClick={async () => {
+                  if (!email) return
+                  await navigator.clipboard.writeText(email).catch(() => {})
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                }}
+                disabled={!email}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[8px] border text-[13px] font-medium"
-                style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
-                onClick={() => navigator.clipboard.writeText(customer.email).catch(() => {})}
+                style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', opacity: email ? 1 : 0.4 }}
               >
-                <Mail size={13} />
-                Copier l'email
+                {copied ? <><Check size={13} /> ✓ Copié !</> : <><Mail size={13} /> Copier l'email</>}
               </button>
               <button
+                onClick={async () => {
+                  if (!customer.customerId || vipLoading) return
+                  setVipLoading(true)
+                  try {
+                    await setManualVipMutation({ customerId: customer.customerId, isVip: !customer.manualVip })
+                    toast.success(customer.manualVip ? 'Statut VIP retiré' : 'Client marqué VIP ⭐')
+                  } catch {
+                    toast.error('Erreur lors de la mise à jour du statut')
+                  } finally {
+                    setVipLoading(false)
+                  }
+                }}
+                disabled={!customer.customerId || vipLoading}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[8px] border text-[13px] font-medium"
-                style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
+                style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', opacity: customer.customerId ? 1 : 0.4 }}
               >
                 <Crown size={13} />
-                Marquer VIP
+                {vipLoading ? '…' : customer.manualVip ? '⭐ Retirer VIP' : '⭐ Marquer VIP'}
               </button>
             </div>
           </div>
         </div>
       </aside>
+
+      <AnimatePresence>
+        {msgModal && (
+          <m.div
+            key="msg-modal"
+            className="fixed inset-0 flex items-center justify-center z-[60] p-4"
+            style={{ background: 'rgba(0,0,0,0.5)' }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={e => { if (e.target === e.currentTarget) setMsgModal(false) }}
+          >
+            <m.div
+              className="rounded-2xl overflow-hidden w-[460px] max-w-full"
+              style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
+              initial={{ scale: 0.95, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 12 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+                <span className="font-bold text-[15px] ds-text-primary">Message à {customer.first}</span>
+                <button onClick={() => setMsgModal(false)} className="ds-text-tertiary hover:ds-text-primary"><X size={16} /></button>
+              </div>
+              <div className="px-5 py-5 space-y-4 max-h-[68vh] overflow-y-auto">
+                <div>
+                  <label className="block text-[11px] font-semibold ds-text-secondary mb-1.5 uppercase tracking-wide">Sujet</label>
+                  <input
+                    value={msgSubject}
+                    onChange={e => setMsgSubject(e.target.value)}
+                    required
+                    className="w-full h-10 px-3 rounded-xl border text-[14px] outline-none focus:border-[#E8920A]"
+                    style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold ds-text-secondary mb-1.5 uppercase tracking-wide">Message</label>
+                  <textarea
+                    value={msgBody}
+                    onChange={e => setMsgBody(e.target.value)}
+                    required
+                    rows={5}
+                    className="w-full px-3 py-2.5 rounded-xl border text-[14px] outline-none resize-none leading-[1.6] focus:border-[#E8920A]"
+                    style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
+                  />
+                </div>
+                <button type="button" onClick={() => setMsgPreview(p => !p)} className="text-[13px] font-semibold" style={{ color: '#E8920A' }}>
+                  {msgPreview ? "Masquer l'aperçu" : "Afficher l'aperçu"}
+                </button>
+                {msgPreview && (
+                  <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'var(--ds-border)' }}>
+                    <div style={{ background: '#0A0A0A', padding: '16px 18px', color: '#fff', fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>
+                      {restaurant?.name ?? 'Votre restaurant'}
+                    </div>
+                    <div style={{ padding: '16px 18px', color: '#18181B', fontSize: 13.5, lineHeight: 1.65, whiteSpace: 'pre-wrap', background: '#fff' }}>
+                      {msgBody.trim() || 'Votre message apparaîtra ici.'}
+                    </div>
+                    <div style={{ padding: '12px 18px 16px', borderTop: '1px solid #E5E7EB', color: '#6B7280', fontSize: 11, lineHeight: 1.5, background: '#fff' }}>
+                      Vous recevez cet email car vous avez accepté les offres de {restaurant?.name ?? 'ce restaurant'} via Splitzy.<br />
+                      <span style={{ textDecoration: 'underline' }}>Se désabonner</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="px-5 pb-5 pt-1">
+                <button
+                  onClick={async () => {
+                    if (!customer.marketingId || !restaurantId) return
+                    setMsgSending(true)
+                    try {
+                      const res = await sendCampaignAction({
+                        restaurantId,
+                        customerIds: [customer.marketingId],
+                        subject: msgSubject.trim(),
+                        body: msgBody,
+                        restaurantName: restaurant?.name ?? 'le restaurant',
+                      })
+                      if (res.sent > 0) {
+                        toast.success('Message envoyé ✓')
+                        setMsgModal(false)
+                        setMsgSubject(''); setMsgBody(''); setMsgPreview(false)
+                      } else {
+                        toast.error("Échec de l'envoi")
+                      }
+                    } catch {
+                      toast.error("Erreur lors de l'envoi")
+                    } finally {
+                      setMsgSending(false)
+                    }
+                  }}
+                  disabled={!msgSubject.trim() || !msgBody.trim() || msgSending}
+                  className="w-full rounded-xl text-sm font-semibold py-2.5 flex items-center justify-center gap-2 text-white transition-opacity"
+                  style={{ background: '#E8920A', opacity: (msgSubject.trim() && msgBody.trim() && !msgSending) ? 1 : 0.5, cursor: (msgSubject.trim() && msgBody.trim() && !msgSending) ? 'pointer' : 'not-allowed' }}
+                >
+                  {msgSending ? 'Envoi en cours…' : <><Send size={14} /> Envoyer</>}
+                </button>
+              </div>
+            </m.div>
+          </m.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }
@@ -455,19 +628,28 @@ export function Clients() {
       const [topMethod, topCount] = Object.entries(methodCounts).sort((a, b) => b[1] - a[1])[0] ?? ['', 0]
       const methodPct = visits > 0 ? Math.round((topCount / visits) * 100) : 0
 
-      // CRM : row consentante (email + marketingConsent) appariée par phone/email du groupe.
+      // CRM : row appariée par phone/email du groupe OU par paymentId (saveContact backfill).
+      // paymentId match handle le cas où le gérant a édité phone/email via drawer :
+      // la row CRM a la nouvelle valeur mais le paiement garde l'ancienne → match by id.
+      const pmtIds = new Set(pmts.map(p => p._id))
       const crmMatch = (crmCustomers ?? []).filter(cc =>
         (gPhone && cc.phone === gPhone) ||
-        (gEmail && cc.email?.toLowerCase() === gEmail)
+        (gEmail && cc.email?.toLowerCase() === gEmail) ||
+        (cc.paymentId != null && pmtIds.has(cc.paymentId))
       )
+      // Priorité CRM > paiement : la row CRM reflète la dernière édition gérant.
+      const crmPhone = crmMatch[0]?.phone ?? ''
+      const crmEmail = crmMatch[0]?.email?.toLowerCase() ?? ''
+      const isManualVip = crmMatch.some(r => (r as any).manualVip === true)
+      if (isManualVip) status = 'vip'
       const consentRow = crmMatch.find(r => r.marketingConsent === true && !!r.email)
 
       list.push({
         id: key,
         tableNumber: recent.tableNumber,
         first, last: '',
-        email: gEmail || (crmMatch[0]?.email ?? ''),
-        phone: gPhone || (crmMatch[0]?.phone ?? ''),
+        email: crmEmail || gEmail,
+        phone: crmPhone || gPhone,
         visits, avg, total,
         lastVisit: formatTimeAgo(lastTs),
         lastIso: new Date(lastTs).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }),
@@ -476,7 +658,8 @@ export function Clients() {
         status,
         split: methodLabel(topMethod), methodPct,
         color: pal.bg, text: pal.color,
-        customerId: crmMatch[0]?._id, realContact: !!(gPhone || gEmail),
+        customerId: crmMatch[0]?._id, realContact: !!(crmPhone || gPhone || crmEmail || gEmail),
+        manualVip: isManualVip,
         consent: !!consentRow, marketingId: consentRow?._id,
         groupPayments: pmts, groupFeedbacks: gFeedbacks,
       })
@@ -559,6 +742,8 @@ export function Clients() {
     const matchSearch = !search || `${c.first} ${c.last} ${c.email}`.toLowerCase().includes(search.toLowerCase())
     return matchFilter && matchSearch
   })
+
+  const liveSelected = selected ? (customers.find(c => c.id === selected.id) ?? selected) : null
 
   return (
     <RestaurantLayout>
@@ -913,12 +1098,13 @@ export function Clients() {
         )}
       </AnimatePresence>
 
-      {selected && restaurantId && (
+      {liveSelected && restaurantId && (
         <CustomerDrawer
-          customer={selected}
+          key={liveSelected.id}
+          customer={liveSelected}
           restaurantId={restaurantId}
-          tablePayments={selected.groupPayments}
-          tableFeedbacks={selected.groupFeedbacks}
+          tablePayments={liveSelected.groupPayments}
+          tableFeedbacks={liveSelected.groupFeedbacks}
           onClose={() => setSelected(null)}
         />
       )}
