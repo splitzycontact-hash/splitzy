@@ -6,7 +6,7 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { toast } from 'sonner'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
-import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
+import { useRestaurantId, useRestaurant, useRestaurantRole } from '../context/RestaurantContext'
 import {
   Printer, Search, SlidersHorizontal, LayoutGrid, List,
   X, ChevronLeft, ChevronRight, Euro, HandCoins, Percent, CreditCard, CheckCircle, Clock, RotateCcw, AlertCircle, FileText, Mail, Trash2, Check, Info, Download,
@@ -126,6 +126,8 @@ function Drawer({ row, restaurantId, restaurantName, onClose }: {
   restaurantName: string
   onClose: () => void
 }) {
+  const role = useRestaurantRole()
+  const canAct = role !== 'viewer' // viewer = lecture seule : ni email reçu, ni remboursement
   const updateStatusMut = useMutation(api.payments.updateStatus)
   const sendCampaignAction = useAction(api.campaigns.sendCampaign)
   const crmCustomers = useQuery(api.customers.getByRestaurant, restaurantId ? { restaurantId } : 'skip') ?? []
@@ -327,10 +329,12 @@ function Drawer({ row, restaurantId, restaurantName, onClose }: {
               <button onClick={handlePDF} className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-[9px] border text-[13px] font-medium transition-colors" style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}>
                 <FileText size={14} /> Télécharger le justificatif PDF
               </button>
-              <button onClick={handleEmailClick} className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-[9px] border text-[13px] font-medium transition-colors" style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}>
-                <Mail size={14} /> Envoyer le reçu par email
-              </button>
-              {row.status !== 'Remboursé' && (
+              {canAct && (
+                <button onClick={handleEmailClick} className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-[9px] border text-[13px] font-medium transition-colors" style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}>
+                  <Mail size={14} /> Envoyer le reçu par email
+                </button>
+              )}
+              {canAct && row.status !== 'Remboursé' && (
                 <button onClick={() => setRefundModal(true)} className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-[9px] border text-[13px] font-medium transition-colors" style={{ background: 'var(--ds-error-soft)', borderColor: 'var(--ds-error-soft)', color: 'var(--ds-error)' }}>
                   <Trash2 size={14} /> Initier un remboursement
                 </button>

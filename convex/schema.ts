@@ -48,7 +48,26 @@ export default defineSchema({
     status: v.union(v.literal("active"), v.literal("pending")),
     invitedAt: v.number(),
     joinedAt: v.optional(v.number()),
-  }).index("by_restaurant", ["restaurantId"]),
+    // Renseigné quand le membre accepte son invitation depuis /restaurant/accept-invite
+    // (identité Clerk de la personne qui a accepté). Voir convex/invitations.ts → accept.
+    clerkUserId: v.optional(v.string()),
+  }).index("by_restaurant", ["restaurantId"])
+    .index("by_clerkUserId", ["clerkUserId"]),
+
+  // Invitations d'équipe envoyées par email (Resend). Le lien d'acceptation porte
+  // un token UUID ; à l'acceptation on crée/active une ligne `members`. Voir
+  // convex/invitations.ts (create/getByToken/listByRestaurant/accept).
+  restaurantInvitations: defineTable({
+    restaurantId: v.id("restaurants"),
+    email: v.string(),
+    role: v.string(),            // 'gerant' | 'manager' | 'viewer'
+    token: v.string(),           // UUID unique
+    status: v.string(),          // 'pending' | 'accepted' | 'expired'
+    createdAt: v.number(),
+    expiresAt: v.number(),       // createdAt + 7 jours
+  })
+    .index("by_token", ["token"])
+    .index("by_restaurant", ["restaurantId"]),
 
   tables: defineTable({
     restaurantId: v.id("restaurants"),

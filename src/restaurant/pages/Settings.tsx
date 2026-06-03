@@ -4,6 +4,7 @@ import { useClerk, useUser } from '@clerk/clerk-react'
 import { useNavigate } from 'react-router-dom'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { QRCodeSVG } from 'qrcode.react'
+import { toast } from 'sonner'
 import {
   Download, Store, QrCode, UserCog, Bell, UserRound,
   CreditCard, Sparkles, Plus, MoreHorizontal, Trash2,
@@ -12,7 +13,7 @@ import {
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
-import { useRestaurant, useRestaurantId } from '../context/RestaurantContext'
+import { useRestaurant, useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
 import { assignEmoji, normalizeCategoryId } from '../../utils/menuEmoji'
 import { generateBillingInvoicePDF, downloadAllInvoices, type BillingInvoiceData } from '../../utils/generateBillingInvoice'
 
@@ -1886,31 +1887,106 @@ const ROLE_STYLE: Record<MemberRole, { bg: string; color: string; label: string 
   staff:   { bg: 'var(--ds-bg-subtle)',     color: 'var(--ds-text-secondary)', label: 'Équipier' },
 }
 
+// Rôles proposés à l'invitation (table restaurantInvitations). Mappés vers
+// owner/manager/staff côté backend à l'acceptation (convex/invitations.ts).
+type InviteRole = 'gerant' | 'manager' | 'viewer'
+
+const INVITE_ROLES: { id: InviteRole; label: string; desc: string }[] = [
+  { id: 'gerant',  label: 'Gérant',  desc: 'Accès complet : paramètres, équipe, facturation.' },
+  { id: 'manager', label: 'Manager', desc: 'Dashboard opérationnel : tables, feedbacks, analytics.' },
+  { id: 'viewer',  label: 'Viewer',  desc: 'Lecture seule des tables et feedbacks du jour.' },
+]
+
+const INVITE_ROLE_LABEL: Record<string, string> = {
+  gerant: 'Gérant', manager: 'Manager', viewer: 'Viewer',
+}
+
+// Badge de statut d'une invitation. 'expired' est calculé aussi quand
+// expiresAt est dépassé même si le statut stocké est encore 'pending'.
+const INVITE_STATUS_STYLE: Record<'pending' | 'accepted' | 'expired', { bg: string; color: string; label: string }> = {
+  pending:  { bg: 'var(--ds-warning-soft)', color: 'var(--ds-warning)',        label: 'En attente' },
+  accepted: { bg: 'var(--ds-success-soft)', color: 'var(--ds-success-strong)', label: 'Acceptée' },
+  expired:  { bg: 'var(--ds-bg-subtle)',    color: 'var(--ds-text-tertiary)',  label: 'Expirée' },
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null }) {
   const { user } = useUser()
+  const restaurant = useRestaurant()
+  const restaurantName = restaurant?.name ?? 'votre restaurant'
   const members = useQuery(api.members.getTeamMembers, restaurantId ? { restaurantId } : 'skip') ?? []
-  const inviteMember     = useMutation(api.members.inviteMember)
+  const invitations = useQuery(api.invitations.listByRestaurant, restaurantId ? { restaurantId } : 'skip') ?? []
+  const createInvitation = useAction(api.invitations.create)
   const updateMemberRole = useMutation(api.members.updateMemberRole)
   const removeMember     = useMutation(api.members.removeMember)
 
   const [showInvite, setShowInvite] = useState(false)
   const [showRoles, setShowRoles] = useState(false)
-  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'staff' as MemberRole })
+  const [inviteForm, setInviteForm] = useState<{ email: string; role: InviteRole }>({ email: '', role: 'manager' })
   const [inviting, setInviting] = useState(false)
+  const [resendingId, setResendingId] = useState<string | null>(null)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState<{ id: Id<'members'>; name: string } | null>(null)
+  const [removing, setRemoving] = useState(false)
+
+  async function handleRemove() {
+    if (!confirmRemove) return
+    setRemoving(true)
+    try {
+      await removeMember({ memberId: confirmRemove.id })
+      toast.success(`${confirmRemove.name} retiré(e) de l'équipe`)
+      setConfirmRemove(null)
+    } catch {
+      toast.error('Échec de la suppression')
+    } finally {
+      setRemoving(false)
+    }
+  }
 
   async function handleInvite() {
-    if (!restaurantId || !inviteForm.name.trim() || !inviteForm.email.trim()) return
+    const email = inviteForm.email.trim()
+    if (!restaurantId || !EMAIL_RE.test(email)) {
+      toast.error('Adresse email invalide')
+      return
+    }
     setInviting(true)
-    await inviteMember({
-      restaurantId,
-      name: inviteForm.name.trim(),
-      email: inviteForm.email.trim(),
-      role: inviteForm.role,
-    }).catch(() => {})
-    setInviting(false)
-    setShowInvite(false)
-    setInviteForm({ name: '', email: '', role: 'staff' })
+    try {
+      const res = await createInvitation({ restaurantId, email, role: inviteForm.role, restaurantName })
+      if (res?.emailSent) {
+        toast.success(`Invitation envoyée à ${email}`)
+      } else {
+        toast.success(`Invitation créée pour ${email}`, {
+          description: "L'email n'a pas pu être envoyé — vérifiez la configuration Resend.",
+        })
+      }
+      setShowInvite(false)
+      setInviteForm({ email: '', role: 'manager' })
+    } catch {
+      toast.error("Échec de l'envoi de l'invitation")
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  async function handleResend(inv: { _id: string; email: string; role: string }) {
+    if (!restaurantId || resendingId) return
+    setResendingId(inv._id)
+    try {
+      const res = await createInvitation({
+        restaurantId,
+        email: inv.email,
+        role: inv.role,
+        restaurantName,
+      })
+      toast.success(
+        res?.emailSent ? `Invitation renvoyée à ${inv.email}` : `Nouvelle invitation créée pour ${inv.email}`
+      )
+    } catch {
+      toast.error('Échec du renvoi')
+    } finally {
+      setResendingId(null)
+    }
   }
 
   // Synthetic owner row from Clerk user (always shown first)
@@ -1921,6 +1997,28 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
   const ownerInitials = ownerName.split(' ').map(w => w[0]?.toUpperCase() ?? '').slice(0, 2).join('')
 
   const pendingCount = members.filter(m => m.status === 'pending').length
+
+  // Invitations acceptées sans ligne `members` correspondante (l'invité a cliqué
+  // le lien mais n'a pas encore de membre en base — typiquement pas encore
+  // reconnecté avec son clerkUserId). On les affiche dans la liste membres comme
+  // « En attente de connexion » pour qu'elles ne disparaissent pas de la vue.
+  const orphanAccepted = invitations.filter(
+    inv =>
+      inv.status === 'accepted' &&
+      !members.some(m => m.email.toLowerCase() === inv.email.toLowerCase())
+  )
+
+  // Initiales d'avatar dérivées de l'email (ex: grg.yann@… → « GY »).
+  function emailInitials(email: string): string {
+    const local = (email.split('@')[0] ?? '').replace(/[._-]+/g, ' ').trim()
+    const ini = local.split(' ').filter(Boolean).map(p => p[0]?.toUpperCase() ?? '').slice(0, 2).join('')
+    return ini || email.slice(0, 2).toUpperCase()
+  }
+
+  // Rôle d'invitation (gerant/manager/viewer) → style ROLE_STYLE (owner/manager/staff).
+  function inviteRoleStyle(role: string) {
+    return ROLE_STYLE[role === 'gerant' ? 'owner' : role === 'viewer' ? 'staff' : 'manager']
+  }
 
   return (
     <div className="space-y-5">
@@ -1956,8 +2054,8 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
         </div>
       </div>
 
-      {/* Members table */}
-      <div className="ds-panel">
+      {/* Members table — overflow visible pour que le menu "⋯" ne soit pas clippé par .ds-panel */}
+      <div className="ds-panel" style={{ overflow: 'visible' }}>
         {/* Header row */}
         <div
           className="grid gap-3.5 px-5 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.07em]"
@@ -2011,7 +2109,7 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
             <div />
           </div>
 
-          {members.length === 0 && (
+          {members.length === 0 && orphanAccepted.length === 0 && (
             <div className="py-8 text-center text-[13px]" style={{ color: 'var(--ds-text-tertiary)' }}>
               Aucun autre membre. Invitez quelqu'un pour commencer.
             </div>
@@ -2074,7 +2172,7 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                     </button>
                     {openMenu === member._id && (
                       <div
-                        className="absolute right-0 top-9 rounded-[10px] py-1 z-20 min-w-[160px]"
+                        className="absolute right-0 top-9 rounded-[10px] py-1 z-50 min-w-[160px]"
                         style={{
                           background: 'var(--ds-bg-surface)',
                           border: '1px solid var(--ds-border)',
@@ -2099,14 +2197,14 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                         <div className="my-1" style={{ borderTop: '1px solid var(--ds-border)' }} />
                         <button
                           onClick={() => {
-                            removeMember({ memberId: member._id }).catch(() => {})
+                            setConfirmRemove({ id: member._id, name: member.name })
                             setOpenMenu(null)
                           }}
                           className="w-full text-left flex items-center gap-2 px-3 py-2 text-[13px] hover:ds-bg-error-soft transition-colors"
                           style={{ color: 'var(--ds-error)' }}
                         >
                           <Trash2 size={13} />
-                          Retirer du compte
+                          Retirer du restaurant
                         </button>
                       </div>
                     )}
@@ -2114,6 +2212,51 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                 </div>
               )
             })}
+
+          {/* Invités acceptés sans membre en base — en attente de leur 1ère connexion */}
+          {orphanAccepted.map(inv => {
+            const roleStyle = inviteRoleStyle(inv.role)
+            return (
+              <div
+                key={inv._id}
+                className="grid gap-3.5 px-5 py-3 border-b items-center"
+                style={{ gridTemplateColumns: '36px 1.5fr 1fr 100px 90px 40px', borderColor: 'var(--ds-border)' }}
+              >
+                {/* Avatar (initiales email) */}
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-[11.5px] font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg, #FFB453, #E8920A)' }}
+                >
+                  {emailInitials(inv.email)}
+                </div>
+                {/* Email comme nom */}
+                <div>
+                  <div className="text-[13px] font-semibold ds-text-primary truncate">{inv.email}</div>
+                </div>
+                {/* Email */}
+                <div className="text-[11.5px] ds-text-tertiary truncate">{inv.email}</div>
+                {/* Role */}
+                <div>
+                  <span
+                    className="inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold"
+                    style={{ background: roleStyle.bg, color: roleStyle.color }}
+                  >
+                    {roleStyle.label}
+                  </span>
+                </div>
+                {/* Status — en attente de connexion */}
+                <div>
+                  <span
+                    className="inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold whitespace-nowrap"
+                    style={{ background: 'var(--ds-warning-soft)', color: 'var(--ds-warning)' }}
+                  >
+                    En attente de connexion
+                  </span>
+                </div>
+                <div />
+              </div>
+            )
+          })}
         </div>
 
         {pendingCount > 0 && (
@@ -2129,6 +2272,115 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
           </div>
         )}
       </div>
+
+      {/* Invitations list */}
+      {invitations.length > 0 && (
+        <div className="ds-panel">
+          <div className="px-5 py-3.5 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+            <div className="font-bold text-[13.5px] ds-text-primary">Invitations</div>
+            <div className="text-[12px] ds-text-tertiary mt-0.5">
+              Suivi des invitations envoyées par email.
+            </div>
+          </div>
+          <div>
+            {invitations.map(inv => {
+              const effectiveStatus: 'pending' | 'accepted' | 'expired' =
+                inv.status === 'accepted'
+                  ? 'accepted'
+                  : inv.status === 'expired' || inv.expiresAt < Date.now()
+                  ? 'expired'
+                  : 'pending'
+              const statusStyle = INVITE_STATUS_STYLE[effectiveStatus]
+              const expiryLabel = new Date(inv.expiresAt).toLocaleDateString('fr-FR', {
+                day: '2-digit', month: 'short', year: 'numeric',
+              })
+              return (
+                <div
+                  key={inv._id}
+                  className="grid gap-3.5 px-5 py-3 border-b items-center"
+                  style={{ gridTemplateColumns: '1.6fr 90px 100px 1fr 100px', borderColor: 'var(--ds-border)' }}
+                >
+                  <div className="text-[13px] font-medium ds-text-primary truncate">{inv.email}</div>
+                  <div>
+                    <span
+                      className="inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold"
+                      style={{ background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-secondary)' }}
+                    >
+                      {INVITE_ROLE_LABEL[inv.role] ?? inv.role}
+                    </span>
+                  </div>
+                  <div>
+                    <span
+                      className="inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold"
+                      style={{ background: statusStyle.bg, color: statusStyle.color }}
+                    >
+                      {statusStyle.label}
+                    </span>
+                  </div>
+                  <div className="text-[11.5px] ds-text-tertiary">
+                    {effectiveStatus === 'accepted' ? '—' : `Expire le ${expiryLabel}`}
+                  </div>
+                  <div className="text-right">
+                    {effectiveStatus !== 'accepted' && (
+                      <button
+                        onClick={() => handleResend(inv)}
+                        disabled={resendingId === inv._id}
+                        className="text-[12px] font-semibold transition-colors disabled:opacity-50"
+                        style={{ color: '#E8920A' }}
+                      >
+                        {resendingId === inv._id ? 'Envoi…' : 'Renvoyer'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Remove confirmation modal */}
+      {confirmRemove && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={e => { if (e.target === e.currentTarget && !removing) setConfirmRemove(null) }}
+        >
+          <div
+            className="rounded-2xl overflow-hidden w-[400px] max-w-full"
+            style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
+          >
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: 'var(--ds-error-soft)' }}>
+                  <Trash2 size={16} style={{ color: 'var(--ds-error)' }} />
+                </div>
+                <div className="font-bold text-[15px] ds-text-primary">Retirer {confirmRemove.name} de l'équipe ?</div>
+              </div>
+              <p className="text-[13px] ds-text-secondary leading-[1.5]">
+                {confirmRemove.name} perdra l'accès au dashboard de {restaurantName}. Cette action est irréversible.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 px-6 pb-5">
+              <button
+                onClick={() => setConfirmRemove(null)}
+                disabled={removing}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-colors disabled:opacity-50"
+                style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleRemove}
+                disabled={removing}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
+                style={{ background: 'var(--ds-error)' }}
+              >
+                {removing ? 'Suppression…' : 'Confirmer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Invite modal */}
       {showInvite && (
@@ -2148,27 +2400,14 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
             </div>
             <div className="px-6 py-5 space-y-4">
               <div>
-                <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Nom complet</label>
-                <input
-                  value={inviteForm.name}
-                  onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="Marie Dupont"
-                  className="w-full rounded-lg border px-3 py-2 text-[13.5px] outline-none transition-all"
-                  style={{
-                    background: 'var(--ds-bg-surface)',
-                    borderColor: 'var(--ds-border)',
-                    color: 'var(--ds-text-primary)',
-                    fontSize: '16px',
-                  }}
-                />
-              </div>
-              <div>
                 <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Email</label>
                 <input
                   type="email"
                   value={inviteForm.email}
                   onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter' && !inviting) handleInvite() }}
                   placeholder="marie@restaurant.fr"
+                  autoFocus
                   className="w-full rounded-lg border px-3 py-2 text-[13.5px] outline-none transition-all"
                   style={{
                     background: 'var(--ds-bg-surface)',
@@ -2181,37 +2420,40 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
               <div>
                 <label className="block text-[12px] font-semibold ds-text-primary mb-2">Rôle</label>
                 <div className="space-y-2">
-                  {(['owner', 'manager', 'staff'] as MemberRole[]).map(r => (
+                  {INVITE_ROLES.map(r => (
                     <label
-                      key={r}
-                      className="flex items-center gap-3 p-3 rounded-[9px] border cursor-pointer transition-colors"
+                      key={r.id}
+                      className="flex items-start gap-3 p-3 rounded-[9px] border cursor-pointer transition-colors"
                       style={{
-                        borderColor: inviteForm.role === r ? '#E8920A' : 'var(--ds-border)',
-                        background: inviteForm.role === r ? 'var(--ds-accent-soft)' : 'var(--ds-bg-base)',
+                        borderColor: inviteForm.role === r.id ? '#E8920A' : 'var(--ds-border)',
+                        background: inviteForm.role === r.id ? 'var(--ds-accent-soft)' : 'var(--ds-bg-base)',
                       }}
                     >
                       <input
                         type="radio"
-                        name="role"
-                        value={r}
-                        checked={inviteForm.role === r}
-                        onChange={() => setInviteForm(f => ({ ...f, role: r }))}
+                        name="invite-role"
+                        value={r.id}
+                        checked={inviteForm.role === r.id}
+                        onChange={() => setInviteForm(f => ({ ...f, role: r.id }))}
                         className="sr-only"
                       />
                       <div
-                        className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0"
-                        style={{ borderColor: inviteForm.role === r ? '#E8920A' : 'var(--ds-border-strong)' }}
+                        className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
+                        style={{ borderColor: inviteForm.role === r.id ? '#E8920A' : 'var(--ds-border-strong)' }}
                       >
-                        {inviteForm.role === r && (
+                        {inviteForm.role === r.id && (
                           <div className="w-2 h-2 rounded-full" style={{ background: '#E8920A' }} />
                         )}
                       </div>
-                      <span
-                        className="text-[13px] font-semibold"
-                        style={{ color: inviteForm.role === r ? 'var(--ds-accent-strong)' : 'var(--ds-text-primary)' }}
-                      >
-                        {ROLE_STYLE[r].label}
-                      </span>
+                      <div>
+                        <div
+                          className="text-[13px] font-semibold"
+                          style={{ color: inviteForm.role === r.id ? 'var(--ds-accent-strong)' : 'var(--ds-text-primary)' }}
+                        >
+                          {r.label}
+                        </div>
+                        <div className="text-[11.5px] ds-text-tertiary mt-0.5">{r.desc}</div>
+                      </div>
                     </label>
                   ))}
                 </div>
@@ -2227,7 +2469,7 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
               </button>
               <button
                 onClick={handleInvite}
-                disabled={inviting || !inviteForm.name.trim() || !inviteForm.email.trim()}
+                disabled={inviting || !EMAIL_RE.test(inviteForm.email.trim())}
                 className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
                 style={{ background: '#E8920A' }}
               >
@@ -2688,6 +2930,14 @@ export function Settings() {
   const rawTables = useQuery(api.tables.list, restaurantId ? { restaurantId } : 'skip')
   const teamMembers = useQuery(api.members.getTeamMembers, restaurantId ? { restaurantId } : 'skip')
 
+  const role = useRestaurantRole()
+  // Manager : pas d'accès Équipe / Facturation / Plan & abonnement (réservé owner).
+  // viewer n'atteint jamais cette page (RoleGuard /settings).
+  const HIDDEN_FOR_MANAGER: SectionKey[] = ['team', 'billing', 'plan']
+  const visibleNav = role === 'manager'
+    ? SUB_NAV.filter(n => !HIDDEN_FOR_MANAGER.includes(n.key))
+    : SUB_NAV
+
   const [section, setSection]       = useState<SectionKey>('restaurant')
   const [saving, setSaving]         = useState(false)
   const [saved, setSaved]           = useState(false)
@@ -2713,6 +2963,12 @@ export function Settings() {
       })
     }
   }, [restaurant?._id])
+
+  // Sécurité : si un manager a (état résiduel) une section réservée sélectionnée,
+  // on retombe sur 'restaurant' — le contenu réservé ne s'affiche jamais pour lui.
+  useEffect(() => {
+    if (role === 'manager' && HIDDEN_FOR_MANAGER.includes(section)) setSection('restaurant')
+  }, [role, section])
 
   async function handleSave() {
     if (!restaurant) return
@@ -2751,7 +3007,7 @@ export function Settings() {
                 Paramètres
               </div>
               <div className="flex overflow-x-auto md:block p-1.5 md:p-1.5 gap-1">
-                {SUB_NAV.map(({ key, label, icon: Icon, pendingDot }) => {
+                {visibleNav.map(({ key, label, icon: Icon, pendingDot }) => {
                   const active = section === key
                   const pendingCount = pendingDot
                     ? (teamMembers?.filter(m => m.status === 'pending').length ?? 0)

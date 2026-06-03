@@ -11,22 +11,26 @@ import { Sidebar } from './Sidebar'
 import { PrintProvider, usePrintState } from '../context/PrintContext'
 import { PrintReport } from '../components/PrintReport'
 import { ThemeProvider, useTheme } from '../context/ThemeContext'
-import { useRestaurantId } from '../context/RestaurantContext'
+import { useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
+import type { RestaurantRole } from '../lib/roles'
 
 interface RestaurantLayoutProps {
   children: ReactNode
 }
 
-const MOBILE_NAV = [
+// `roles` = rôles autorisés (absent = tous). Réglages owner-only (cf goal Étape 2).
+const MOBILE_NAV: { label: string; icon: React.ElementType; to: string; exact?: boolean; feedbackBadge?: boolean; roles?: RestaurantRole[] }[] = [
   { label: 'Accueil',   icon: LayoutDashboard, to: '/restaurant',            exact: true },
   { label: 'Tables',    icon: Grid3x3,          to: '/restaurant/tables' },
   { label: 'Réputation',icon: Star,             to: '/restaurant/reputation', feedbackBadge: true },
   { label: 'Factures',  icon: Receipt,          to: '/restaurant/factures' },
-  { label: 'Réglages',  icon: Settings,         to: '/restaurant/settings' },
+  { label: 'Réglages',  icon: Settings,         to: '/restaurant/settings', roles: ['owner', 'manager'] },
 ]
 
 function MobileBottomNav() {
   const restaurantId = useRestaurantId()
+  const role = useRestaurantRole() ?? 'owner'
+  const items = MOBILE_NAV.filter(item => !item.roles || item.roles.includes(role))
   const { theme } = useTheme()
   const newFeedbackCount = useQuery(
     api.feedbacks.getNewCount,
@@ -43,7 +47,7 @@ function MobileBottomNav() {
         color: theme === 'dark' ? '#FAFAFA' : '#0A0A0A',
       }}
     >
-      {MOBILE_NAV.map(({ label, icon: Icon, to, exact, feedbackBadge }) => {
+      {items.map(({ label, icon: Icon, to, exact, feedbackBadge }) => {
         const badge = feedbackBadge && newFeedbackCount > 0 ? newFeedbackCount : 0
         return (
           <NavLink

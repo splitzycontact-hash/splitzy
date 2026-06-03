@@ -41,6 +41,22 @@ export const getByClerkId = query({
   },
 })
 
+// Restaurant auquel l'utilisateur connecté est rattaché via une invitation
+// acceptée — sa ligne `members` porte son clerkUserId (écrit par invitations.accept).
+// Permet à un membre invité, qui n'est PAS dans la table `restaurants`, d'accéder
+// au dashboard du restaurant existant au lieu d'être renvoyé vers l'onboarding.
+export const getByMembership = query({
+  args: { clerkUserId: v.string() },
+  handler: async (ctx, { clerkUserId }) => {
+    const membership = await ctx.db
+      .query("members")
+      .withIndex("by_clerkUserId", q => q.eq("clerkUserId", clerkUserId))
+      .first()
+    if (!membership) return null
+    return ctx.db.get(membership.restaurantId)
+  },
+})
+
 export const create = mutation({
   args: {
     name: v.string(),

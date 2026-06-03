@@ -1,6 +1,12 @@
 import { SignIn } from '@clerk/clerk-react'
+import { useSearchParams } from 'react-router-dom'
 
 export function RestaurantSignIn() {
+  const [params] = useSearchParams()
+  // Permet de revenir sur une page précise après login (ex: accept-invite).
+  // On n'accepte que des chemins internes pour éviter les redirections ouvertes.
+  const rawRedirect = params.get('redirect')
+  const redirectUrl = rawRedirect && rawRedirect.startsWith('/') ? rawRedirect : '/restaurant/onboarding'
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-6 p-6">
       <div className="text-center">
@@ -10,8 +16,8 @@ export function RestaurantSignIn() {
         <div className="text-sm text-muted">Interface gérant</div>
       </div>
       <SignIn
-        forceRedirectUrl="/restaurant/onboarding"
-        signUpForceRedirectUrl="/restaurant/onboarding"
+        forceRedirectUrl={redirectUrl}
+        signUpForceRedirectUrl={redirectUrl}
         appearance={{
           variables: {
             colorPrimary: '#E8920A',

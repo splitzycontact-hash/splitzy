@@ -7,8 +7,9 @@ import {
 import { useUser, useClerk } from '@clerk/clerk-react'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
-import { useRestaurant, useRestaurantId } from '../context/RestaurantContext'
+import { useRestaurant, useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
 import { useTheme } from '../context/ThemeContext'
+import { ROLE_LABEL, type RestaurantRole } from '../lib/roles'
 
 const clerkReady = (() => {
   const k = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined
@@ -22,13 +23,32 @@ const PILOTAGE_ITEMS = [
   { label: 'Analytics',     icon: TrendingUp,       to: '/restaurant/analytics',  exact: false, badge: false },
 ]
 
-const RESTAURANT_ITEMS = [
-  { label: 'Menu / Carte',  icon: Utensils, to: '/restaurant/menu'          },
-  { label: 'Clients',       icon: Users,    to: '/restaurant/clients'       },
+// `roles` = rôles autorisés à VOIR l'entrée (absent = tous). Aligné sur les
+// RoleGuard de RestaurantApp : Intégrations owner-only ; Paramètres owner+manager
+// (le manager voit l'entrée et accède aux sections non sensibles — les onglets
+// Équipe/Facturation/Plan sont masqués dans Settings.tsx).
+const RESTAURANT_ITEMS: { label: string; icon: React.ElementType; to: string; roles?: RestaurantRole[] }[] = [
+  { label: 'Menu / Carte',  icon: Utensils, to: '/restaurant/menu',         roles: ['owner', 'manager'] },
+  { label: 'Clients',       icon: Users,    to: '/restaurant/clients',      roles: ['owner', 'manager'] },
   { label: 'Factures',      icon: Receipt,  to: '/restaurant/factures'      },
-  { label: 'Intégrations',  icon: Plug,     to: '/restaurant/integrations'  },
-  { label: 'Paramètres',    icon: Settings, to: '/restaurant/settings'      },
+  { label: 'Intégrations',  icon: Plug,     to: '/restaurant/integrations', roles: ['owner'] },
+  { label: 'Paramètres',    icon: Settings, to: '/restaurant/settings',     roles: ['owner', 'manager'] },
 ]
+
+function RoleBadge({ role }: { role: Exclude<RestaurantRole, 'owner'> }) {
+  const isManager = role === 'manager'
+  return (
+    <span
+      className="inline-flex items-center w-fit px-1.5 py-px rounded-full text-[10px] font-semibold mt-1"
+      style={{
+        background: isManager ? '#DBEAFE' : '#F4F4F5',
+        color: isManager ? '#1D4ED8' : '#52525B',
+      }}
+    >
+      {ROLE_LABEL[role]}
+    </span>
+  )
+}
 
 function SplitzyLogo() {
   return (
@@ -138,6 +158,8 @@ function UserSection() {
 export function Sidebar() {
   const restaurant = useRestaurant()
   const restaurantId = useRestaurantId()
+  const role = useRestaurantRole() ?? 'owner'
+  const restaurantItems = RESTAURANT_ITEMS.filter(item => !item.roles || item.roles.includes(role))
   const { theme, toggleTheme } = useTheme()
   const newFeedbackCount = useQuery(
     api.feedbacks.getNewCount,
@@ -165,6 +187,7 @@ export function Sidebar() {
           <div className="text-[12px] truncate" style={{ color: 'var(--ds-text-tertiary)' }}>
             {restaurant?.name ?? '—'}
           </div>
+          {role !== 'owner' && <RoleBadge role={role} />}
         </div>
       </div>
 
@@ -186,7 +209,7 @@ export function Sidebar() {
 
         <NavSectionLabel label="Restaurant" />
         <div className="flex flex-col gap-px">
-          {RESTAURANT_ITEMS.map(item => (
+          {restaurantItems.map(item => (
             <NavItem key={item.to} to={item.to} icon={item.icon} label={item.label} />
           ))}
         </div>

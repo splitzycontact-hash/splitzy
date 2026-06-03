@@ -10,7 +10,7 @@ import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
-import { useRestaurantId } from '../context/RestaurantContext'
+import { useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
 import { formatEur } from '../../utils/formatCurrency'
 
 type TableStatus = 'free' | 'dining' | 'payment' | 'paid'
@@ -84,6 +84,7 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
   table: TableData; onSimulate: () => void;
   onView: () => void; onAdd: () => void; onSend: () => void;
 }) {
+  const role = useRestaurantRole()
   const { status, id } = table
   const paid    = table.paidCents   ?? 0
   const total   = table.amountCents ?? 0
@@ -279,15 +280,17 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
         </div>
       </div>
 
-      {/* Simulate button */}
-      <button
-        onClick={onSimulate}
-        className="mx-4 mb-3 flex items-center justify-center gap-1.5 rounded-lg border border-dashed px-2 py-1.5 text-[11px] font-semibold transition-colors"
-        style={{ borderColor: '#FBBF24', background: 'rgba(245,158,11,0.06)', color: '#92400E' }}
-      >
-        <span className="rounded px-1 py-px text-white text-[9px] font-bold" style={{ background: '#FBBF24' }}>TEST</span>
-        Simuler commande
-      </button>
+      {/* Simulate button — masqué pour viewer (lecture seule) */}
+      {role !== 'viewer' && (
+        <button
+          onClick={onSimulate}
+          className="mx-4 mb-3 flex items-center justify-center gap-1.5 rounded-lg border border-dashed px-2 py-1.5 text-[11px] font-semibold transition-colors"
+          style={{ borderColor: '#FBBF24', background: 'rgba(245,158,11,0.06)', color: '#92400E' }}
+        >
+          <span className="rounded px-1 py-px text-white text-[9px] font-bold" style={{ background: '#FBBF24' }}>TEST</span>
+          Simuler commande
+        </button>
+      )}
     </article>
   )
 }

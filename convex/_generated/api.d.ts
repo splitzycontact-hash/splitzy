@@ -14,6 +14,7 @@ import type * as customers from "../customers.js";
 import type * as dependencyStatus from "../dependencyStatus.js";
 import type * as feedbacks from "../feedbacks.js";
 import type * as insights from "../insights.js";
+import type * as invitations from "../invitations.js";
 import type * as members from "../members.js";
 import type * as menuItems from "../menuItems.js";
 import type * as payments from "../payments.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   dependencyStatus: typeof dependencyStatus;
   feedbacks: typeof feedbacks;
   insights: typeof insights;
+  invitations: typeof invitations;
   members: typeof members;
   menuItems: typeof menuItems;
   payments: typeof payments;
