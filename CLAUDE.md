@@ -154,7 +154,9 @@ Every sensitive Convex mutation checks `ctx.auth.getUserIdentity()` → looks up
 | File | Key exports |
 |---|---|
 | `schema.ts` | Full DB schema |
-| `restaurants.ts` | `getTableContext`, `getByClerkId`, `getBySlug`, `create`, `update`, `setSuspended`, `deleteAll` |
+| `restaurants.ts` | `getTableContext`, `getByClerkId`, `getByMembership` (restaurant rattaché via `members.clerkUserId` — accès dashboard pour membre invité, pas dans `restaurants`), `getBySlug`, `create`, `update`, `setSuspended`, `deleteAll` |
+| `members.ts` | `getTeamMembers`, `updateMemberRole`, `removeMember` — table `members` (équipe + RBAC) |
+| `invitations.ts` | `create` (action — token UUID + email Resend via `fetch`, **pas** SDK → 0 dépendance npm), `getByToken` (public), `listByRestaurant`, `accept` (upsert `members` + invitation→`accepted`), `insert` (internal) |
 | `tables.ts` | `list`, `createBulk`, `updateStatus`, `resetToFree`, `importAmounts` |
 | `menuItems.ts` | `listByRestaurant`, `addItem`, `updateItem`, `deleteItem`, `replaceAll`, `syncFromSquare` |
 | `payments.ts` | `list`, `create` (accepte `paidItemNames?`), `getOverviewStats` |
@@ -205,7 +207,9 @@ Full schema — all tables, all indexes. `_id` and `_creationTime` are auto-gene
 ```
 restaurants      slug*, clerkUserId*, status*, plan, healthScore?, stripeAccountId?, kycStatus?, suspended?, posProvider?
 users            clerkUserId*, role*, email, firstName?, lastName?, totpEnabled?
-restaurantMembers restaurantId*, userId*, role
+restaurantMembers restaurantId*, userId*, role   ⚠ legacy/inutilisé — l'UI Équipe + RBAC utilisent `members` ci-dessous
+members          restaurantId*, clerkUserId*, email, name, role (owner|manager|staff), status (active|pending), invitedAt, joinedAt?, clerkUserId? (rempli à l'acceptation d'invitation)
+restaurantInvitations restaurantId*, token* (UUID), email, role (gerant|manager|viewer), status (pending|accepted|expired), createdAt, expiresAt (=createdAt+7j)
 tables           restaurantId*, qrToken*, number, capacity, status, guests?, amountCents?, alert?
 menuCategories   restaurantId*, name, displayOrder?
 menuItems        restaurantId*, categoryId?, name, priceCents, emoji?, category?, isAvailable?, externalId?
@@ -340,10 +344,12 @@ Routing (`RestaurantApp.tsx`) — toutes les routes sont sous `/restaurant/*`, l
 | `/restaurant/menu` | `MenuPage` | Carte / menu (sync Square) |
 | `/restaurant/clients` | `Clients` | Clients dérivés des `payments` + `feedbacks` réels (identités fixes indexées par `tableNumber` 1-10), statut vip/régulier/insatisfait/nouveau |
 | `/restaurant/factures` | `Factures` | Factures |
-| `/restaurant/integrations` | `Integrations` | Intégrations POS / tierces |
-| `/restaurant/settings` | `Settings` | POS config, menu sync, QR codes, table setup |
+| `/restaurant/integrations` | `Integrations` | Intégrations POS / tierces — **owner-only** (`RoleGuard`) |
+| `/restaurant/settings` | `Settings` | POS config, menu sync, QR codes, table setup, **Équipe** (invitations) — **owner+manager** |
+| `/restaurant/clients` | `Clients` | (déjà ci-dessus) — **owner+manager** (`RoleGuard`) |
 | `/restaurant/onboarding` | `RestaurantOnboarding` | Flow création restaurant (hors layout) |
 | `/restaurant/sign-in` | `RestaurantSignIn` | Connexion gérant (hors layout) |
+| `/restaurant/accept-invite?token=…` | `AcceptInvite` | Acceptation invitation équipe (hors layout) — auto-accept au montage si connecté Clerk |
 
 `/restaurant/feedbacks` redirige (301 client) vers `/restaurant/reputation`. La sidebar desktop (`layout/Sidebar.tsx`) groupe ces pages en deux sections : **Pilotage** (Vue d'ensemble, Tables, Réputation, Analytics) et **Restaurant** (Menu, Clients, Factures, Intégrations, Paramètres). La bottom-nav mobile (`RestaurantLayout.tsx`) n'expose que 5 entrées : Accueil, Tables, Réputation, Factures, Réglages.
 
@@ -368,6 +374,32 @@ Located in `Tables.tsx`. Each table card has a dashed amber `[TEST] Simuler comm
 2. Randomly picks 2–4 items (quantity 1–2 each) via `generateOrder()`
 3. Shows a breakdown + total in a modal with a ↺ re-roll button
 4. On confirm: calls `tables.updateStatus(tableId, status='dining', guests=totalQty, amountCents=total)`
+
+### RBAC dashboard (owner / manager / viewer) — UI-only
+
+Rôle applicatif `RestaurantRole = 'owner' | 'manager' | 'viewer'` (`src/restaurant/lib/roles.ts`). **Restrictions UI uniquement** — les mutations Convex sensibles gardent leurs propres guards backend ; ne jamais s'appuyer sur le RBAC front pour la sécurité.
+
+**Résolution du rôle** (`RestaurantGuard.tsx → GuardWithClerk`), dans l'ordre :
+1. `restaurants.getByClerkId` non null → propriétaire → rôle **owner**.
+2. Sinon `restaurants.getByMembership` (restaurant rattaché via `members.clerkUserId`) → membre invité. Le rôle vient de sa ligne `members` lue via la query **existante** `members.getTeamMembers` (pas de nouvelle query Convex) : `members.role` (owner|manager|**staff**) → `memberRoleToAppRole` → owner|manager|**viewer** (staff/inconnu ⇒ viewer, moindre privilège).
+3. Ni l'un ni l'autre → `Navigate /restaurant/onboarding`.
+4. Dev sans Clerk (`GuardNoClerk`) → rôle **owner** (rien masqué).
+
+Le rôle est fourni par `RestaurantProvider` → consommé via `useRestaurantRole()` (`null` hors contexte). `useRestaurant()` / `useRestaurantId()` inchangés.
+
+**Application** :
+- Routes : `<RoleGuard allowed={[…]}>` dans `RestaurantApp.tsx` — Intégrations `['owner']`, Clients + Settings `['owner','manager']`. `RoleGuard` redirige vers `/restaurant` si rôle absent, ne rend rien si `role === null`.
+- Nav : `Sidebar.tsx` (desktop) + `RestaurantLayout.tsx` (bottom-nav mobile) filtrent les entrées via un champ `roles?` (absent = tous). Badge de rôle (`ROLE_LABEL`, manager bleu / viewer gris) affiché si `role !== 'owner'`.
+
+### Invitations d'équipe (`Settings.tsx` Équipe + `convex/invitations.ts`)
+
+Flow : **Paramètres → Équipe → « Inviter »** → `invitations.create` (action) génère un token UUID, persiste `restaurantInvitations` (status `pending`, expire +7j), envoie un email Resend via **`fetch`** (API REST, **pas** le SDK → aucune dépendance npm, donc pas concerné par « Deps des actions Convex »). Lien : `https://www.splitzy.fr/restaurant/accept-invite?token=…`.
+
+- `RESEND_API_KEY` absente → invitation créée quand même, `emailSent: false` (toast adapté). `from: "Splitzy <noreply@splitzy.fr>"`.
+- **Acceptation** (`AcceptInvite.tsx`) : auto-accept au montage dès que l'invité est connecté Clerk + invitation `pending` non expirée → `invitations.accept({ token, clerkUserId })` → `navigate('/restaurant')`. États : lien invalide / introuvable / déjà acceptée / expirée / connexion requise (si Clerk off).
+- `accept` mappe le rôle d'invitation → rôle `members` : gerant→**owner**, manager→**manager**, viewer→**staff**. Upsert **`members`** (réutilise la ligne par email même restaurant, sinon insert), pose `clerkUserId` + `status:'active'`, passe l'invitation à `accepted`.
+- `PendingInviteWatcher` (`RestaurantApp.tsx`) : Clerk peut rediriger vers `/restaurant` ou `/onboarding` après sign-up au lieu de préserver `?redirect`. Le token survit en `sessionStorage('pendingInviteToken')` → dès connexion, re-navigue vers `/accept-invite` (sinon membre renvoyé à tort vers l'onboarding).
+- `Settings` Équipe affiche `members` (actifs + pending) et `invitations.listByRestaurant` ; `orphanAccepted` = invitations `accepted` sans ligne `members` correspondante (email). Actions : `members.updateMemberRole`, `members.removeMember`.
 
 ---
 
