@@ -8,6 +8,16 @@ export const list = query({
   },
 })
 
+// Paiements d'une table, plus récents d'abord. Sert au flow client (/welcome)
+// pour reconstruire les convives de la sitting courante (cumul des subtotals
+// jusqu'à atteindre table.paidCents). Lecture seule.
+export const listByTable = query({
+  args: { tableId: v.id("tables") },
+  handler: async (ctx, { tableId }) => {
+    return ctx.db.query("payments").withIndex("by_table", q => q.eq("tableId", tableId)).order("desc").collect()
+  },
+})
+
 export const create = mutation({
   args: {
     restaurantId: v.id("restaurants"),
@@ -19,6 +29,8 @@ export const create = mutation({
     commissionCents: v.number(),
     totalCents: v.number(),
     paymentMethod: v.string(),
+    firstName: v.optional(v.string()),
+    avatarIndex: v.optional(v.number()),
     paidItemNames: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {

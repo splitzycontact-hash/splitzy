@@ -25,6 +25,13 @@ const initialState: SessionState = {
   feedbackTags: [],
   feedbackText: '',
   feedbackSent: false,
+  paymentMethod: '',
+  paymentRef: '',
+  paymentTimestamp: 0,
+  paidSubtotalCents: 0,
+  paidTipCents: 0,
+  paidTotalCents: 0,
+  lastPaymentId: '',
 }
 
 function sessionReducer(state: SessionState, action: SessionAction): SessionState {
@@ -63,6 +70,18 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
       return { ...state, selectedCardId: action.payload }
     case 'CONFIRM_PAYMENT':
       return { ...state, paymentConfirmed: true }
+    case 'SET_PAYMENT_DETAILS':
+      return {
+        ...state,
+        paymentMethod: action.payload.method,
+        paymentRef: action.payload.ref,
+        paymentTimestamp: action.payload.timestamp,
+        paidSubtotalCents: action.payload.subtotalCents,
+        paidTipCents: action.payload.tipCents,
+        paidTotalCents: action.payload.totalCents,
+      }
+    case 'SET_LAST_PAYMENT_ID':
+      return { ...state, lastPaymentId: action.payload }
     case 'SET_FEEDBACK_STARS':
       return { ...state, feedbackStars: action.payload }
     case 'TOGGLE_FEEDBACK_TAG': {
@@ -119,6 +138,13 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
         tableTotalCents: state.tableTotalCents,
         cachedOrderItems: state.cachedOrderItems,
         cachedPaidCents: state.cachedPaidCents,
+        // Détails de paiement : remis à zéro (pas préservés) au retour du client.
+        paymentMethod: '',
+        paymentRef: '',
+        paymentTimestamp: 0,
+        paidSubtotalCents: 0,
+        paidTipCents: 0,
+        paidTotalCents: 0,
       }
     default:
       return state

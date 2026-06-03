@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { useQuery } from 'convex/react'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
+import { AVATARS } from '../components/ui/Avatar'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 
@@ -42,6 +43,26 @@ export function Landing() {
   const remainingCents = Math.max(0, billCents - paidCents)
   const hasPaidSomething = paidCents > 0
   const isFullyPaid = billCents > 0 && remainingCents === 0
+
+  // Convives déjà passés à la caisse sur la sitting courante.
+  // payments.paidCents (table) ne cumule QUE la sitting en cours ; on prend donc
+  // les paiements les plus récents et on cumule leur subtotal jusqu'à atteindre
+  // paidCents — ça isole la sitting courante sans toucher au backend.
+  const tablePayments = useQuery(
+    api.payments.listByTable,
+    state.convexTableId ? { tableId: state.convexTableId as Id<'tables'> } : 'skip',
+  )
+  const sittingPayers = useMemo(() => {
+    if (!tablePayments || tablePayments.length === 0 || paidCents <= 0) return []
+    const out: typeof tablePayments = []
+    let acc = 0
+    for (const p of tablePayments) {
+      if (acc >= paidCents) break
+      out.push(p)
+      acc += p.subtotalCents ?? 0
+    }
+    return out.reverse() // ordre chronologique
+  }, [tablePayments, paidCents])
 
   const tableLabel = state.tableNumber
     ? `Table ${state.tableNumber}${state.restaurantName ? ` · ${state.restaurantName}` : ''}`
@@ -159,6 +180,49 @@ export function Landing() {
           </div>
         </div>
 
+        {/* Convives déjà passés à la caisse (sitting courante) */}
+        {sittingPayers.length > 0 && (
+          <m.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: '#fff', border: '1px solid #E5E7EB', borderRadius: 16,
+              padding: '12px 14px', marginBottom: 16,
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+              Déjà passés à la caisse
+            </div>
+            {sittingPayers.map(p => {
+              const a = AVATARS[(p.avatarIndex ?? 0) % AVATARS.length]
+              return (
+                <div key={p._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: '50%', background: a.bg, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                  }}>
+                    {a.emoji}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {p.firstName || 'Convive'}
+                  </div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#10B981', fontVariantNumeric: 'tabular-nums' }}>
+                    {formatEur(p.subtotalCents)}
+                  </div>
+                </div>
+              )
+            })}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F1F1F2', marginTop: 8, paddingTop: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: isFullyPaid ? '#047857' : '#92400E' }}>
+                {isFullyPaid ? 'Table entièrement réglée ✓' : 'Reste à payer'}
+              </span>
+              <span style={{ fontSize: 15, fontWeight: 800, color: isFullyPaid ? '#10B981' : '#E8920A', fontVariantNumeric: 'tabular-nums' }}>
+                {formatEur(remainingCents)}
+              </span>
+            </div>
+          </m.div>
+        )}
+
         {/* Bandeau état de paiement — loading pendant reconnexion WS iOS */}
         {tableLoading && (
           <div style={{
@@ -177,7 +241,7 @@ export function Landing() {
         )}
         {/* Bandeau état de paiement live — affiché dès qu'au moins un paiement
             partiel ou total a été enregistré sur la sitting courante. */}
-        {!tableLoading && hasPaidSomething && (
+        {!tableLoading && hasPaidSomething && sittingPayers.length === 0 && (
           <m.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}

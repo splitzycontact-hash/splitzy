@@ -33,6 +33,7 @@ export function Confirmation() {
         tableNumber: state.tableNumber,
         firstName: state.userName || undefined,
         avatarIndex: state.userAvatarIndex,
+        paymentId: state.lastPaymentId || undefined,
         marketingConsent: true,
         ...(validPhone ? { phone: phone.trim() } : {}),
         ...(validEmail ? { email: email.trim().toLowerCase() } : {}),
@@ -59,7 +60,7 @@ export function Confirmation() {
       {/* Dark hero */}
       <div style={{
         position: 'relative', overflow: 'hidden',
-        background: '#0A0A0A', padding: '60px 24px 36px', color: '#fff', flexShrink: 0,
+        background: '#0A0A0A', padding: '20px 24px 14px', color: '#fff', flexShrink: 0,
       }}>
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.5,
@@ -76,13 +77,13 @@ export function Confirmation() {
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 240, damping: 16, delay: 0.05 }}
             style={{
-              width: 72, height: 72, borderRadius: '50%', margin: '0 auto 18px',
+              width: 46, height: 46, borderRadius: '50%', margin: '0 auto 8px',
               background: '#10B981',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 12px 36px -8px rgba(16,185,129,0.55), inset 0 0 0 1px rgba(255,255,255,0.18)',
             }}
           >
-            <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+            <svg width="24" height="24" viewBox="0 0 34 34" fill="none">
               <path d="M6 17L13.5 24L28 9" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </m.div>
@@ -90,7 +91,7 @@ export function Confirmation() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 }}
-            style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.025em' }}
+            style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.025em' }}
           >
             Paiement reçu !
           </m.div>
@@ -98,7 +99,7 @@ export function Confirmation() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.35 }}
-            style={{ fontSize: 13.5, color: '#A1A1AA', marginTop: 6 }}
+            style={{ fontSize: 12, color: '#A1A1AA', marginTop: 3 }}
           >
             Merci pour cette soirée chez<br />
             <strong style={{ color: '#fff', fontWeight: 600 }}>{state.restaurantName}</strong>
@@ -107,14 +108,14 @@ export function Confirmation() {
       </div>
 
       {/* Receipt */}
-      <div style={{ padding: '16px 20px 0' }}>
+      <div style={{ padding: '10px 20px 0' }}>
         <m.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          style={{ background: '#fff', borderRadius: 16, border: '1px solid #E4E4E7', padding: '6px 18px' }}
+          style={{ background: '#fff', borderRadius: 16, border: '1px solid #E4E4E7', padding: '2px 16px' }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0 10px', borderBottom: '1px dashed #E4E4E7', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0 6px', borderBottom: '1px dashed #E4E4E7', alignItems: 'flex-start', gap: 12 }}>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0A0A0A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {state.restaurantName}
@@ -133,7 +134,7 @@ export function Confirmation() {
             if (!item) return null
             const linePrice = Math.round(item.price / sel.splitFactor)
             return (
-              <div key={sel.menuItemId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', gap: 8 }}>
+              <div key={sel.menuItemId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', gap: 8 }}>
                 <span style={{ fontSize: 13.5, color: '#52525B', fontWeight: 500 }}>
                   {item.emoji ? `${item.emoji} ` : ''}{item.name}
                   {sel.splitFactor > 1 && <span style={{ fontSize: 11, color: '#A1A1AA', marginLeft: 4 }}>÷{sel.splitFactor}</span>}
@@ -151,7 +152,7 @@ export function Confirmation() {
             ...(tipAmount > 0 ? [{ l: `Pourboire (${state.tipPercent} %)`, v: `+${formatEur(tipAmount)}`, c: '#E8920A' }] : []),
             { l: 'Commission Splitzy (1,5 %)', v: formatEur(splitzyFee), c: '#A1A1AA', note: 'payée par le restaurant' },
           ].map((row, idx) => (
-            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', gap: 8 }}>
+            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', gap: 8 }}>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <span style={{ fontSize: 13.5, color: row.c, fontWeight: 500 }}>{row.l}</span>
                 {row.note && (
@@ -164,16 +165,16 @@ export function Confirmation() {
             </div>
           ))}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0 14px', borderTop: '1px solid #E4E4E7', marginTop: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0 6px', borderTop: '1px solid #E4E4E7', marginTop: 4 }}>
             <span style={{ fontSize: 15, fontWeight: 800, color: '#0A0A0A' }}>Total payé</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 20, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
               {totalStr}€
             </span>
           </div>
         </m.div>
 
         {/* Receipt actions */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <button
             type="button"
             onClick={async () => {
@@ -181,7 +182,7 @@ export function Confirmation() {
               generateInvoicePDF(state)
             }}
             style={{
-              flex: 1, height: 40, borderRadius: 11, border: '1px solid #E4E4E7',
+              flex: 1, height: 36, borderRadius: 11, border: '1px solid #E4E4E7',
               background: '#fff', color: '#0A0A0A', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
@@ -194,7 +195,7 @@ export function Confirmation() {
           <button
             type="button"
             style={{
-              flex: 1, height: 40, borderRadius: 11, border: '1px solid #E4E4E7',
+              flex: 1, height: 36, borderRadius: 11, border: '1px solid #E4E4E7',
               background: '#fff', color: '#0A0A0A', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
             }}
           >
@@ -204,12 +205,12 @@ export function Confirmation() {
       </div>
 
       {/* CRM optionnel */}
-      <div style={{ padding: '14px 20px 0' }}>
+      <div style={{ padding: '8px 20px 0' }}>
         <m.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          style={{ background: '#fff', borderRadius: 16, border: '1px solid #E4E4E7', padding: '16px 16px 14px' }}
+          style={{ background: '#fff', borderRadius: 16, border: '1px solid #E4E4E7', padding: '8px 12px 8px' }}
         >
           <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0A0A0A', letterSpacing: '-0.005em' }}>
             Recevoir tes prochaines offres ?
@@ -219,7 +220,7 @@ export function Confirmation() {
           </div>
 
           {/* Deux champs toujours visibles — téléphone + email */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 8 }}>
             <input
               type="tel"
               inputMode="tel"
@@ -258,7 +259,7 @@ export function Confirmation() {
 
           {/* Consentement unique — apparaît dès qu'un champ contient quelque chose. Jamais pré-coché. */}
           {(phone.trim() !== '' || email.trim() !== '') && (
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 12, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginTop: 8, cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={consent}
@@ -287,7 +288,7 @@ export function Confirmation() {
             onClick={saveContact}
             disabled={!canSave}
             style={{
-              width: '100%', height: 44, marginTop: 12, borderRadius: 11, border: 0,
+              width: '100%', height: 44, marginTop: 8, borderRadius: 11, border: 0,
               background: saved ? '#10B981' : canSave ? '#E8920A' : '#E5E7EB',
               color: saved || canSave ? '#fff' : '#9CA3AF',
               fontSize: 14, fontWeight: 700,
@@ -307,16 +308,16 @@ export function Confirmation() {
           </button>
 
           {/* Mention */}
-          <div style={{ fontSize: 10.5, color: '#A1A1AA', marginTop: 10, textAlign: 'center' }}>
+          <div style={{ fontSize: 10.5, color: '#A1A1AA', marginTop: 4, textAlign: 'center' }}>
             Optionnel · Jamais partagé
           </div>
         </m.div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 16 }} />
+      <div style={{ flex: 1, minHeight: 0 }} />
 
       {/* Bloc feedback */}
-      <div style={{ padding: '14px 20px', paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))' }}>
+      <div style={{ padding: '6px 20px', paddingBottom: 'max(12px, calc(6px + env(safe-area-inset-bottom)))' }}>
         <m.button
           type="button"
           whileTap={{ scale: 0.985 }}
@@ -339,13 +340,13 @@ export function Confirmation() {
           onClick={() => navigate('/feedback/sent')}
           style={{
             width: '100%', background: 'transparent', border: 0, color: '#52525B',
-            fontSize: 13.5, fontWeight: 600, cursor: 'pointer', padding: '12px 0 0',
+            fontSize: 13.5, fontWeight: 600, cursor: 'pointer', padding: '6px 0 0',
           }}
         >
           Passer
         </button>
 
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
+        <div style={{ textAlign: 'center', marginTop: 6 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <span style={{
               width: 16, height: 16, borderRadius: 4, background: '#0A0A0A',

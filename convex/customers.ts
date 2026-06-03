@@ -89,6 +89,9 @@ export const saveContact = mutation({
     email: v.optional(v.string()),
     marketingConsent: v.optional(v.boolean()),
     consentAt: v.optional(v.number()),
+    // Paiement courant (state.lastPaymentId) — backfill phone/email sur le paiement
+    // pour permettre le regroupement client par contact (1 paiement = 1 client).
+    paymentId: v.optional(v.id("payments")),
   },
   handler: async (ctx, args) => {
     const { restaurantId } = args
@@ -116,6 +119,7 @@ export const saveContact = mutation({
       ...(email ? { email } : {}),
       ...(firstName ? { firstName } : {}),
       ...(args.avatarIndex !== undefined ? { avatarIndex: args.avatarIndex } : {}),
+      ...(args.paymentId ? { paymentId: args.paymentId } : {}),
       ...(args.tableNumber !== undefined ? { tableNumber: args.tableNumber } : {}),
       ...(args.marketingConsent !== undefined ? { marketingConsent: args.marketingConsent } : {}),
       // Horodatage du consentement posé côté serveur (source de vérité) si le
@@ -123,6 +127,18 @@ export const saveContact = mutation({
       ...(args.consentAt !== undefined
         ? { consentAt: args.consentAt }
         : args.marketingConsent ? { consentAt: Date.now() } : {}),
+    }
+
+    // Backfill du paiement avec le contact → regroupement client par phone/email.
+    // Le paiement est créé AVANT /confirmation (donc sans contact) ; on le complète ici.
+    if (args.paymentId && (phone || email)) {
+      const pmt = await ctx.db.get(args.paymentId)
+      if (pmt) {
+        await ctx.db.patch(args.paymentId, {
+          ...(phone ? { phone } : {}),
+          ...(email ? { email } : {}),
+        })
+      }
     }
 
     if (existing) {

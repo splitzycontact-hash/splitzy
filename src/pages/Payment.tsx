@@ -34,7 +34,7 @@ export function Payment() {
     setLoading(method)
 
     if (state.convexRestaurantId && state.convexTableId) {
-      void httpMutation('payments:create', {
+      httpMutation<string | null>('payments:create', {
         restaurantId: state.convexRestaurantId,
         tableId: state.convexTableId,
         tableNumber: state.tableNumber,
@@ -44,10 +44,24 @@ export function Payment() {
         commissionCents: splitzyFee,
         totalCents: total,
         paymentMethod: method,
+        firstName: state.userName || undefined,
+        avatarIndex: state.userAvatarIndex,
         paidItemNames: paidItemNames && paidItemNames.length > 0 ? paidItemNames : undefined,
-      }).catch(() => {})
+      })
+        // Mémorise l'id du paiement → /confirmation le passe à saveContact pour
+        // backfiller phone/email sur CE paiement (regroupement client par contact).
+        .then(id => { if (id) dispatch({ type: 'SET_LAST_PAYMENT_ID', payload: id }) })
+        .catch(() => {})
     }
 
+    dispatch({ type: 'SET_PAYMENT_DETAILS', payload: {
+      method,
+      ref: `SPZ-${Date.now()}-T${state.tableNumber}`,
+      timestamp: Date.now(),
+      subtotalCents: subtotal,
+      tipCents: tipAmount,
+      totalCents: total,
+    } })
     dispatch({ type: 'CONFIRM_PAYMENT' })
     dispatch({ type: 'ADD_CACHED_PAID_CENTS', payload: subtotal })
     if (subtotal >= remainingCents && remainingCents > 0) {

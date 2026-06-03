@@ -81,10 +81,16 @@ export default defineSchema({
     commissionCents: v.number(),
     totalCents: v.number(),
     paymentMethod: v.string(),
+    firstName: v.optional(v.string()),
+    avatarIndex: v.optional(v.number()),
+    // Coordonnées laissées sur /confirmation, backfillées via customers.saveContact(paymentId).
+    // Servent au regroupement client (1 paiement = 1 client, fusion par phone/email).
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
     status: v.union(v.literal("Encaissé"), v.literal("En attente"), v.literal("Remboursé")),
     createdAt: v.number(),
     dateLabel: v.string(),
-  }).index("by_restaurant", ["restaurantId"]),
+  }).index("by_restaurant", ["restaurantId"]).index("by_table", ["tableId"]),
 
   feedbacks: defineTable({
     restaurantId: v.id("restaurants"),
@@ -137,6 +143,8 @@ export default defineSchema({
     email: v.optional(v.string()),
     marketingConsent: v.optional(v.boolean()),
     consentAt: v.optional(v.number()),
+    // Paiement associé (dernier en date) — lie le contact CRM à un paiement précis.
+    paymentId: v.optional(v.id("payments")),
     createdAt: v.number(),
   }).index("by_restaurant", ["restaurantId"])
     .index("by_restaurant_phone", ["restaurantId", "phone"])

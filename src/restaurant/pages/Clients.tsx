@@ -3,7 +3,9 @@ import { AnimatePresence, m } from 'framer-motion'
 import { toast } from 'sonner'
 import { useQuery, useMutation, useAction } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
-import type { Id } from '../../../convex/_generated/dataModel'
+import type { Doc, Id } from '../../../convex/_generated/dataModel'
+import { formatEur } from '../../utils/formatCurrency'
+import { AVATARS } from '../../components/ui/Avatar'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
@@ -31,28 +33,28 @@ const STATUS_STYLE: Record<Status, { bg: string; color: string }> = {
 }
 
 interface Customer {
-  id: number; first: string; last: string; email: string
+  id: string // clé de groupe : phone:… | email:… | pay:<paymentId>
+  tableNumber: number // table du paiement le plus récent (pour updateContact gérant)
+  first: string; last: string; email: string
   visits: number; avg: number; total: number
-  lastVisit: string; lastIso: string
+  lastVisit: string; lastIso: string; firstTs: number
   rating: number; status: Status
-  phone: string; split: string
+  phone: string; split: string; methodPct: number
   color: string; text: string
   customerId?: Id<'customers'>; realContact: boolean
   // Campagne email : id de la row consentante (email + marketingConsent) si éligible.
   consent: boolean; marketingId?: Id<'customers'>
+  // Données réelles du groupe pour le panneau détail.
+  groupPayments: Doc<'payments'>[]; groupFeedbacks: Doc<'feedbacks'>[]
 }
 
-const IDENTITIES: Record<number, { first: string; last: string; email: string; phone: string; split: string; color: string; text: string }> = {
-  1:  { first: 'Sophie',    last: 'Martin',   email: 'sophie.martin@gmail.com',   phone: '06 12 34 56 78', split: 'Par article',  color: '#FFEFD9', text: '#B8730A' },
-  2:  { first: 'Alexandre', last: 'Dubois',   email: 'alex.dubois@outlook.fr',    phone: '06 78 12 34 56', split: 'Parts égales', color: '#E0F2FE', text: '#0369A1' },
-  3:  { first: 'Camille',   last: 'Lefebvre', email: 'camille.lf@gmail.com',      phone: '07 22 11 88 99', split: 'Par article',  color: '#FCE7F3', text: '#BE185D' },
-  4:  { first: 'Manon',     last: 'Bonnet',   email: 'manon.b@yahoo.fr',          phone: '06 55 44 33 22', split: 'Par article',  color: '#DCFCE7', text: '#15803D' },
-  5:  { first: 'Thomas',    last: 'Bernard',  email: 'thomas.bernard@me.com',     phone: '07 89 65 43 21', split: 'Parts égales', color: '#EDE9FE', text: '#6D28D9' },
-  6:  { first: 'Léa',       last: 'Moreau',   email: 'lea.moreau@protonmail.com', phone: '06 33 22 11 00', split: 'Par article',  color: '#FEF3C7', text: '#B45309' },
-  7:  { first: 'Emma',      last: 'Roux',     email: 'emma.roux@gmail.com',       phone: '07 11 22 33 44', split: 'Par article',  color: '#FCE7F3', text: '#BE185D' },
-  8:  { first: 'Lucas',     last: 'Fournier', email: 'lfournier@gmail.com',       phone: '06 91 82 73 64', split: 'Tout payer',   color: '#FEE2E2', text: '#B91C1C' },
-  9:  { first: 'Chloé',     last: 'Girard',   email: 'chloe.girard@hey.com',      phone: '07 65 54 43 32', split: 'Parts égales', color: '#E0E7FF', text: '#4338CA' },
-  10: { first: 'Antoine',   last: 'Mercier',  email: 'a.mercier@orange.fr',       phone: '06 47 58 69 70', split: 'Tout payer',   color: '#FEE2E2', text: '#B91C1C' },
+const METHOD_LABEL: Record<string, string> = {
+  visa: 'Visa', mastercard: 'Mastercard', amex: 'Amex',
+  apple_pay: 'Apple Pay', google_pay: 'Google Pay', card: 'Carte',
+}
+function methodLabel(m: string): string {
+  if (!m) return 'Carte'
+  return METHOD_LABEL[m] ?? (m.charAt(0).toUpperCase() + m.slice(1))
 }
 
 function formatTimeAgo(ts: number): string {
@@ -62,7 +64,7 @@ function formatTimeAgo(ts: number): string {
   return `il y a ${days}j`
 }
 
-function initials(c: Customer) { return ((c.first[0] ?? '') + (c.last[0] ?? '')).toUpperCase() }
+function initials(c: Customer) { return (c.first[0] ?? '?').toUpperCase() }
 function fullName(c: { first: string; last: string }) { return [c.first, c.last].filter(Boolean).join(' ') }
 
 function StarRating({ rating, size = 13 }: { rating: number; size?: number }) {
@@ -80,7 +82,7 @@ function StarRating({ rating, size = 13 }: { rating: number; size?: number }) {
   )
 }
 
-function CustomerDrawer({ customer, restaurantId, onClose }: { customer: Customer; restaurantId: Id<'restaurants'>; onClose: () => void }) {
+function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks, onClose }: { customer: Customer; restaurantId: Id<'restaurants'>; tablePayments: Doc<'payments'>[]; tableFeedbacks: Doc<'feedbacks'>[]; onClose: () => void }) {
   const updateContact = useMutation(api.customers.updateContact)
   const [cid, setCid]       = useState<Id<'customers'> | undefined>(customer.customerId)
   const [phone, setPhone]   = useState(customer.phone ?? '')
@@ -95,7 +97,7 @@ function CustomerDrawer({ customer, restaurantId, onClose }: { customer: Custome
       const id = await updateContact({
         customerId: cid,
         restaurantId,
-        tableNumber: customer.id,
+        tableNumber: customer.tableNumber,
         firstName: customer.first,
         phone,
         email,
@@ -108,22 +110,45 @@ function CustomerDrawer({ customer, restaurantId, onClose }: { customer: Custome
     }
   }
 
-  const visits = [
-    { date:'27/05', line1:'Table 4 · 2 convives', line2:'Lundi 19h42 · Par article · Pourboire 10%', amount:'54,20€' },
-    { date:'18/05', line1:'Table 7 · 4 convives', line2:'Dimanche 13h12 · Parts égales · Pourboire 12%', amount:'42,80€' },
-    { date:'02/05', line1:'Table 2 · 2 convives', line2:'Vendredi 20h05 · Par article · Pourboire 10%', amount:'58,30€' },
-    { date:'21/04', line1:'Table 4 · 3 convives', line2:'Dimanche 12h54 · Par article · Pourboire 8%', amount:'49,90€' },
-    { date:'08/04', line1:'Table 1 · 2 convives', line2:'Samedi 21h18 · Par article · Pourboire 10%', amount:'56,70€' },
-  ].slice(0, Math.min(customer.visits, 5))
+  // Historique réel : paiements de cette table, plus récents d'abord.
+  const visits = [...tablePayments]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 5)
+    .map(p => {
+      const d = new Date(p.createdAt)
+      const date = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+      const tipPct = p.subtotalCents > 0 ? Math.round((p.tipCents / p.subtotalCents) * 100) : 0
+      return {
+        date,
+        line1: `Table ${p.tableNumber} · ${p.guests} convive${p.guests > 1 ? 's' : ''}`,
+        line2: `${methodLabel(p.paymentMethod)}${tipPct > 0 ? ` · Pourboire ${tipPct}%` : ''}`,
+        amount: formatEur(p.totalCents),
+      }
+    })
 
-  const feedbacks = [
-    { rating:5, text:"Service impeccable comme toujours. Le tartare était excellent et l'accueil chaleureux.", date:`${customer.lastIso} · Table 4`, badge:'google' },
-    { rating:5, text:'Très bon moment, plats savoureux et le système de paiement est génial.', date:'18 mai · Table 7', badge:'google' },
-    { rating:4, text:"Très bon repas mais un peu d'attente entre l'entrée et le plat.", date:'02 mai · Table 2', badge:'intercepted' },
-  ].slice(0, Math.min(customer.visits, 3))
+  // Feedbacks réels de cette table (privés — jamais publiés sur Google).
+  const feedbacks = [...tableFeedbacks]
+    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+    .slice(0, 5)
+    .map(f => ({ rating: f.stars, text: f.text, date: f.timeLabel ?? '' }))
 
-  const bars = [2, 4, 3, 6]
-  const maxBar = Math.max(...bars)
+  // "Client depuis" = date du 1er paiement réel.
+  const sinceLabel = tablePayments.length
+    ? new Date(Math.min(...tablePayments.map(p => p.createdAt))).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })
+    : ''
+
+  // Fréquence réelle : nb de paiements par semaine sur les 4 dernières semaines.
+  const WEEK = 7 * 86400000
+  const nowTs = Date.now()
+  const weekBars = [3, 2, 1, 0].map(off => {
+    const end = nowTs - off * WEEK
+    const start = end - WEEK
+    return tablePayments.filter(p => p.createdAt > start && p.createdAt <= end).length
+  }) // [S-3, S-2, S-1, cette sem.]
+  const maxBar = Math.max(1, ...weekBars)
+  const last4 = weekBars.reduce((a, b) => a + b, 0)
+  const prev4 = tablePayments.filter(p => p.createdAt > nowTs - 8 * WEEK && p.createdAt <= nowTs - 4 * WEEK).length
+  const deltaPct = prev4 > 0 ? Math.round(((last4 - prev4) / prev4) * 100) : null
 
   return (
     <>
@@ -153,7 +178,7 @@ function CustomerDrawer({ customer, restaurantId, onClose }: { customer: Custome
                   <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: STATUS_STYLE[customer.status].color }} />
                   {STATUS_LABEL[customer.status]}
                 </span>
-                <span className="text-[11.5px] ds-text-tertiary">Client depuis avr. 2025</span>
+                {sinceLabel && <span className="text-[11.5px] ds-text-tertiary">Client depuis {sinceLabel}</span>}
               </div>
             </div>
           </div>
@@ -214,10 +239,10 @@ function CustomerDrawer({ customer, restaurantId, onClose }: { customer: Custome
             <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-3">Vue rapide</h4>
             <div className="grid grid-cols-2 gap-2.5">
               {[
-                { label: 'Visites', value: String(customer.visits), sub: 'depuis 14 mois' },
+                { label: 'Visites', value: String(customer.visits), sub: sinceLabel ? `depuis ${sinceLabel}` : `${customer.visits} paiement${customer.visits > 1 ? 's' : ''}` },
                 { label: 'Total dépensé', value: `${customer.total.toFixed(0)}€`, sub: `panier moy. ${customer.avg.toFixed(2).replace('.', ',')}€`, accent: true },
-                { label: 'Note moyenne', value: `${customer.rating.toFixed(1)} ★`, sub: `sur ${Math.min(customer.visits, 8)} feedbacks` },
-                { label: 'Mode préféré', value: customer.split, sub: customer.split === 'Par article' ? '82% de ses paiements' : '67% de ses paiements' },
+                { label: 'Note moyenne', value: customer.rating > 0 ? `${customer.rating.toFixed(1)} ★` : '—', sub: `sur ${tableFeedbacks.length} feedback${tableFeedbacks.length > 1 ? 's' : ''}` },
+                { label: 'Moyen préféré', value: customer.split, sub: customer.methodPct > 0 ? `${customer.methodPct}% des paiements` : '—' },
               ].map(tile => (
                 <div
                   key={tile.label}
@@ -237,39 +262,40 @@ function CustomerDrawer({ customer, restaurantId, onClose }: { customer: Custome
             </div>
           </div>
 
-          {/* Fréquence */}
-          <div>
-            <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-3">
-              Fréquence des visites · 4 dernières semaines
-            </h4>
-            <div className="rounded-[10px] border p-3.5" style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}>
-              <div className="flex items-end justify-between mb-2">
-                <span className="text-[11.5px] ds-text-tertiary">Total : {bars.reduce((a,b)=>a+b,0)} visites</span>
-                <span className="text-[13px] font-semibold" style={{ color: 'var(--ds-success-strong)' }}>+50% vs mois préc.</span>
-              </div>
-              <div className="flex items-end gap-1.5 h-12">
-                {bars.map((v, i) => (
-                  <div key={i} className="flex-1 relative">
-                    <div
-                      className="rounded-t-[3px] relative"
-                      style={{ height: `${(v / maxBar) * 100}%`, background: 'var(--ds-accent-soft)', minHeight: '4px' }}
+          {/* Fréquence — paiements réels par semaine (4 dernières sem.) */}
+          {last4 > 0 && (
+            <div>
+              <h4 className="font-semibold text-[12px] ds-text-tertiary uppercase tracking-[0.07em] mb-3">
+                Fréquence des visites · 4 dernières semaines
+              </h4>
+              <div className="rounded-[10px] border p-3.5" style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}>
+                <div className="flex items-end justify-between mb-2">
+                  <span className="text-[11.5px] ds-text-tertiary">Total : {last4} visite{last4 > 1 ? 's' : ''}</span>
+                  {deltaPct !== null && (
+                    <span
+                      className="text-[13px] font-semibold"
+                      style={{ color: deltaPct >= 0 ? 'var(--ds-success-strong)' : 'var(--ds-error-strong)' }}
                     >
-                      <div
-                        className="absolute bottom-0 left-0 right-0 rounded-b-[3px]"
-                        style={{ height: '40%', background: '#E8920A', borderRadius: '0 0 3px 3px' }}
-                      />
+                      {deltaPct >= 0 ? '+' : ''}{deltaPct}% vs mois préc.
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-end gap-1.5 h-12">
+                  {weekBars.map((v, i) => (
+                    <div key={i} className="flex-1 relative">
+                      <div className="rounded-[3px]" style={{ height: `${(v / maxBar) * 100}%`, background: '#E8920A', minHeight: v > 0 ? '4px' : '0' }} />
+                      <span className="block text-center text-[10px] ds-text-tertiary mt-1">{v}</span>
                     </div>
-                    <span className="block text-center text-[10px] ds-text-tertiary mt-1">{v}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-1.5 mt-1">
-                {['S-3','S-2','S-1','Cette sem.'].map(l => (
-                  <div key={l} className="flex-1 text-center text-[10px] ds-text-tertiary">{l}</div>
-                ))}
+                  ))}
+                </div>
+                <div className="flex gap-1.5 mt-1">
+                  {['S-3', 'S-2', 'S-1', 'Cette sem.'].map(l => (
+                    <div key={l} className="flex-1 text-center text-[10px] ds-text-tertiary">{l}</div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Historique visites */}
           <div>
@@ -303,19 +329,18 @@ function CustomerDrawer({ customer, restaurantId, onClose }: { customer: Custome
                     <StarRating rating={f.rating} />
                     <span
                       className="text-[10.5px] font-semibold px-1.5 py-[2px] rounded-[4px]"
-                      style={
-                        f.badge === 'google'
-                          ? { background: 'var(--ds-success-soft)', color: 'var(--ds-success-strong)' }
-                          : { background: 'var(--ds-error-soft)', color: 'var(--ds-error-strong)' }
-                      }
+                      style={{ background: 'var(--ds-accent-soft)', color: '#B45309' }}
                     >
-                      {f.badge === 'google' ? 'Redirigé Google' : 'Intercepté'}
+                      Privé
                     </span>
                   </div>
-                  <p className="text-[13px] ds-text-primary leading-[1.5]">"{f.text}"</p>
-                  <div className="text-[11px] ds-text-tertiary mt-1.5">{f.date}</div>
+                  {f.text && <p className="text-[13px] ds-text-primary leading-[1.5]">"{f.text}"</p>}
+                  {f.date && <div className="text-[11px] ds-text-tertiary mt-1.5">{f.date}</div>}
                 </div>
               ))}
+              {feedbacks.length === 0 && (
+                <div className="text-[12.5px] ds-text-tertiary">Aucun feedback laissé.</div>
+              )}
             </div>
           </div>
 
@@ -374,54 +399,86 @@ export function Clients() {
   const crmCustomers = useQuery(api.customers.getByRestaurant, restaurantId ? { restaurantId } : 'skip')
 
   const customers = useMemo<Customer[]>(() => {
+    if (payments.length === 0) return []
+
+    // 1 paiement = 1 client. Fusion uniquement si même téléphone OU même email
+    // (backfillés sur le paiement par customers.saveContact). Sinon one-shot anonyme.
+    const groupKeyOf = (p: Doc<'payments'>): string => {
+      const phone = p.phone?.trim()
+      const email = p.email?.trim().toLowerCase()
+      if (phone) return `phone:${phone}`
+      if (email) return `email:${email}`
+      return `pay:${p._id}`
+    }
+    const groups = new Map<string, Doc<'payments'>[]>()
+    for (const p of payments) {
+      const k = groupKeyOf(p)
+      const arr = groups.get(k)
+      if (arr) arr.push(p)
+      else groups.set(k, [p])
+    }
+
     const list: Customer[] = []
-    for (let n = 1; n <= 10; n++) {
-      const ident = IDENTITIES[n]
-      const pmts = payments.filter(p => p.tableNumber === n)
-      if (pmts.length === 0) continue
-      const fbs = feedbacks.filter(f => f.tableNumber === n)
+    for (const [key, gp] of groups) {
+      const pmts = [...gp].sort((a, b) => b.createdAt - a.createdAt) // récent → ancien
+      const recent = pmts[0]
       const visits = pmts.length
       const total = pmts.reduce((s, p) => s + p.totalCents, 0) / 100
       const avg = total / visits
-      const avgRating = fbs.length > 0 ? fbs.reduce((s, f) => s + f.stars, 0) / fbs.length : 0
-      const lastTs = pmts.reduce((mx, p) => Math.max(mx, p.createdAt), 0)
+      const lastTs = recent.createdAt
+      const firstTs = pmts.reduce((mn, p) => Math.min(mn, p.createdAt), recent.createdAt)
+
+      // Contact du groupe (depuis le paiement le plus récent qui en porte un).
+      const gPhone = pmts.find(p => p.phone)?.phone ?? ''
+      const gEmail = pmts.find(p => p.email)?.email?.toLowerCase() ?? ''
+
+      // Feedbacks attribués par tableNumber des paiements du groupe (les feedbacks
+      // ne portent pas le contact — meilleure approximation réelle disponible).
+      const tableSet = new Set(pmts.map(p => p.tableNumber))
+      const gFeedbacks = feedbacks.filter(f => tableSet.has(f.tableNumber))
+      const avgRating = gFeedbacks.length > 0 ? gFeedbacks.reduce((s, f) => s + f.stars, 0) / gFeedbacks.length : 0
+
       let status: Status
       if (visits >= 10 || total >= 500) status = 'vip'
       else if (avgRating > 0 && avgRating < 3) status = 'insatisfait'
       else if (visits >= 3) status = 'regulier'
       else status = 'nouveau'
-      // Join CRM : on MERGE toutes les rows customers de cette table (join par
-      // tableNumber, ou par email démo). saveContact peut avoir créé des rows
-      // séparées (phone d'un côté, email de l'autre) — on prend le phone ET
-      // l'email les plus récents non vides (rows triées createdAt desc).
-      const crmRows = (crmCustomers ?? []).filter(cc =>
-        cc.tableNumber === n ||
-        (cc.email && cc.email.toLowerCase() === ident.email.toLowerCase())
+
+      // Identité réelle : prénom du paiement le plus récent (saisi sur /profile).
+      const first = (pmts.find(p => p.firstName)?.firstName || 'Client').trim() || 'Client'
+      const avatarIdx = pmts.find(p => p.avatarIndex != null)?.avatarIndex ?? 0
+      const pal = AVATARS[avatarIdx % AVATARS.length]
+
+      // Moyen de paiement dominant + sa part (%).
+      const methodCounts: Record<string, number> = {}
+      for (const p of pmts) methodCounts[p.paymentMethod] = (methodCounts[p.paymentMethod] ?? 0) + 1
+      const [topMethod, topCount] = Object.entries(methodCounts).sort((a, b) => b[1] - a[1])[0] ?? ['', 0]
+      const methodPct = visits > 0 ? Math.round((topCount / visits) * 100) : 0
+
+      // CRM : row consentante (email + marketingConsent) appariée par phone/email du groupe.
+      const crmMatch = (crmCustomers ?? []).filter(cc =>
+        (gPhone && cc.phone === gPhone) ||
+        (gEmail && cc.email?.toLowerCase() === gEmail)
       )
-      const crmEmail     = crmRows.find(r => r.email)?.email
-      const crmPhone     = crmRows.find(r => r.phone)?.phone
-      const crmFirstName = crmRows.find(r => r.firstName)?.firstName
-      const hasCrm = crmRows.length > 0
-      // Éligibilité campagne : row avec email ET marketingConsent actif (RGPD).
-      const consentRow = crmRows.find(r => r.marketingConsent === true && !!r.email)
-      // Nom : prénom réel saisi sur /profile (customers.firstName) en priorité.
-      // Vrai contact sans prénom → "Client anonyme". Aucun contact CRM → identité démo.
-      const first = hasCrm ? (crmFirstName || 'Client') : ident.first
-      const last  = hasCrm ? (crmFirstName ? '' : 'anonyme') : ident.last
+      const consentRow = crmMatch.find(r => r.marketingConsent === true && !!r.email)
+
       list.push({
-        id: n,
-        first, last,
-        // Pour un vrai client : uniquement ses coordonnées réelles (pas de fake démo).
-        email: hasCrm ? (crmEmail ?? '') : ident.email,
+        id: key,
+        tableNumber: recent.tableNumber,
+        first, last: '',
+        email: gEmail || (crmMatch[0]?.email ?? ''),
+        phone: gPhone || (crmMatch[0]?.phone ?? ''),
         visits, avg, total,
         lastVisit: formatTimeAgo(lastTs),
         lastIso: new Date(lastTs).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }),
+        firstTs,
         rating: avgRating,
         status,
-        phone: hasCrm ? (crmPhone ?? '') : ident.phone, split: ident.split,
-        color: ident.color, text: ident.text,
-        customerId: crmRows[0]?._id, realContact: hasCrm,
+        split: methodLabel(topMethod), methodPct,
+        color: pal.bg, text: pal.color,
+        customerId: crmMatch[0]?._id, realContact: !!(gPhone || gEmail),
         consent: !!consentRow, marketingId: consentRow?._id,
+        groupPayments: pmts, groupFeedbacks: gFeedbacks,
       })
     }
     return list.sort((a, b) => b.total - a.total)
@@ -856,7 +913,15 @@ export function Clients() {
         )}
       </AnimatePresence>
 
-      {selected && restaurantId && <CustomerDrawer customer={selected} restaurantId={restaurantId} onClose={() => setSelected(null)} />}
+      {selected && restaurantId && (
+        <CustomerDrawer
+          customer={selected}
+          restaurantId={restaurantId}
+          tablePayments={selected.groupPayments}
+          tableFeedbacks={selected.groupFeedbacks}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </RestaurantLayout>
   )
 }

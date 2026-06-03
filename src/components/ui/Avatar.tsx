@@ -6,6 +6,8 @@ export const AVATARS = [
   { emoji: '🐙', color: '#8B5CF6', bg: '#EDE9FE' },
   { emoji: '🦄', color: '#EC4899', bg: '#FCE7F3' },
   { emoji: '🐯', color: '#EF4444', bg: '#FEE2E2' },
+  { emoji: '🐺', color: '#64748B', bg: '#F1F5F9' },
+  { emoji: '🐨', color: '#0D9488', bg: '#CCFBF1' },
 ]
 
 type AvatarSize = 'sm' | 'md' | 'lg' | 'xl'

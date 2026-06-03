@@ -88,9 +88,10 @@ SQUARE_LOCATION_ID         # LS3JS5QB97NV8
 STRIPE_SECRET_KEY          # sk_… (never in VITE_* — server only)
 STRIPE_WEBHOOK_SECRET      # whsec_… for signature verification
 MAILGUN_API_KEY            # for transactional emails
+RESEND_API_KEY             # re_… — envoi des campagnes email (campaigns:sendCampaign)
 ```
 
-These must also be set on the prod deployment.
+These must also be set on the prod deployment. `RESEND_API_KEY` déjà posée sur dev (`scintillating-viper-372`) **et** prod (`mellow-chinchilla-481`). DNS Resend (`splitzy.fr`) ajoutés sur IONOS — l'envoi réel depuis `noreply@splitzy.fr` ne marche qu'une fois le domaine vérifié côté Resend.
 
 ### Routing overview (current single-repo)
 
@@ -110,6 +111,8 @@ These must also be set on the prod deployment.
 /a-propos             → AboutPage
 /contact              → ContactPage
 /carrieres            → CarriersPage
+/privacy              → PrivacyPage (politique de confidentialité, structure CNIL)
+/unsubscribe?id=…     → Unsubscribe (désabonnement marketing depuis lien email — public)
 
 /welcome              → Landing (consumer — après scan QR)
 /profile              → Profile (avatar + prénom)
@@ -157,6 +160,8 @@ Every sensitive Convex mutation checks `ctx.auth.getUserIdentity()` → looks up
 | `payments.ts` | `list`, `create` (accepte `paidItemNames?`), `getOverviewStats` |
 | `feedbacks.ts` | `list`, `create`, `markRead` |
 | `posIntegrations.ts` | `getByProvider`, `upsert`, `syncLive` |
+| `customers.ts` | `list`, `getByRestaurant`, `saveContact` (upsert phone+email, consolidation via `customerId`), `updateContact`, `unsubscribe` (public, sans auth — lien email), `getManyForCampaign` (internalQuery) |
+| `campaigns.ts` | `sendCampaign` (action `"use node"`, Resend — double check `email`+`marketingConsent` backend, footer désabonnement RGPD). ⚠ dépend du pkg `resend` — voir « Deps des actions Convex » |
 
 ### Files to add (admin + interconnexion phases)
 
@@ -181,6 +186,15 @@ Every sensitive Convex mutation checks `ctx.auth.getUserIdentity()` → looks up
 | `gdprRequests.ts` | `create`, `resolve` |
 | `subscriptions.ts` | `list`, `listPastDue`, `incrementDunning` |
 | `broadcasts.ts` | `create`, `send` |
+
+### Deps des actions Convex (gotcha build/deploy)
+
+Tout pkg npm importé par une action Convex (`"use node"`, ex : `resend`, `@anthropic-ai/sdk`) doit être installé à **DEUX** endroits, sinon ça casse :
+
+1. **`splitzy-client/`** → `npm install <pkg>`. `tsconfig.app.json` a `include: ["src"]`, mais `src → convex/_generated/api.d.ts → import type * as campaigns from "../campaigns.js"` tire le vrai `.ts` (campaigns.ts) dans le graphe de types. `api.d.ts` est skipLibCheck, mais le `.ts` cible ne l'est pas → `tsc -b` échoue avec `TS2307: Cannot find module 'resend'` (build local **et** Vercel).
+2. **`Splitzy/convex/`** (`@splitzy/convex`, monorepo pnpm) → `pnpm add <pkg>` (⚠ `npm install` y plante : `Cannot read properties of null (reading 'matches')`). Sinon `npx convex deploy --yes` échoue : esbuild `Could not resolve "resend"`.
+
+Mirror obligatoire : la fonction existe dans `Splitzy/convex/` (déployé en prod) **et** `splitzy-client/convex/` (codegen + types dashboard). Si on n'exécute pas `convex codegen`, enregistrer le nouveau module à la main dans `splitzy-client/convex/_generated/api.d.ts` (ligne `import type * as X` + entrée `X: typeof X` dans `fullApi`). `api.js` utilise `anyApi` → pas à toucher.
 
 ---
 
@@ -220,6 +234,7 @@ platformConfig   key*, value, updatedBy?, updatedAt
 savedViews       userId*, scope, name, filters
 pinnedRestaurants userId*, userId+restaurantId*
 posIntegrations  restaurantId*, restaurantId+provider*, provider, apiKey, status, lastSyncAt?
+customers        restaurantId*, restaurantId+phone*, restaurantId+email*, tableNumber?, firstName?, avatarIndex?, phone?, email?, marketingConsent?, consentAt?, createdAt
 ```
 
 `*` = indexed. `tables.status` values: `"free" | "dining" | "payment" | "paid"`.
@@ -338,7 +353,13 @@ Routing (`RestaurantApp.tsx`) — toutes les routes sont sous `/restaurant/*`, l
 
 ### Clients — données réelles (`Clients.tsx`)
 
-Plus de tableau `CUSTOMERS` statique : `useQuery(api.payments.list)` (filtré `status === 'Encaissé'`) + `useQuery(api.feedbacks.list)`, agrégés par `tableNumber` dans un `useMemo`. Statut dérivé : `vip` (visits ≥ 10 ou total ≥ 500€), `insatisfait` (0 < avgRating < 3), `regulier` (visits ≥ 3), sinon `nouveau`. Tables sans paiement filtrées, tri par total décroissant. Les KPIs header sont calculés depuis cet agrégat (plus de valeurs en dur).
+Plus de tableau `CUSTOMERS` statique : `useQuery(api.payments.list)` (filtré `status === 'Encaissé'`) + `useQuery(api.feedbacks.list)` + `useQuery(api.customers.getByRestaurant)`, agrégés par `tableNumber` dans un `useMemo`. Statut dérivé : `vip` (visits ≥ 10 ou total ≥ 500€), `insatisfait` (0 < avgRating < 3), `regulier` (visits ≥ 3), sinon `nouveau`. Tables sans paiement filtrées, tri par total décroissant. Les KPIs header sont calculés depuis cet agrégat (plus de valeurs en dur). Chaque `Customer` porte `consent` + `marketingId` (id de la row CRM avec email + `marketingConsent` actif), pour la campagne email.
+
+### Clients — campagne email (`Clients.tsx` + `convex/campaigns.ts`)
+
+Bouton **« Campagne email »** → modale : sélecteur segment radio (Tous / Réguliers / Nouveaux / Insatisfaits, avec nb d'éligibles = email + consentement par segment), sujet (required), corps (required), toggle aperçu (rendu final avec footer désabonnement), bouton « Envoyer à X clients » → `useAction(api.campaigns.sendCampaign)` avec les `marketingId` du segment. Toast résultat (`sonner`, `Toaster` monté dans `RestaurantLayout`). `restaurantName` vient de `useRestaurant()?.name`.
+
+`sendCampaign` (action `"use node"`) **revérifie côté backend** pour chaque client `email` non vide + `marketingConsent === true` (le front n'est jamais la seule barrière RGPD), envoie via Resend (`from: "Splitzy <noreply@splitzy.fr>"`), template HTML inline (header dark `#0A0A0A` + nom resto, corps gérant échappé, footer gris 12px avec lien `https://www.splitzy.fr/unsubscribe?id=<customerId>`), retourne `{ sent, failed }`. `/unsubscribe` appelle `api.customers.unsubscribe` (patch `marketingConsent: false`, sans auth).
 
 ### "Simuler commande" (test feature)
 
@@ -507,6 +528,30 @@ NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentio
 
 ## Known issues fixed (context for future sessions)
 
+- **Reçu PDF convive + feature Factures dashboard + Tiime** (session 2026-06-02) :
+  - **Tiime** : compte créé sur `apps.tiime.fr` (company ID 576580, email `splitzy.contact@gmail.com`). Société : Splitzy, SAS, adresse temporaire 123 Rue de l'Innovation 75001 Paris (à mettre à jour dès réception SIRET). Numérotation factures : `2026-000001`. SIRET et TVA : N/C — à compléter dès immatriculation. Tiime est la plateforme d'émission des factures Splitzy → restaurants (commission mensuelle 1,5%). PDP agréée e-facturation sept. 2026.
+  - **Légal factures** : seule facture à émettre = Splitzy → Restaurant (commission 1,5% + TVA). Les convives reçoivent un reçu PDF (justificatif de paiement, pas une facture TVA). Pas d'obligation de facture B2C. Worldline = PSP agréé qui couvre réglementairement la collecte de fonds pour compte de tiers (PSD2).
+  - **`src/utils/generateInvoice.ts`** — reçu PDF convive refait :
+    - Nouveaux champs dans `SessionState` (`src/context/types.ts`) : `paymentMethod: string`, `paymentRef: string`, `paymentTimestamp: number`, `paidSubtotalCents: number`, `paidTipCents: number`, `paidTotalCents: number` — tous initialisés à `''`/`0`, remis à 0 dans `RESET_SESSION`.
+    - Nouvelle action : `SET_PAYMENT_DETAILS` avec payload `{ method, ref, timestamp, subtotalCents, tipCents, totalCents }` — dispatchée dans `Payment.tsx` → `handlePay` avant `CONFIRM_PAYMENT`.
+    - `calcAmounts` utilise les montants gelés (`paidSubtotalCents` etc.) plutôt que de recalculer depuis `cachedOrderItems` (qui contient toute la table) ou `selectedItems` statiques.
+    - Articles affichés depuis `state.selectedItems` (ce que le convive a choisi), fallback "Part du repas" si vide.
+    - Footer complet : `Ref`, heure, méthode de paiement, mention légale TVA ("Ce document est un justificatif de paiement et ne constitue pas une facture TVA. Pour une facture de votre repas, contactez le restaurant directement.").
+    - Commission Splitzy supprimée du PDF (info interne, pas utile pour le convive).
+    - Nom fichier : `recu-{slug}-table{N}-{date}.pdf`.
+  - **`src/restaurant/pages/Factures.tsx`** — système d'onglets ajouté :
+    - Tab "Transactions" → contenu existant inchangé (historique paiements clients).
+    - Tab "Factures Splitzy" → factures commission Splitzy → restaurant. Contient : bandeau SIRET, 3 KPIs (Total facturé TTC / Payé / En attente), table (Numéro · Période · HT · TVA · TTC · Statut · PDF).
+    - `SPLITZY_COMPANY_CONFIG` en haut du fichier : `{ siret: 'En cours d\'immatriculation', tvaNumber: '', commissionRate: 0.015, tvaRate: 0.20 }` — **à mettre à jour dès réception SIRET**.
+    - `MOCK_SPLITZY_INVOICES` : tableau de `SplitzyInvoice[]` — **à remplacer par query Convex + Tiime API** quand SIRET obtenu. Chaque entrée : `{ id, number, period, issuedAt, dueAt, amountHT, tva, amountTTC, status, tiimePdfUrl }`.
+    - Bouton PDF → `window.open(tiimePdfUrl)` si URL non null, sinon grisé ("PDF disponible après émission").
+  - **Bug drawer Factures** : "Sous-total HT" et "TVA 10%" s'affichaient vides — les spans valeur n'avaient ni classe couleur ni `color` explicite. Fix : `ds-text-secondary` ajouté sur les spans non-bold.
+
+- **Page /privacy + refonte CRM confirmation + campagne email** (branche `c1`) :
+  - `/privacy` (`PrivacyPage.tsx`, structure CNIL) + lien footer marketing (`Footer.tsx`) et footer discret des écrans client (`PrivacyFooterLink.tsx` dans Confirmation/Feedback/Profile, ouvre `target="_blank"`). Ajouté à `sitemap.xml`, non bloqué par `robots.txt`.
+  - `Confirmation.tsx` : section CRM refondue — 2 champs (tel + email) toujours visibles, **1 seule** checkbox opt-in (jamais pré-cochée, apparaît dès qu'un champ est rempli), **1 seul** bouton « Enregistrer » → un seul `httpMutation('customers:saveContact', …)` ; état « Enregistré ✓ » vert après save. `canSave = (validPhone || validEmail) && consent && !saved`.
+  - Campagne email : `convex/campaigns.ts` (`sendCampaign`, Resend), `customers.unsubscribe` + `getManyForCampaign`, page `/unsubscribe`, modale dans `Clients.tsx`. Voir « Clients — campagne email » et « Deps des actions Convex ».
+  - **Splitzy/ n'est PAS un repo git** : les changements `Splitzy/convex/` ne sont pas versionnés là ; seul le mirror `splitzy-client/convex/` est poussé (suffit pour capturer le code des fonctions).
 - **Flow client iOS résilient au WS lent** (sauvegarde v11) : refonte complète du chemin critique pour ne plus dépendre du WebSocket Convex (cold start 15-30 s sur iOS). Voir section « iOS Safari — résilience réseau ». En résumé :
   - `payments:create` cassé en prod : `{ ...args }` dans `ctx.db.insert("payments", …)` incluait `paidItemNames` (absent du schema `payments`) → Convex rejetait **tous** les inserts → « Erreur de paiement ». Fix : `const { paidItemNames, ...paymentData } = args` avant l'insert ; `paidItemNames` sert ensuite à marquer `orderItems[].paid` (partiel géré via consommation de `remaining[]` pour les qty > 1).
   - Mutations `payments:create` / `tables:updateStatus` / `feedbacks:create` basculées sur `httpMutation` (`src/utils/convexHttp.ts`, `fetch keepalive`) — sinon perdues si l'onglet se ferme avant l'établissement du WS → le gérant ne voyait rien.

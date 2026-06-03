@@ -5,11 +5,16 @@ import { pageVariants } from '../utils/animations'
 import { NAME_SUGGESTIONS } from '../data/session'
 import { PrivacyFooterLink } from '../components/ui/PrivacyFooterLink'
 
+// Ordre des emojis aligné sur components/ui/Avatar.tsx (index = userAvatarIndex)
 const AVATARS = [
-  { id: 0, emoji: '🦊', bg: '#E8920A', label: 'Léo' },
-  { id: 1, emoji: '🐻', bg: '#3B82F6', label: 'Mia' },
-  { id: 2, emoji: '🐸', bg: '#8B5CF6', label: 'Alex' },
-  { id: 3, emoji: '🐙', bg: '#10B981', label: 'Sam' },
+  { id: 0, emoji: '🦊', bg: '#E8920A' },
+  { id: 1, emoji: '🐻', bg: '#3B82F6' },
+  { id: 2, emoji: '🐸', bg: '#8B5CF6' },
+  { id: 3, emoji: '🐙', bg: '#10B981' },
+  { id: 4, emoji: '🦄', bg: '#EC4899' },
+  { id: 5, emoji: '🐯', bg: '#EF4444' },
+  { id: 6, emoji: '🐺', bg: '#64748B' },
+  { id: 7, emoji: '🐨', bg: '#0D9488' },
 ]
 
 export function Profile() {
@@ -135,49 +140,47 @@ export function Profile() {
           Tes convives verront ton avatar et ton prénom 👋
         </div>
 
-        {/* Avatar 2×2 grid */}
+        {/* Avatar grid — 4×2, sans prénom, choix de l'emoji seulement */}
         <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
           Ton avatar
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20 }}>
           {AVATARS.map(a => {
             const active = state.userAvatarIndex === a.id
             return (
               <m.button
                 key={a.id}
                 type="button"
-                whileTap={{ scale: 0.96 }}
+                aria-label={`Avatar ${a.emoji}`}
+                whileTap={{ scale: 0.94 }}
                 onClick={() => dispatch({ type: 'SET_USER_AVATAR', payload: a.id })}
                 style={{
                   background: active ? '#FEF3C7' : '#F4F4F5',
                   border: active ? '2.5px solid #E8920A' : '2.5px solid #E5E7EB',
-                  borderRadius: 18, padding: '16px 0 12px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+                  borderRadius: 16, padding: '8px 0',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', position: 'relative',
-                  transition: 'all 0.22s cubic-bezier(0.34,1.56,0.64,1)',
-                  transform: active ? 'translateY(-3px)' : 'none',
-                  boxShadow: active ? '0 6px 20px rgba(232,146,10,0.2)' : 'none',
-                  minHeight: 88,
+                  transition: 'all 0.2s cubic-bezier(0.34,1.56,0.64,1)',
+                  transform: active ? 'translateY(-2px)' : 'none',
+                  boxShadow: active ? '0 5px 16px rgba(232,146,10,0.22)' : 'none',
+                  aspectRatio: '1 / 1', minHeight: 56,
                 }}
               >
                 {active && (
                   <div style={{
-                    position: 'absolute', top: 8, right: 8,
-                    width: 18, height: 18, background: '#E8920A', borderRadius: '50%',
+                    position: 'absolute', top: 4, right: 4,
+                    width: 15, height: 15, background: '#E8920A', borderRadius: '50%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 10, fontWeight: 900, color: '#fff',
+                    fontSize: 9, fontWeight: 900, color: '#fff',
                   }}>
                     ✓
                   </div>
                 )}
                 <div style={{
-                  width: 52, height: 52, borderRadius: '50%', background: a.bg,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
+                  width: 42, height: 42, borderRadius: '50%', background: a.bg,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 23,
                 }}>
                   {a.emoji}
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: active ? '#B45309' : '#9CA3AF' }}>
-                  {a.label}
                 </div>
               </m.button>
             )

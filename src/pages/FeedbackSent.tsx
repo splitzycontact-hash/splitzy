@@ -101,7 +101,7 @@ export function FeedbackSent() {
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M8 1v9M8 10l-3-3M8 10l3-3M2 13h12" stroke="#374151" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Télécharger ma facture (PDF)
+          Télécharger mon reçu (PDF)
         </button>
 
         <m.button

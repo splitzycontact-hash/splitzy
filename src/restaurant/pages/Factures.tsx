@@ -7,8 +7,35 @@ import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId } from '../context/RestaurantContext'
 import {
   Printer, Search, SlidersHorizontal, LayoutGrid, List,
-  X, ChevronLeft, ChevronRight, Euro, HandCoins, Percent, CreditCard, CheckCircle, Clock, RotateCcw, AlertCircle, FileText, Mail, Trash2, Check,
+  X, ChevronLeft, ChevronRight, Euro, HandCoins, Percent, CreditCard, CheckCircle, Clock, RotateCcw, AlertCircle, FileText, Mail, Trash2, Check, Info, Download,
 } from 'lucide-react'
+
+// ─── À REMPLACER par query Convex + Tiime API quand SIRET obtenu ───────────
+type SplitzyInvoice = {
+  id: string
+  number: string       // ex: "2026-000001"
+  period: string       // ex: "Mai 2026"
+  issuedAt: string     // ex: "01/06/2026"
+  dueAt: string        // ex: "15/06/2026"
+  amountHT: number     // en euros
+  tva: number          // en euros
+  amountTTC: number    // en euros
+  status: 'Payée' | 'En attente' | 'En retard'
+  tiimePdfUrl: string | null  // lien PDF Tiime, null si pas encore émise
+}
+
+const SPLITZY_COMPANY_CONFIG = {
+  siret: 'En cours d\'immatriculation',  // ← remplacer dès réception du SIRET
+  tvaNumber: '',                          // ← remplacer dès activation TVA
+  commissionRate: 0.015,
+  tvaRate: 0.20,
+}
+
+const MOCK_SPLITZY_INVOICES: SplitzyInvoice[] = [
+  { id: '1', number: '2026-000001', period: 'Avril 2026', issuedAt: '01/05/2026', dueAt: '15/05/2026', amountHT: 48.50, tva: 9.70, amountTTC: 58.20, status: 'Payée', tiimePdfUrl: null },
+  { id: '2', number: '2026-000002', period: 'Mai 2026', issuedAt: '01/06/2026', dueAt: '15/06/2026', amountHT: 62.30, tva: 12.46, amountTTC: 74.76, status: 'En attente', tiimePdfUrl: null },
+]
+// ────────────────────────────────────────────────────────────────────────────
 
 type PeriodKey = 'today' | 'week' | 'month' | 'quarter' | 'custom'
 
@@ -159,7 +186,7 @@ function Drawer({ row, onClose }: { row: LocalRow; onClose: () => void }) {
                 >
                   <span className={r.bold ? 'font-semibold ds-text-primary' : 'ds-text-secondary'}>{r.k}</span>
                   <span
-                    className={`font-semibold tabular-nums ${r.bold ? 'ds-text-primary' : ''}`}
+                    className={`font-semibold tabular-nums ${r.bold ? 'ds-text-primary' : 'ds-text-secondary'}`}
                     style={{ color: r.color ?? undefined }}
                   >
                     {r.v}
@@ -234,7 +261,165 @@ const METHOD_OPTS: { label: string; value: PayMethod }[] = [
   { label: 'Google Pay',  value: 'gpay' },
 ]
 
+const SPLITZY_STATUS_STYLE: Record<SplitzyInvoice['status'], { bg: string; color: string; Icon: typeof CheckCircle }> = {
+  'Payée':      { bg: 'var(--ds-success-soft)', color: 'var(--ds-success-strong)', Icon: CheckCircle },
+  'En attente': { bg: 'var(--ds-warning-soft)', color: 'var(--ds-warning)',        Icon: Clock },
+  'En retard':  { bg: 'var(--ds-error-soft)',   color: 'var(--ds-error)',          Icon: AlertCircle },
+}
+
+function SplitzyStatusBadge({ status }: { status: SplitzyInvoice['status'] }) {
+  const s = SPLITZY_STATUS_STYLE[status]
+  const Icon = s.Icon
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full text-[11px] font-semibold"
+      style={{ background: s.bg, color: s.color }}
+    >
+      <Icon size={10} />
+      {status}
+    </span>
+  )
+}
+
+const SPLITZY_GRID = '130px 1fr 110px 90px 120px 120px 170px'
+
+function SplitzyInvoicesTab() {
+  const invoices = MOCK_SPLITZY_INVOICES
+  const totalTTC   = invoices.reduce((s, i) => s + i.amountTTC, 0)
+  const paidTTC    = invoices.filter(i => i.status === 'Payée').reduce((s, i) => s + i.amountTTC, 0)
+  const pendingTTC = invoices.filter(i => i.status === 'En attente').reduce((s, i) => s + i.amountTTC, 0)
+
+  return (
+    <div className="px-9 py-6 space-y-5">
+
+      {/* Info banner */}
+      <div
+        className="flex items-start gap-2.5 px-4 py-3 rounded-[10px] border text-[12.5px]"
+        style={{ background: 'var(--ds-accent-soft)', borderColor: '#F5DDB3', color: 'var(--ds-accent-strong)' }}
+      >
+        <Info size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>Vos factures de commission Splitzy (1,5% + TVA). SIRET : {SPLITZY_COMPANY_CONFIG.siret}</span>
+      </div>
+
+      {/* KPI row */}
+      <section
+        className="grid grid-cols-1 sm:grid-cols-3 border rounded-[12px] overflow-hidden"
+        style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
+      >
+        {/* Total facturé TTC */}
+        <div className="flex flex-col gap-1.5 px-5 py-4" style={{ borderRight: '1px solid var(--ds-border)' }}>
+          <div className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">
+            <Euro size={12} style={{ color: 'var(--ds-text-tertiary)' }} />
+            Total facturé TTC
+          </div>
+          <div className="font-extrabold tabular-nums leading-none tracking-[-0.025em]" style={{ fontSize: '22px', color: 'var(--ds-accent)', fontFamily: 'Inter, sans-serif' }}>
+            {fmt(totalTTC)} €
+          </div>
+          <div className="text-[11.5px] ds-text-tertiary">{invoices.length} factures émises</div>
+        </div>
+
+        {/* Payé */}
+        <div className="flex flex-col gap-1.5 px-5 py-4" style={{ borderRight: '1px solid var(--ds-border)' }}>
+          <div className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">
+            <CheckCircle size={12} style={{ color: 'var(--ds-text-tertiary)' }} />
+            Payé
+          </div>
+          <div className="font-extrabold tabular-nums leading-none tracking-[-0.025em] ds-text-success" style={{ fontSize: '22px', fontFamily: 'Inter, sans-serif' }}>
+            {fmt(paidTTC)} €
+          </div>
+          <div className="text-[11.5px] ds-text-tertiary">{invoices.filter(i => i.status === 'Payée').length} facture(s) réglée(s)</div>
+        </div>
+
+        {/* En attente */}
+        <div className="flex flex-col gap-1.5 px-5 py-4">
+          <div className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">
+            <Clock size={12} style={{ color: 'var(--ds-text-tertiary)' }} />
+            En attente
+          </div>
+          <div className="font-extrabold tabular-nums leading-none tracking-[-0.025em]" style={{ fontSize: '22px', color: 'var(--ds-warning)', fontFamily: 'Inter, sans-serif' }}>
+            {fmt(pendingTTC)} €
+          </div>
+          <div className="text-[11.5px] ds-text-tertiary">{invoices.filter(i => i.status === 'En attente').length} facture(s) à régler</div>
+        </div>
+      </section>
+
+      {/* Table */}
+      <div className="ds-panel">
+        {/* Header */}
+        <div
+          className="grid text-[10.5px] font-bold uppercase tracking-[0.07em] px-5 py-2.5"
+          style={{
+            gridTemplateColumns: SPLITZY_GRID,
+            background: 'var(--ds-bg-subtle)',
+            color: 'var(--ds-text-tertiary)',
+            borderBottom: '1px solid var(--ds-border)',
+          }}
+        >
+          <div>Numéro</div>
+          <div>Période</div>
+          <div className="text-right">Montant HT</div>
+          <div className="text-right">TVA</div>
+          <div className="text-right">Montant TTC</div>
+          <div>Statut</div>
+          <div className="text-right">Action</div>
+        </div>
+
+        {/* Rows */}
+        {invoices.map((inv, i) => (
+          <div
+            key={inv.id}
+            className="grid items-center px-5 py-3 border-b"
+            style={{
+              gridTemplateColumns: SPLITZY_GRID,
+              borderColor: 'var(--ds-border)',
+              background: i % 2 === 1 ? 'var(--ds-bg-base)' : 'var(--ds-bg-surface)',
+            }}
+          >
+            <div className="font-mono text-[12px] font-semibold ds-text-primary">{inv.number}</div>
+            <div>
+              <div className="text-[13px] ds-text-primary font-medium">{inv.period}</div>
+              <div className="text-[11px] ds-text-tertiary mt-0.5">Émise {inv.issuedAt} · Éch. {inv.dueAt}</div>
+            </div>
+            <div className="text-right text-[13px] ds-text-secondary tabular-nums">{fmt(inv.amountHT)} €</div>
+            <div className="text-right text-[13px] ds-text-tertiary tabular-nums">{fmt(inv.tva)} €</div>
+            <div className="text-right text-[13px] font-semibold ds-text-primary tabular-nums">{fmt(inv.amountTTC)} €</div>
+            <div><SplitzyStatusBadge status={inv.status} /></div>
+            <div className="text-right">
+              {inv.tiimePdfUrl ? (
+                <button
+                  onClick={() => window.open(inv.tiimePdfUrl!, '_blank')}
+                  className="inline-flex items-center gap-1.5 px-3 py-[5px] rounded-lg border text-[12px] font-medium transition-colors"
+                  style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', boxShadow: 'var(--ds-shadow-sm)' }}
+                >
+                  <Download size={13} />
+                  Télécharger PDF
+                </button>
+              ) : (
+                <button
+                  disabled
+                  title="PDF disponible après émission"
+                  className="inline-flex items-center gap-1.5 px-3 py-[5px] rounded-lg border text-[12px] font-medium cursor-not-allowed"
+                  style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-tertiary)', opacity: 0.6 }}
+                >
+                  <Download size={13} />
+                  Télécharger PDF
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div className="text-center text-[11.5px] ds-text-tertiary pt-1">
+        Factures émises via Tiime · Pour toute question : splitzy.contact@gmail.com
+      </div>
+    </div>
+  )
+}
+
 export function Factures() {
+  const [activeTab, setActiveTab]       = useState<'transactions' | 'splitzy'>('transactions')
   const [period, setPeriod]             = useState<PeriodKey>('week')
   const [search, setSearch]             = useState('')
   const [drawerRow, setDrawerRow]       = useState<LocalRow | null>(null)
@@ -322,6 +507,32 @@ export function Factures() {
         }
       />
 
+      {/* Tabs */}
+      <div className="px-9 pt-5">
+        <div
+          className="inline-flex rounded-[10px] p-[3px] gap-px border"
+          style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
+        >
+          {([{ k: 'transactions', label: 'Transactions' }, { k: 'splitzy', label: 'Factures Splitzy' }] as const).map(t => (
+            <button
+              key={t.k}
+              onClick={() => setActiveTab(t.k)}
+              className="px-4 py-[6px] rounded-[7px] text-[12.5px] transition-colors whitespace-nowrap"
+              style={{
+                background: activeTab === t.k ? 'var(--ds-bg-subtle)' : 'none',
+                color: activeTab === t.k ? 'var(--ds-text-primary)' : 'var(--ds-text-secondary)',
+                fontWeight: activeTab === t.k ? 600 : 500,
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab === 'splitzy' && <SplitzyInvoicesTab />}
+
+      {activeTab === 'transactions' && (
       <div className="px-9 py-6 space-y-5">
 
         {/* KPI row */}
@@ -713,6 +924,7 @@ export function Factures() {
         </div>
 
       </div>
+      )}
 
       {/* Plus de filtres drawer */}
       <AnimatePresence>

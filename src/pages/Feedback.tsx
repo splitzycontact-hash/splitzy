@@ -56,7 +56,7 @@ export function Feedback() {
       {/* Dark hero */}
       <div style={{
         position: 'relative', overflow: 'hidden',
-        background: '#0A0A0A', padding: '50px 24px 28px', color: '#fff', flexShrink: 0,
+        background: '#0A0A0A', padding: '16px 24px 12px', color: '#fff', flexShrink: 0,
       }}>
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.5,
@@ -74,7 +74,7 @@ export function Feedback() {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 14px',
               background: 'rgba(255,255,255,0.08)', border: 0, borderRadius: 10, color: '#fff',
-              fontSize: 13, fontWeight: 600, cursor: 'pointer', marginBottom: 14, minHeight: 44,
+              fontSize: 13, fontWeight: 600, cursor: 'pointer', marginBottom: 6, minHeight: 40,
             }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -84,28 +84,28 @@ export function Feedback() {
           </button>
           {/* Orange icon */}
           <div style={{
-            width: 40, height: 40, borderRadius: '50%', background: '#E8920A',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+            width: 32, height: 32, borderRadius: '50%', background: '#E8920A',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 6,
           }}>
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
               <path d="M11 2L13.5 8L20 9L15 13.8L16.3 20L11 17.1L5.7 20L7 13.8L2 9L8.5 8L11 2Z" fill="white" />
             </svg>
           </div>
           <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.15 }}>
             Comment s'est passée<br />ta soirée ?
           </div>
-          <div style={{ fontSize: 13, color: '#A1A1AA', marginTop: 6 }}>
+          <div style={{ fontSize: 13, color: '#A1A1AA', marginTop: 2 }}>
             {state.restaurantName}
           </div>
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', padding: '16px 20px 0' }}>
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', padding: '8px 20px 0' }}>
         {/* Privacy badge */}
         <div style={{
-          padding: 14, borderRadius: 14, background: '#FFF4E5',
+          padding: '6px 10px', borderRadius: 14, background: '#FFF4E5',
           border: '1px solid rgba(232,146,10,0.2)',
-          display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14,
+          display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6,
         }}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
             <path d="M9 1.5L2.25 4.5v5.25C2.25 13.5 9 16.5 9 16.5S15.75 13.5 15.75 9.75V4.5L9 1.5z" stroke="#E8920A" strokeWidth="1.4" />
@@ -122,10 +122,10 @@ export function Feedback() {
         {/* Stars card */}
         <div style={{
           background: '#fff', border: '1px solid #E4E4E7', borderRadius: 16,
-          padding: '16px 14px 20px', textAlign: 'center', marginBottom: 14,
+          padding: '8px 12px 10px', textAlign: 'center', marginBottom: 6,
         }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#0A0A0A' }}>Ton expérience globale</div>
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginTop: 6 }}>
             <StarRating
               value={state.feedbackStars}
               onChange={s => dispatch({ type: 'SET_FEEDBACK_STARS', payload: s })}
@@ -141,12 +141,12 @@ export function Feedback() {
         </div>
 
         {/* Chips */}
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11.5, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
             Ce qui t'a marqué{' '}
             <span style={{ textTransform: 'none', letterSpacing: 0, color: '#A1A1AA' }}>(optionnel)</span>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {FEEDBACK_TAGS.map(tag => {
               const sel = state.feedbackTags.includes(tag)
               const dot = FEEDBACK_CHIP_DOTS[tag] ?? '#E4E4E7'
@@ -156,11 +156,11 @@ export function Feedback() {
                   type="button"
                   onClick={() => dispatch({ type: 'TOGGLE_FEEDBACK_TAG', payload: tag })}
                   style={{
-                    padding: '9px 12px', borderRadius: 999,
+                    padding: '6px 10px', borderRadius: 999,
                     border: `1.5px solid ${sel ? '#E8920A' : '#E4E4E7'}`,
                     background: sel ? '#FFF4E5' : '#fff',
                     color: sel ? '#E8920A' : '#0A0A0A',
-                    fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
                     display: 'inline-flex', alignItems: 'center', gap: 7,
                     transition: 'all 0.15s',
                   }}
@@ -178,8 +178,8 @@ export function Feedback() {
         </div>
 
         {/* Note */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11.5, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: '#52525B', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
             Un mot en plus ?{' '}
             <span style={{ textTransform: 'none', letterSpacing: 0, color: '#A1A1AA' }}>(optionnel)</span>
           </div>
@@ -187,7 +187,7 @@ export function Feedback() {
             value={state.feedbackText}
             onChange={e => dispatch({ type: 'SET_FEEDBACK_TEXT', payload: e.target.value })}
             maxLength={500}
-            rows={3}
+            rows={2}
             placeholder="Décris ton expérience…"
             style={{
               width: '100%', padding: 14, borderRadius: 14,
@@ -206,14 +206,14 @@ export function Feedback() {
       </div>
 
       {/* CTAs */}
-      <div style={{ padding: '14px 20px', paddingBottom: 'max(24px, calc(12px + env(safe-area-inset-bottom)))', flexShrink: 0 }}>
+      <div style={{ padding: '8px 20px', paddingBottom: 'max(12px, calc(6px + env(safe-area-inset-bottom)))', flexShrink: 0 }}>
         <m.button
           type="button"
           whileTap={{ scale: 0.985 }}
           onClick={handleSend}
           disabled={!canSend}
           style={{
-            width: '100%', height: 56, borderRadius: 16, border: 0,
+            width: '100%', height: 52, borderRadius: 16, border: 0,
             background: canSend ? '#E8920A' : '#E4E4E7',
             color: canSend ? '#fff' : '#A1A1AA',
             fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em',

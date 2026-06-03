@@ -1,33 +1,33 @@
 import { jsPDF } from 'jspdf'
 import type { SessionState } from '../context/types'
-import { MENU_ITEMS } from '../data/menu'
 import { formatEur } from './formatCurrency'
-import { TABLE_TOTAL_CENTS } from '../data/session'
 
 function calcAmounts(state: SessionState) {
-  let subtotal = 0
-  if (state.splitMode === 'item') {
-    subtotal = state.selectedItems.reduce((acc, si) => {
-      const item = MENU_ITEMS.find(m => m.id === si.menuItemId)
-      return item ? acc + Math.round(item.price / si.splitFactor) : acc
-    }, 0)
-  } else if (state.splitMode === 'equal') {
-    subtotal = Math.round(TABLE_TOTAL_CENTS / state.equalSplitCount)
-  } else {
-    subtotal = state.customAmount
+  // Montants réellement payés par le convive, figés au moment du paiement.
+  return {
+    subtotal: state.paidSubtotalCents,
+    tipAmount: state.paidTipCents,
+    total: state.paidTotalCents,
   }
-  const tipAmount = Math.round(subtotal * state.tipPercent / 100)
-  const splitzyFee = Math.round(subtotal * 0.015)
-  const total = subtotal + tipAmount
-  return { subtotal, tipAmount, splitzyFee, total }
+}
+
+function methodLabel(method: string): string {
+  if (method === 'apple_pay') return 'Apple Pay'
+  if (method === 'google_pay') return 'Google Pay'
+  return 'Carte bancaire'
 }
 
 export function generateInvoicePDF(state: SessionState) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
-  const { subtotal, tipAmount, splitzyFee, total } = calcAmounts(state)
+  const { subtotal, tipAmount, total } = calcAmounts(state)
   const M = 20 // left/right margin
   const W = 210 - M * 2
   let y = 0
+
+  // Détails du paiement (avec fallbacks si la session n'a pas été renseignée).
+  const paymentDate = new Date(state.paymentTimestamp || Date.now())
+  const heureStr = paymentDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  const label = methodLabel(state.paymentMethod)
 
   const dateStr = new Date().toLocaleDateString('fr-FR', {
     day: 'numeric', month: 'long', year: 'numeric',
@@ -80,28 +80,25 @@ export function generateInvoicePDF(state: SessionState) {
 
   y += 6
 
-  if (state.splitMode === 'item') {
+  if (state.selectedItems.length > 0) {
+    // Articles réellement sélectionnés et payés par le convive.
     state.selectedItems.forEach(si => {
-      const item = MENU_ITEMS.find(m => m.id === si.menuItemId)
-      if (!item) return
-      const linePrice = Math.round(item.price / si.splitFactor)
-      const label = si.splitFactor > 1 ? `${item.name}  (÷${si.splitFactor})` : item.name
+      const linePrice = Math.round(si.priceCents / si.splitFactor)
+      const itemLabel = si.splitFactor > 1 ? `${si.name}  (÷${si.splitFactor})` : si.name
 
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(17, 24, 39)
-      doc.text(label, M, y)
+      doc.text(itemLabel, M, y)
       doc.text(formatEur(linePrice), 210 - M, y, { align: 'right' })
       y += 7
     })
   } else {
-    const label = state.splitMode === 'equal'
-      ? `Part égale  (1/${state.equalSplitCount})`
-      : 'Montant libre'
+    // Parts égales / montant libre : pas de détail article, juste la part payée.
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(17, 24, 39)
-    doc.text(label, M, y)
+    doc.text('Part du repas', M, y)
     doc.text(formatEur(subtotal), 210 - M, y, { align: 'right' })
     y += 7
   }
@@ -122,7 +119,7 @@ export function generateInvoicePDF(state: SessionState) {
 
   // ── Totals ────────────────────────────────────────────────
   const row = (
-    label: string,
+    rowLabel: string,
     value: string,
     opts: { bold?: boolean; labelRgb?: [number, number, number]; valueRgb?: [number, number, number] } = {}
   ) => {
@@ -131,7 +128,7 @@ export function generateInvoicePDF(state: SessionState) {
     doc.setFontSize(10)
     doc.setFont('helvetica', opts.bold ? 'bold' : 'normal')
     doc.setTextColor(labelColor[0], labelColor[1], labelColor[2])
-    doc.text(label, M, y)
+    doc.text(rowLabel, M, y)
     doc.setTextColor(valueColor[0], valueColor[1], valueColor[2])
     doc.text(value, 210 - M, y, { align: 'right' })
     y += 7
@@ -146,12 +143,6 @@ export function generateInvoicePDF(state: SessionState) {
       { labelRgb: [180, 83, 9], valueRgb: [180, 83, 9] }
     )
   }
-
-  row(
-    'Commission Splitzy (1,5%)',
-    formatEur(splitzyFee),
-    { labelRgb: [156, 163, 175], valueRgb: [156, 163, 175] }
-  )
 
   y += 2
   doc.setDrawColor(229, 231, 235)
@@ -169,16 +160,32 @@ export function generateInvoicePDF(state: SessionState) {
   y += 16
 
   // ── Footer card ───────────────────────────────────────────
-  doc.setFillColor(249, 250, 251)
-  doc.roundedRect(M, y, W, 22, 3, 3, 'F')
+  const disclaimer =
+    'Ce document est un justificatif de paiement et ne constitue pas une facture TVA. Pour une facture de votre repas, contactez le restaurant directement.'
 
   doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')
+  const discLines = doc.splitTextToSize(disclaimer, W - 12) as string[]
+  const cardH = 28 + discLines.length * 4
+
+  doc.setFillColor(249, 250, 251)
+  doc.roundedRect(M, y, W, cardH, 3, 3, 'F')
+
+  doc.setTextColor(107, 114, 128)
+  doc.text(`Ref : ${state.paymentRef || 'N/A'}  ·  Payé le ${dateStr} à ${heureStr}`, M + 6, y + 7)
+  doc.text(`Méthode : ${label}`, M + 6, y + 13)
+
   doc.setTextColor(156, 163, 175)
-  doc.text('Paiement traité par Splitzy  ·  splitzy.fr', 210 / 2, y + 8, { align: 'center' })
-  doc.text('Ce document tient lieu de reçu de paiement.', 210 / 2, y + 14, { align: 'center' })
+  doc.text('Paiement traité par Splitzy  ·  splitzy.fr', M + 6, y + 19)
+
+  let dy = y + 25
+  discLines.forEach(ln => {
+    doc.text(ln, M + 6, dy)
+    dy += 4
+  })
 
   // ── Save ──────────────────────────────────────────────────
   const slug = state.restaurantName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-  doc.save(`facture-${slug}-table${state.tableNumber}.pdf`)
+  const fileDate = paymentDate.toISOString().slice(0, 10)
+  doc.save(`recu-${slug}-table${state.tableNumber}-${fileDate}.pdf`)
 }

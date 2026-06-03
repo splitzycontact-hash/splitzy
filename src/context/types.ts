@@ -55,6 +55,13 @@ export interface SessionState {
   feedbackTags: string[]
   feedbackText: string
   feedbackSent: boolean
+  paymentMethod: string
+  paymentRef: string
+  paymentTimestamp: number
+  paidSubtotalCents: number
+  paidTipCents: number
+  paidTotalCents: number
+  lastPaymentId: string // id du dernier paiement créé (payments:create) — lie le contact CRM au paiement
 }
 
 export type SessionAction =
@@ -68,6 +75,8 @@ export type SessionAction =
   | { type: 'SET_TIP_PERCENT'; payload: number }
   | { type: 'SET_SELECTED_CARD'; payload: string }
   | { type: 'CONFIRM_PAYMENT' }
+  | { type: 'SET_PAYMENT_DETAILS'; payload: { method: string; ref: string; timestamp: number; subtotalCents: number; tipCents: number; totalCents: number } }
+  | { type: 'SET_LAST_PAYMENT_ID'; payload: string }
   | { type: 'SET_FEEDBACK_STARS'; payload: number }
   | { type: 'TOGGLE_FEEDBACK_TAG'; payload: string }
   | { type: 'SET_FEEDBACK_TEXT'; payload: string }
