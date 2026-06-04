@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { useQuery, useMutation } from 'convex/react'
+import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
@@ -14,77 +13,6 @@ import {
 type ConvexTable   = { number: number; status: string; amountCents?: number; paidCents?: number; durationMinutes?: number; alert?: boolean }
 type ConvexPayment = { tableNumber: number; totalCents: number; tipCents: number; subtotalCents: number; createdAt: number; dateLabel: string; status: string; guests: number }
 type ConvexFeedback = { stars: number }
-
-type SeedResult = {
-  restaurantName: string
-  payments: Array<{ createdAt: number; tableNumber: number; guests: number; subtotalCents: number; tipCents: number; totalCents: number; paymentMethod: string; dateLabel: string }>
-  feedbacks: Array<{ createdAt: number; tableNumber: number; stars: number; tags: string[]; text: string; timeLabel: string }>
-}
-
-function generateTestPDF(data: SeedResult) {
-  const { restaurantName, payments, feedbacks } = data
-  const nbPay = payments.length
-  const totalCentsSum = payments.reduce((s, p) => s + p.totalCents, 0)
-  const avgBasket = nbPay > 0 ? Math.round(totalCentsSum / nbPay) : 0
-  const nbFb = feedbacks.length
-  const avgStars = nbFb > 0 ? (feedbacks.reduce((s, f) => s + f.stars, 0) / nbFb) : 0
-
-  const DAY_NAMES = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
-  const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
-  const byDay: Record<number, number> = {}
-  for (const p of payments) { const d = new Date(p.createdAt).getDay(); byDay[d] = (byDay[d] ?? 0) + p.totalCents }
-
-  const sortedPay = [...payments].sort((a, b) => b.createdAt - a.createdAt)
-  const sortedFb  = [...feedbacks].sort((a, b) => b.createdAt - a.createdAt)
-
-  const fmt = (c: number) => (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-  const fmtD = (ts: number) => { const d = new Date(ts); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` }
-  const now = new Date()
-  const nowStr = `${fmtD(now.getTime())} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-
-  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Rapport de test — ${restaurantName}</title>
-<style>
-body{font-family:system-ui,sans-serif;font-size:13px;color:#111;margin:32px}
-h1{font-size:20px;margin-bottom:4px}
-.sub{color:#888;font-size:11px;margin:0 0 24px}
-h2{font-size:12px;font-weight:700;margin:28px 0 10px;border-bottom:2px solid #e5e5e5;padding-bottom:6px;text-transform:uppercase;letter-spacing:.07em;color:#333}
-.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:8px}
-.kpi{background:#f8f8f8;border:1px solid #eee;border-radius:8px;padding:12px 14px}
-.kl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
-.kv{font-size:22px;font-weight:800}
-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
-th{background:#f2f2f2;text-align:left;padding:7px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#555}
-td{padding:6px 10px;border-bottom:1px solid #f0f0f0;vertical-align:top}
-tr:last-child td{border-bottom:none}
-.stars{color:#E8920A;letter-spacing:1px}
-.tag{display:inline-block;background:#f0f0f0;border-radius:4px;padding:1px 6px;font-size:10px;margin:1px 2px 1px 0}
-@media print{body{font-size:11px;margin:16px}.kv{font-size:16px}h2{page-break-after:avoid}tr{page-break-inside:avoid}}
-</style></head><body>
-<h1>Rapport de test — ${restaurantName}</h1>
-<p class="sub">Généré le ${nowStr}</p>
-<h2>KPIs</h2>
-<div class="kpis">
-  <div class="kpi"><div class="kl">CA total</div><div class="kv">${fmt(totalCentsSum)}</div></div>
-  <div class="kpi"><div class="kl">Paiements</div><div class="kv">${nbPay}</div></div>
-  <div class="kpi"><div class="kl">Panier moyen</div><div class="kv">${fmt(avgBasket)}</div></div>
-  <div class="kpi"><div class="kl">Feedbacks</div><div class="kv">${nbFb}</div></div>
-  <div class="kpi"><div class="kl">Note moyenne</div><div class="kv">${avgStars.toFixed(1)} ★</div></div>
-</div>
-<h2>CA par jour de la semaine</h2>
-<table><tr>${DAY_ORDER.map(d=>`<th>${DAY_NAMES[d]}</th>`).join('')}</tr><tr>${DAY_ORDER.map(d=>`<td>${fmt(byDay[d]??0)}</td>`).join('')}</tr></table>
-<h2>Paiements (${nbPay})</h2>
-<table><tr><th>Date</th><th>Table</th><th>Convives</th><th>Montant</th><th>Pourboire</th><th>Méthode</th></tr>
-${sortedPay.map(p=>`<tr><td>${fmtD(p.createdAt)}</td><td>${p.tableNumber}</td><td>${p.guests}</td><td>${fmt(p.totalCents)}</td><td>${fmt(p.tipCents)}</td><td>${p.paymentMethod}</td></tr>`).join('')}
-</table>
-<h2>Feedbacks (${nbFb})</h2>
-<table><tr><th>Date</th><th>Table</th><th>Note</th><th>Tags</th><th>Commentaire</th></tr>
-${sortedFb.map(f=>`<tr><td>${fmtD(f.createdAt)}</td><td>${f.tableNumber}</td><td class="stars">${'★'.repeat(f.stars)}${'☆'.repeat(5-f.stars)}</td><td>${f.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</td><td>${f.text}</td></tr>`).join('')}
-</table>
-</body></html>`
-
-  const win = window.open('', '_blank')
-  if (win) { win.document.write(html); win.document.close(); win.print() }
-}
 
 const NOW = new Date()
 const DATE_FR = NOW.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -384,37 +312,6 @@ export function Overview() {
   const restaurantId = useRestaurantId()
   const restaurant   = useRestaurant()
 
-  const seedScenario  = useMutation(api.seed.seedScenarioComplet)
-  const clearScenario = useMutation(api.seed.clearSnackMomoFull)
-  const [seeding,  setSeeding]  = useState(false)
-  const [clearing, setClearing] = useState(false)
-
-  const handleSeed = async () => {
-    setSeeding(true)
-    try {
-      const result = await seedScenario()
-      generateTestPDF(result as SeedResult)
-    } catch (e) {
-      console.error(e)
-      alert('Erreur lors de la génération du scénario')
-    } finally {
-      setSeeding(false)
-    }
-  }
-
-  const handleClear = async () => {
-    if (!window.confirm('Supprimer toutes les données de test ?')) return
-    setClearing(true)
-    try {
-      await clearScenario()
-    } catch (e) {
-      console.error(e)
-      alert('Erreur lors du nettoyage')
-    } finally {
-      setClearing(false)
-    }
-  }
-
   const stats          = useQuery(api.payments.getOverviewStats, restaurantId ? { restaurantId } : 'skip')
   const rawTables      = useQuery(api.tables.list,               restaurantId ? { restaurantId } : 'skip')
   const rawPayments    = useQuery(api.payments.list,             restaurantId ? { restaurantId } : 'skip')
@@ -458,32 +355,6 @@ export function Overview() {
         }
         live
       />
-
-      {/* ── Mode Test ── */}
-      <div
-        className="mx-9 mt-3 mb-0 px-4 py-2.5 rounded-xl flex items-center gap-3"
-        style={{ background: '#1a1a2e', border: '1px solid rgba(232,146,10,0.2)' }}
-      >
-        <span className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ color: '#E8920A' }}>
-          Mode Test
-        </span>
-        <button
-          onClick={handleSeed}
-          disabled={seeding}
-          className="text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-opacity disabled:opacity-50"
-          style={{ background: '#E8920A', color: '#fff' }}
-        >
-          {seeding ? 'Génération…' : '🧪 Simuler scénario'}
-        </button>
-        <button
-          onClick={handleClear}
-          disabled={clearing}
-          className="text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-opacity disabled:opacity-50"
-          style={{ border: '1px solid rgba(239,68,68,0.35)', color: 'rgba(252,165,165,0.85)', background: 'transparent' }}
-        >
-          {clearing ? 'Nettoyage…' : '🗑 Nettoyer'}
-        </button>
-      </div>
 
       <div className="px-9 py-6 space-y-5">
 

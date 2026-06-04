@@ -1,6 +1,6 @@
-import { mutation } from "./_generated/server"
+import { internalMutation } from "./_generated/server"
 
-export const seedLeComptoir = mutation({
+export const seedLeComptoir = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Check if already seeded
@@ -111,7 +111,7 @@ export const seedLeComptoir = mutation({
   },
 })
 
-export const seedScenarioComplet = mutation({
+export const seedScenarioComplet = internalMutation({
   args: {},
   handler: async (ctx) => {
     const restaurant = await ctx.db
@@ -225,7 +225,7 @@ export const seedScenarioComplet = mutation({
   },
 })
 
-export const clearSnackMomoFull = mutation({
+export const clearSnackMomoFull = internalMutation({
   args: {},
   handler: async (ctx) => {
     const restaurant = await ctx.db
@@ -250,7 +250,7 @@ export const clearSnackMomoFull = mutation({
   },
 })
 
-export const simulateClient = mutation({
+export const simulateClient = internalMutation({
   args: {},
   handler: async (ctx) => {
     const restaurant = await ctx.db
