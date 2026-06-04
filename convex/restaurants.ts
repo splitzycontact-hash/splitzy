@@ -75,6 +75,7 @@ export const create = mutation({
     email: v.string(),
     type: v.string(),
     clerkUserId: v.string(),
+    plan: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
