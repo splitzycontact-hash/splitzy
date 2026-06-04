@@ -1,5 +1,6 @@
 import { query, mutation, internalQuery } from "./_generated/server"
 import { v } from "convex/values"
+import { requireRestaurantAccess } from "./authz"
 
 // Récupère les profils clients ciblés par une campagne email (consommé par
 // l'action campaigns:sendCampaign, runtime node). Filtre par restaurantId pour
@@ -28,6 +29,9 @@ export const unsubscribe = mutation({
 export const setManualVip = mutation({
   args: { customerId: v.id('customers'), isVip: v.boolean() },
   handler: async (ctx, { customerId, isVip }) => {
+    const c = await ctx.db.get(customerId)
+    if (!c) throw new Error("Client introuvable")
+    await requireRestaurantAccess(ctx, c.restaurantId, ["owner", "manager"])
     await ctx.db.patch(customerId, { manualVip: isVip })
   },
 })
@@ -35,6 +39,7 @@ export const setManualVip = mutation({
 export const list = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
+    await requireRestaurantAccess(ctx, restaurantId, ["owner", "manager"])
     return ctx.db.query("customers").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).order("desc").collect()
   },
 })
@@ -44,6 +49,7 @@ export const list = query({
 export const getByRestaurant = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
+    await requireRestaurantAccess(ctx, restaurantId, ["owner", "manager"])
     const rows = await ctx.db.query("customers")
       .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
       .collect()
@@ -65,6 +71,7 @@ export const updateContact = mutation({
     email: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireRestaurantAccess(ctx, args.restaurantId, ["owner", "manager"])
     const patch: Record<string, unknown> = {}
     if (args.phone !== undefined) patch.phone = args.phone.trim() || undefined
     if (args.email !== undefined) patch.email = args.email.trim().toLowerCase() || undefined

@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server"
 import { v } from "convex/values"
+import { requireRestaurantAccess } from "./authz"
 
 export const createBulk = mutation({
   args: {
@@ -8,6 +9,7 @@ export const createBulk = mutation({
     capacity: v.number(),
   },
   handler: async (ctx, { restaurantId, count, capacity }) => {
+    await requireRestaurantAccess(ctx, restaurantId, ["owner", "manager"])
     const existing = await ctx.db
       .query("tables")
       .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
@@ -28,6 +30,7 @@ export const createBulk = mutation({
 export const list = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
+    await requireRestaurantAccess(ctx, restaurantId)
     return ctx.db.query("tables").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).collect()
   },
 })
@@ -63,10 +66,11 @@ export const updateStatus = mutation({
   },
   handler: async (ctx, { tableId, status, guests, amountCents, orderItems }) => {
     const existing = await ctx.db.get(tableId)
+    if (!existing) throw new Error("Table introuvable")
     const patch: Record<string, unknown> = { status }
-    if (guests !== undefined) patch.guests = guests
+    if (guests !== undefined) patch.guests = Math.max(0, guests)
     if (amountCents !== undefined) {
-      patch.amountCents = amountCents
+      patch.amountCents = Math.max(0, amountCents)
       const wasFreshSitting = !existing
         || existing.status === "free"
         || existing.status === "paid"
@@ -84,6 +88,9 @@ export const updateStatus = mutation({
 export const resetToFree = mutation({
   args: { tableId: v.id("tables") },
   handler: async (ctx, { tableId }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
     await ctx.db.patch(tableId, {
       status: 'free',
       guests: undefined,
@@ -101,9 +108,16 @@ export const importAmounts = mutation({
     rows: v.array(v.object({ tableId: v.id("tables"), amountCents: v.number() })),
   },
   handler: async (ctx, { rows }) => {
+    const verified = new Set<string>()
     for (const { tableId, amountCents } of rows) {
+      const table = await ctx.db.get(tableId)
+      if (!table) throw new Error("Table introuvable")
+      if (!verified.has(table.restaurantId)) {
+        await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+        verified.add(table.restaurantId)
+      }
       await ctx.db.patch(tableId, {
-        amountCents,
+        amountCents: Math.max(0, amountCents),
         status: 'dining',
         paidCents: undefined,
         paidTipCents: undefined,

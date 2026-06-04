@@ -1,9 +1,11 @@
 import { query, mutation } from "./_generated/server"
 import { v } from "convex/values"
+import { requireRestaurantAccess } from "./authz"
 
 export const list = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
+    await requireRestaurantAccess(ctx, restaurantId)
     return ctx.db.query("payments").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).order("desc").collect()
   },
 })
@@ -34,20 +36,37 @@ export const create = mutation({
     paidItemNames: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    // CONVIVE PUBLIC : pas d'auth (le client n'est pas connecté). On durcit
+    // côté serveur sans casser le mock.
+    // 1) La table doit exister ET appartenir au restaurant annoncé.
+    const table = await ctx.db.get(args.tableId)
+    if (!table || table.restaurantId !== args.restaurantId) throw new Error("Table invalide")
+    // 2) Pas de montants négatifs.
+    if (args.subtotalCents < 0 || args.tipCents < 0) throw new Error("Montant invalide")
+    // 3) Plafonner le sous-total au restant dû si une note est connue.
+    const subtotalCents = table.amountCents && table.amountCents > 0
+      ? Math.min(args.subtotalCents, Math.max(0, table.amountCents - (table.paidCents ?? 0)))
+      : args.subtotalCents
+    // 4) Recalculer commission (1,5%) et total côté serveur (ignorer les valeurs client).
+    const commissionCents = Math.round(subtotalCents * 0.015)
+    const totalCents = subtotalCents + args.tipCents
+
     // paidItemNames n'existe pas dans le schema payments — l'extraire avant l'insert.
+    // Les commissionCents/totalCents/subtotalCents client restent dans paymentData mais
+    // sont écrasés par les valeurs serveur recalculées ci-dessous (l'ordre des clés du
+    // spread garantit l'override).
     const { paidItemNames, ...paymentData } = args
     const now = Date.now()
     const d = new Date(now)
     const dateLabel = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
-    const paymentId = await ctx.db.insert("payments", { ...paymentData, status: "Encaissé", createdAt: now, dateLabel })
+    const paymentId = await ctx.db.insert("payments", { ...paymentData, subtotalCents, tipCents: args.tipCents, commissionCents, totalCents, status: "Encaissé", createdAt: now, dateLabel })
 
     // Réconcilier la table : cumuler le payé sur la sitting courante + ajuster le statut.
     // Le restant est calculé sur le sous-total (hors pourboire) ; les pourboires
     // sont agrégés à part pour le dashboard. Jamais de throw : si la table a
     // disparu on conserve quand même le ledger.
-    const table = await ctx.db.get(args.tableId)
-    if (table) {
-      const paidCents = (table.paidCents ?? 0) + args.subtotalCents
+    {
+      const paidCents = (table.paidCents ?? 0) + subtotalCents
       const paidTipCents = (table.paidTipCents ?? 0) + args.tipCents
       const billCents = table.amountCents ?? 0
       const status = billCents > 0 && paidCents >= billCents ? "paid" as const : "payment" as const
@@ -79,6 +98,9 @@ export const create = mutation({
 export const updateStatus = mutation({
   args: { paymentId: v.id('payments'), status: v.union(v.literal('Encaissé'), v.literal('En attente'), v.literal('Remboursé')) },
   handler: async (ctx, { paymentId, status }) => {
+    const pmt = await ctx.db.get(paymentId)
+    if (!pmt) throw new Error("Paiement introuvable")
+    await requireRestaurantAccess(ctx, pmt.restaurantId, ["owner", "manager"])
     await ctx.db.patch(paymentId, { status })
   },
 })
@@ -86,6 +108,7 @@ export const updateStatus = mutation({
 export const getOverviewStats = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
+    await requireRestaurantAccess(ctx, restaurantId)
     const payments = await ctx.db.query("payments").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).collect()
     const encaisse = payments.filter(p => p.status === "Encaissé")
     const totalCA = encaisse.reduce((s, p) => s + p.totalCents, 0)

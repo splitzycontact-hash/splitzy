@@ -252,9 +252,9 @@ function PosSection({ tables, restaurantId }: { tables: TableRef[]; restaurantId
     const prefilled: Record<string, string> = {}
     if (existing) {
       pos.fields.forEach(f => {
-        if (f.convexField === 'apiKey') prefilled[f.key] = existing.apiKey
+        if (f.convexField === 'apiKey') prefilled[f.key] = existing.hasApiKey ? '••••••••' : ''
         else if (f.convexField === 'locationId') prefilled[f.key] = existing.locationId ?? ''
-        else if (f.convexField === 'extraKey') prefilled[f.key] = existing.extraKey ?? ''
+        else if (f.convexField === 'extraKey') prefilled[f.key] = existing.hasApiKey ? '••••••••' : ''
       })
     }
     setFields(prefilled)

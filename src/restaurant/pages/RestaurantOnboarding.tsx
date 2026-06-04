@@ -16,7 +16,7 @@ function OnboardingWithClerk() {
   const clerk = useClerk()
   const restaurant = useQuery(
     api.restaurants.getByClerkId,
-    isSignedIn && user ? { clerkUserId: user.id } : 'skip',
+    isSignedIn && user ? {} : 'skip',
   )
 
   if (!isLoaded || (isSignedIn && restaurant === undefined)) {

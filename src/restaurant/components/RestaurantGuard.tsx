@@ -18,12 +18,12 @@ function GuardWithClerk({ children }: { children: React.ReactNode }) {
   // 1) propriétaire → sa ligne dans `restaurants`
   const ownerRestaurant = useQuery(
     api.restaurants.getByClerkId,
-    user ? { clerkUserId: user.id } : 'skip',
+    user ? {} : 'skip',
   )
   // 2) sinon membre invité → restaurant rattaché via `members` (invitation acceptée)
   const memberRestaurant = useQuery(
     api.restaurants.getByMembership,
-    user ? { clerkUserId: user.id } : 'skip',
+    user ? {} : 'skip',
   )
   // Rôle du membre invité : on lit sa ligne `members` via la query EXISTANTE
   // getTeamMembers (pas de nouvelle query Convex). Skip tant qu'on n'est pas sur le

@@ -1,24 +1,31 @@
-import { query, mutation, action, internalMutation } from "./_generated/server"
+import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server"
 import { v } from "convex/values"
 import { internal, api } from "./_generated/api"
+import { requireRestaurantAccess, requireIdentity } from "./authz"
 
 export const listByRestaurant = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
-    return ctx.db
+    await requireRestaurantAccess(ctx, restaurantId, ["owner"])
+    const rows = await ctx.db
       .query("posIntegrations")
       .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
       .collect()
+    return rows.map(({ apiKey, extraKey, ...safe }) => ({ ...safe, hasApiKey: !!apiKey }))
   },
 })
 
 export const getByProvider = query({
   args: { restaurantId: v.id("restaurants"), provider: v.string() },
   handler: async (ctx, { restaurantId, provider }) => {
-    return ctx.db
+    await requireRestaurantAccess(ctx, restaurantId, ["owner"])
+    const row = await ctx.db
       .query("posIntegrations")
       .withIndex("by_restaurant_provider", q => q.eq("restaurantId", restaurantId).eq("provider", provider))
       .unique()
+    if (!row) return null
+    const { apiKey, extraKey, ...safe } = row
+    return { ...safe, hasApiKey: !!apiKey }
   },
 })
 
@@ -31,6 +38,7 @@ export const upsert = mutation({
     extraKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireRestaurantAccess(ctx, args.restaurantId, ["owner"])
     const existing = await ctx.db
       .query("posIntegrations")
       .withIndex("by_restaurant_provider", q => q.eq("restaurantId", args.restaurantId).eq("provider", args.provider))
@@ -59,6 +67,7 @@ export const upsert = mutation({
 export const remove = mutation({
   args: { restaurantId: v.id("restaurants"), provider: v.string() },
   handler: async (ctx, { restaurantId, provider }) => {
+    await requireRestaurantAccess(ctx, restaurantId, ["owner"])
     const existing = await ctx.db
       .query("posIntegrations")
       .withIndex("by_restaurant_provider", q => q.eq("restaurantId", restaurantId).eq("provider", provider))
@@ -105,7 +114,11 @@ export const updateTableFromPOS = internalMutation({
 export const syncTables = action({
   args: { restaurantId: v.id("restaurants"), provider: v.string() },
   handler: async (ctx, { restaurantId, provider }) => {
-    const integration = await ctx.runQuery(api.posIntegrations.getByProviderInternal, {
+    await requireIdentity(ctx)
+    const ownRestaurant = await ctx.runQuery(api.restaurants.getByClerkId, {})
+    if (!ownRestaurant || ownRestaurant._id !== restaurantId) throw new Error("Accès refusé")
+
+    const integration = await ctx.runQuery(internal.posIntegrations.getByProviderInternal, {
       restaurantId,
       provider,
     })
@@ -117,7 +130,6 @@ export const syncTables = action({
       if (provider === "square") {
         const squareToken = (process.env.SQUARE_ACCESS_TOKEN || integration.apiKey).trim()
         const squareLocationId = (process.env.SQUARE_LOCATION_ID || integration.locationId || "").trim()
-        console.log("Token used:", squareToken?.slice(0, 15), "| Length:", squareToken?.length)
         tableUpdates = await syncSquare(squareToken, squareLocationId)
       } else if (provider === "sumup") {
         tableUpdates = await syncSumUp(integration.apiKey)
@@ -160,7 +172,7 @@ export const syncTables = action({
 })
 
 // Internal query used by the action (actions can't call public queries directly in Convex)
-export const getByProviderInternal = query({
+export const getByProviderInternal = internalQuery({
   args: { restaurantId: v.id("restaurants"), provider: v.string() },
   handler: async (ctx, { restaurantId, provider }) => {
     return ctx.db
@@ -173,7 +185,6 @@ export const getByProviderInternal = query({
 // ── POS-specific sync handlers ─────────────────────────────────────────────
 
 async function syncSquare(apiKey: string, locationId: string) {
-  console.log("squareToken received:", apiKey?.slice(0, 15), "| Length:", apiKey?.length)
   const res = await fetch("https://connect.squareupsandbox.com/v2/orders/search", {
     method: "POST",
     headers: {

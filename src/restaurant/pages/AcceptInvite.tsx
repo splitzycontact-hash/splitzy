@@ -84,7 +84,7 @@ function AcceptInviteInner() {
     autoAcceptDone.current = true
     setAccepting(true)
     setError(null)
-    accept({ token, clerkUserId: user.id })
+    accept({ token })
       .then(() => navigate('/restaurant', { replace: true }))
       .catch(() => {
         autoAcceptDone.current = false
@@ -168,7 +168,7 @@ function AcceptInviteInner() {
     setAccepting(true)
     setError(null)
     try {
-      await accept({ token, clerkUserId: user.id })
+      await accept({ token })
       navigate('/restaurant', { replace: true })
     } catch {
       setError('Cette invitation est invalide ou expirée.')

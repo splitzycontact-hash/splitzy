@@ -60,7 +60,7 @@ export default defineSchema({
   restaurantInvitations: defineTable({
     restaurantId: v.id("restaurants"),
     email: v.string(),
-    role: v.string(),            // 'gerant' | 'manager' | 'viewer'
+    role: v.union(v.literal("gerant"), v.literal("manager"), v.literal("viewer")),            // 'gerant' | 'manager' | 'viewer'
     token: v.string(),           // UUID unique
     status: v.string(),          // 'pending' | 'accepted' | 'expired'
     createdAt: v.number(),

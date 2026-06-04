@@ -1,8 +1,9 @@
 "use node"
 import { action } from "./_generated/server"
-import { internal } from "./_generated/api"
+import { api, internal } from "./_generated/api"
 import { v } from "convex/values"
 import { Resend } from "resend"
+import { requireIdentity } from "./authz"
 
 // Échappe le HTML pour que le sujet / corps saisis par le gérant ne puissent
 // pas casser le template ni injecter de markup.
@@ -50,6 +51,16 @@ export const sendCampaign = action({
     restaurantName: v.string(),
   },
   handler: async (ctx, args): Promise<{ sent: number; failed: number }> => {
+    // Vérification ownership : l'action est PUBLIC (appelable directement via
+    // POST /api/action), donc on revérifie côté backend que l'appelant possède
+    // bien le restaurant ciblé par la campagne. Les actions n'ont pas ctx.db,
+    // on passe donc par la query owner-scoped restaurants.getByClerkId.
+    await requireIdentity(ctx)
+    const ownerRestaurant = await ctx.runQuery(api.restaurants.getByClerkId, {})
+    if (!ownerRestaurant || ownerRestaurant._id !== args.restaurantId) {
+      throw new Error("Accès refusé")
+    }
+
     const apiKey = process.env.RESEND_API_KEY
     if (!apiKey) {
       console.error("[Campaign] RESEND_API_KEY not set")

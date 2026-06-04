@@ -1,6 +1,7 @@
 import { query, mutation, action } from "./_generated/server"
 import { v } from "convex/values"
-import { api } from "./_generated/api"
+import { api, internal } from "./_generated/api"
+import { requireRestaurantAccess, requireIdentity } from "./authz"
 
 export const listByRestaurant = query({
   args: { restaurantId: v.id("restaurants") },
@@ -25,6 +26,9 @@ export const updateItem = mutation({
     allergenes: v.optional(v.string()),
   },
   handler: async (ctx, { id, ...patch }) => {
+    const item = await ctx.db.get(id)
+    if (!item) throw new Error("Article introuvable")
+    await requireRestaurantAccess(ctx, item.restaurantId, ["owner", "manager"])
     await ctx.db.patch(id, patch)
   },
 })
@@ -32,6 +36,9 @@ export const updateItem = mutation({
 export const deleteItem = mutation({
   args: { id: v.id("menuItems") },
   handler: async (ctx, { id }) => {
+    const item = await ctx.db.get(id)
+    if (!item) throw new Error("Article introuvable")
+    await requireRestaurantAccess(ctx, item.restaurantId, ["owner", "manager"])
     await ctx.db.delete(id)
   },
 })
@@ -49,6 +56,7 @@ export const addItem = mutation({
     allergenes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireRestaurantAccess(ctx, args.restaurantId, ["owner", "manager"])
     return ctx.db.insert("menuItems", args)
   },
 })
@@ -65,6 +73,7 @@ export const replaceAll = mutation({
     })),
   },
   handler: async (ctx, { restaurantId, items }) => {
+    await requireRestaurantAccess(ctx, restaurantId, ["owner", "manager"])
     const existing = await ctx.db
       .query("menuItems")
       .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
@@ -81,8 +90,11 @@ export const replaceAll = mutation({
 export const syncFromSquare = action({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
+    await requireIdentity(ctx)
     // Always prefer env var; fall back to DB token
-    const integration = await ctx.runQuery(api.posIntegrations.getByProvider, {
+    // Utiliser l'internalQuery pour récupérer le vrai apiKey (getByProvider
+    // public retourne une version redactée sans apiKey pour des raisons de sécurité).
+    const integration = await ctx.runQuery(internal.posIntegrations.getByProviderInternal, {
       restaurantId,
       provider: "square",
     })

@@ -1,6 +1,7 @@
-import { query, mutation, internalMutation, action } from "./_generated/server"
+import { query, mutation, internalMutation, internalQuery, action } from "./_generated/server"
 import { internal } from "./_generated/api"
 import { v } from "convex/values"
+import { requireRestaurantAccess, requireIdentity } from "./authz"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Invitations d'équipe (dashboard gérant).
@@ -73,7 +74,7 @@ export const insert = internalMutation({
   args: {
     restaurantId: v.id("restaurants"),
     email: v.string(),
-    role: v.string(),
+    role: v.union(v.literal("gerant"), v.literal("manager"), v.literal("viewer")),
     token: v.string(),
     status: v.string(),
     createdAt: v.number(),
@@ -81,6 +82,28 @@ export const insert = internalMutation({
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("restaurantInvitations", args)
+  },
+})
+
+// assertCanInvite — internalQuery appelée par l'action `create` (qui n'a pas
+// ctx.db). Renvoie le rôle du caller pour ce restaurant : "owner" si
+// propriétaire, sinon le rôle de sa ligne `members` active (owner/manager),
+// sinon null (pas le droit d'inviter).
+export const assertCanInvite = internalQuery({
+  args: { restaurantId: v.id("restaurants"), clerkUserId: v.string() },
+  handler: async (ctx, { restaurantId, clerkUserId }): Promise<"owner" | "manager" | null> => {
+    const restaurant = await ctx.db.get(restaurantId)
+    if (!restaurant) return null
+    if (restaurant.clerkUserId && restaurant.clerkUserId === clerkUserId) return "owner"
+    const members = await ctx.db
+      .query("members")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
+      .collect()
+    const me = members.find(m => m.clerkUserId === clerkUserId && m.status === "active")
+    if (!me) return null
+    if (me.role === "owner") return "owner"
+    if (me.role === "manager") return "manager"
+    return null
   },
 })
 
@@ -94,6 +117,26 @@ export const create = action({
     restaurantName: v.string(),
   },
   handler: async (ctx, { restaurantId, email, role, restaurantName }): Promise<{ token: string; emailSent: boolean }> => {
+    // Auth + appartenance owner/manager AVANT tout insert (une action n'a pas
+    // ctx.db → on passe par l'internalQuery assertCanInvite).
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) throw new Error("Non authentifié")
+    const callerRole = await ctx.runQuery(internal.invitations.assertCanInvite, {
+      restaurantId,
+      clerkUserId: identity.subject,
+    })
+    if (!callerRole) throw new Error("Accès refusé")
+
+    // Borne de rôle : rôles d'invitation valides + qui peut inviter quoi.
+    // - Seul un owner peut inviter un "gerant".
+    // - Un manager ne peut inviter que "manager" ou "viewer".
+    if (role !== "gerant" && role !== "manager" && role !== "viewer") {
+      throw new Error("Rôle d'invitation invalide")
+    }
+    if (role === "gerant" && callerRole !== "owner") {
+      throw new Error("Seul le propriétaire peut inviter un gérant")
+    }
+
     const token = crypto.randomUUID()
     const now = Date.now()
 
@@ -151,10 +194,14 @@ export const getByToken = query({
       .first()
     if (!inv) return null
     const restaurant = await ctx.db.get(inv.restaurantId)
+    const isExpired = inv.status === "expired" || inv.expiresAt < Date.now()
+    // Redacté : l'invité n'est pas connecté. Pas de token, restaurantId, ni _id.
     return {
-      ...inv,
       restaurantName: restaurant?.name ?? "ce restaurant",
-      isExpired: inv.status === "expired" || inv.expiresAt < Date.now(),
+      role: inv.role,
+      email: inv.email,
+      status: inv.status,
+      isExpired,
     }
   },
 })
@@ -163,6 +210,7 @@ export const getByToken = query({
 export const listByRestaurant = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
+    await requireRestaurantAccess(ctx, restaurantId)
     const invitations = await ctx.db
       .query("restaurantInvitations")
       .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
@@ -174,14 +222,22 @@ export const listByRestaurant = query({
 // accept — appelée après login Clerk. Valide le token + l'expiration, crée ou
 // réactive la ligne `members` correspondante, passe l'invitation à 'accepted'.
 export const accept = mutation({
-  args: { token: v.string(), clerkUserId: v.string() },
-  handler: async (ctx, { token, clerkUserId }) => {
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const identity = await requireIdentity(ctx)
+    const clerkUserId = identity.subject
+
     const inv = await ctx.db
       .query("restaurantInvitations")
       .withIndex("by_token", q => q.eq("token", token))
       .first()
     if (!inv || inv.status !== "pending" || inv.expiresAt < Date.now()) {
       throw new Error("Invitation invalide ou expirée")
+    }
+
+    // L'invitation est nominative : l'email Clerk du caller doit correspondre.
+    if ((identity.email ?? "").toLowerCase() !== inv.email.toLowerCase()) {
+      throw new Error("Cette invitation ne correspond pas à votre adresse")
     }
 
     const memberRole = inviteRoleToMemberRole(inv.role)

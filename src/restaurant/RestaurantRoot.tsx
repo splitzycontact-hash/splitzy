@@ -1,4 +1,6 @@
-import { ClerkProvider } from '@clerk/clerk-react'
+import { ClerkProvider, useAuth } from '@clerk/clerk-react'
+import { ConvexProviderWithClerk } from 'convex/react-clerk'
+import { convex } from '../lib/convex'
 import { RestaurantApp } from './RestaurantApp'
 
 const clerkReady = (() => {
@@ -14,7 +16,9 @@ export default function RestaurantRoot() {
         signInForceRedirectUrl="/restaurant/onboarding"
         signUpForceRedirectUrl="/restaurant/onboarding"
       >
-        <RestaurantApp />
+        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+          <RestaurantApp />
+        </ConvexProviderWithClerk>
       </ClerkProvider>
     )
   }

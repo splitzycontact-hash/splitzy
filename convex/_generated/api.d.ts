@@ -9,6 +9,7 @@
  */
 
 import type * as actions_generateInsights from "../actions/generateInsights.js";
+import type * as authz from "../authz.js";
 import type * as campaigns from "../campaigns.js";
 import type * as customers from "../customers.js";
 import type * as dependencyStatus from "../dependencyStatus.js";
@@ -31,6 +32,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "actions/generateInsights": typeof actions_generateInsights;
+  authz: typeof authz;
   campaigns: typeof campaigns;
   customers: typeof customers;
   dependencyStatus: typeof dependencyStatus;

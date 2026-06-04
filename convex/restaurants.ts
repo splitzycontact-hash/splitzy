@@ -1,5 +1,6 @@
 import { query, mutation, action } from "./_generated/server"
 import { v } from "convex/values"
+import { requireRestaurantAccess, requireIdentity } from "./authz"
 
 export const getTableContext = query({
   args: { slug: v.string(), tableNumber: v.number() },
@@ -23,6 +24,7 @@ export const update = mutation({
     plan: v.optional(v.string()),
   },
   handler: async (ctx, { id, ...patch }) => {
+    await requireRestaurantAccess(ctx, id, ["owner"])
     await ctx.db.patch(id, patch)
   },
 })
@@ -34,23 +36,30 @@ export const getBySlug = query({
   },
 })
 
+// Retourne le restaurant du caller connecté. Pas de param clerkUserId (évite
+// l'énumération) : l'id est lu depuis le JWT. Retourne null si non connecté ou
+// aucun restaurant trouvé — jamais de throw (un throw provoquerait des retries
+// Convex en boucle quand Clerk n'a pas encore initialisé la session).
 export const getByClerkId = query({
-  args: { clerkUserId: v.string() },
-  handler: async (ctx, { clerkUserId }) => {
-    return ctx.db.query("restaurants").withIndex("by_clerk_user", q => q.eq("clerkUserId", clerkUserId)).unique()
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+    return ctx.db.query("restaurants").withIndex("by_clerk_user", q => q.eq("clerkUserId", identity.subject)).unique()
   },
 })
 
 // Restaurant auquel l'utilisateur connecté est rattaché via une invitation
 // acceptée — sa ligne `members` porte son clerkUserId (écrit par invitations.accept).
-// Permet à un membre invité, qui n'est PAS dans la table `restaurants`, d'accéder
-// au dashboard du restaurant existant au lieu d'être renvoyé vers l'onboarding.
+// Même pattern : pas de param, null si non connecté, jamais de throw.
 export const getByMembership = query({
-  args: { clerkUserId: v.string() },
-  handler: async (ctx, { clerkUserId }) => {
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
     const membership = await ctx.db
       .query("members")
-      .withIndex("by_clerkUserId", q => q.eq("clerkUserId", clerkUserId))
+      .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
       .first()
     if (!membership) return null
     return ctx.db.get(membership.restaurantId)
@@ -68,15 +77,17 @@ export const create = mutation({
     clerkUserId: v.string(),
   },
   handler: async (ctx, args) => {
+    const identity = await requireIdentity(ctx)
     const existing = await ctx.db.query("restaurants").withIndex("by_slug", q => q.eq("slug", args.slug)).first()
     if (existing) return existing._id
-    return ctx.db.insert("restaurants", args)
+    return ctx.db.insert("restaurants", { ...args, clerkUserId: identity.subject })
   },
 })
 
 export const updateQrColor = mutation({
   args: { id: v.id("restaurants"), qrColor: v.string() },
   handler: async (ctx, { id, qrColor }) => {
+    await requireRestaurantAccess(ctx, id, ["owner"])
     await ctx.db.patch(id, { qrColor })
   },
 })
@@ -84,6 +95,7 @@ export const updateQrColor = mutation({
 export const setSuspended = mutation({
   args: { id: v.id("restaurants"), suspended: v.boolean() },
   handler: async (ctx, { id, suspended }) => {
+    await requireRestaurantAccess(ctx, id, ["owner"])
     await ctx.db.patch(id, { suspended })
   },
 })
@@ -91,6 +103,7 @@ export const setSuspended = mutation({
 export const deleteAll = mutation({
   args: { id: v.id("restaurants") },
   handler: async (ctx, { id }) => {
+    await requireRestaurantAccess(ctx, id, ["owner"])
     const deleteTable = async (table: string, index: string) => {
       const rows = await (ctx.db.query(table as any) as any)
         .withIndex(index, (q: any) => q.eq("restaurantId", id))
@@ -106,12 +119,16 @@ export const deleteAll = mutation({
 })
 
 export const generateUploadUrl = action({
-  handler: async (ctx) => ctx.storage.generateUploadUrl(),
+  handler: async (ctx) => {
+    await requireIdentity(ctx)
+    return ctx.storage.generateUploadUrl()
+  },
 })
 
 export const setLogoStorageId = mutation({
   args: { id: v.id("restaurants"), storageId: v.optional(v.id("_storage")) },
   handler: async (ctx, { id, storageId }) => {
+    await requireRestaurantAccess(ctx, id, ["owner"])
     await ctx.db.patch(id, { logoStorageId: storageId })
   },
 })
