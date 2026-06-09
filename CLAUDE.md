@@ -58,39 +58,43 @@ All three apps share **one Convex deployment** (one schema, one set of functions
 |---|---|---|
 | Convex backend | `scintillating-viper-372` (`.env.local`) | `mellow-chinchilla-481` (Convex deploy) |
 | Vercel frontend | `http://localhost:5173` | `https://www.splitzy.fr` |
-| Clerk auth | `pk_test_bm92ZWwtY291Z2FyLTg4…` (dev instance) | `pk_test_…` + origin `splitzy-client.vercel.app` autorisée |
+| Clerk auth | `pk_test_…novel-cougar-88` (dev instance) | `pk_live_Y2xlcmsuc3BsaXR6eS5mciQ` — instance prod **clerk.splitzy.fr** (cutover 2026-06-09) |
 | Square POS | `connect.squareup.com` (production) | same |
 | Stripe Connect | Stripe Connect Express | platform: Splitzy, 1.5% commission |
 
 The Vercel production deployment points to **Convex prod** (`mellow-chinchilla-481`). Local dev points to **Convex dev** (`scintillating-viper-372`). Changes to Convex functions must be deployed to both if you want them in prod.
 
-### Clerk — contraintes de domaine (important)
+### Clerk — instances (cutover prod fait 2026-06-09)
 
-Clerk a deux types d'instances :
-- **Dev instance** (`pk_test_...`) — supporte n'importe quel domaine si ajouté dans **Allowed origins**. Utilisée en local ET sur Vercel pour l'instant.
-- **Prod instance** (`pk_live_...`) — nécessite un domaine custom vérifié. Les domaines `.vercel.app` ne sont **pas** supportés en prod Clerk.
+Deux instances :
+- **Dev** (`pk_test_…novel-cougar-88`, issuer `novel-cougar-88.clerk.accounts.dev`) — inscription ouverte. Utilisée en **local** et par l'**admin app** (déploiement Convex dev `scintillating-viper-372`).
+- **Prod** (`pk_live_Y2xlcmsuc3BsaXR6eS5mciQ`, issuer `clerk.splitzy.fr`, sign-in via `accounts.splitzy.fr`) — instance production active, `home_url=https://splitzy.fr`, template JWT `convex` + claim email configurés.
 
-**État actuel** : on utilise la clé `pk_test_...` sur Vercel avec `https://splitzy-client.vercel.app` ajouté dans Clerk dashboard → Configure → Restrictions → **Allowed origins**.
+**État actuel (post-cutover)** : Vercel prod `VITE_CLERK_PUBLISHABLE_KEY` = `pk_live_…` (clerk.splitzy.fr). Le frontend `splitzy.fr` n'émet plus que des JWT prod.
 
-**Quand on aura un domaine custom** (ex: `app.splitzy.fr`) :
-1. Créer une instance Clerk prod → récupérer `pk_live_...`
-2. Ajouter le domaine dans Clerk dashboard → Domains (vérification DNS)
-3. Remplacer `VITE_CLERK_PUBLISHABLE_KEY` dans Vercel par `pk_live_...`
-4. Redéployer
+**auth.config.ts — par déploiement (IMPORTANT)** :
+- `splitzy-client/convex/auth.config.ts` (PROD `mellow`) : **seul** issuer `clerk.splitzy.fr`. L'issuer dev `novel-cougar-88` a été RETIRÉ (Vuln 4) — un compte créé sur l'instance dev ne peut plus atteindre la prod.
+- `Splitzy/convex/auth.config.ts` (DEV `scintillating-viper-372`) : GARDE `novel-cougar-88` (l'admin app tourne dessus). Ne pas le retirer.
 
-Une instance Clerk prod est déjà créée (`pk_live_Y2x1cmsuc3BsaXR6eXRleHQuY29tJ2Rldi1wcm9k`) — en attente d'un domaine custom pour être activée.
+⚠ La clé publishable Clerk = `pk_<env>_<base64(frontendApiDomain + "$")>` — publique et déterministe, dérivable sans dashboard. Rollback cutover : re-set `pk_test_…` sur Vercel prod + redeploy.
 
 ### Convex env vars (set on dev deployment)
 
 ```
-SQUARE_ACCESS_TOKEN        # Square production token (EAAAl_b44btPH…)
-SQUARE_LOCATION_ID         # LS3JS5QB97NV8
+SQUARE_ACCESS_TOKEN        # Square production token — ROTÉ 2026-06-09 (ancien révoqué)
+SQUARE_LOCATION_ID         # location id Square
 STRIPE_SECRET_KEY          # sk_… (never in VITE_* — server only)
 STRIPE_WEBHOOK_SECRET      # whsec_… for signature verification
 MAILGUN_API_KEY            # for transactional emails
 RESEND_API_KEY             # re_… — envoi des campagnes email (campaigns:sendCampaign)
+IMPERSONATION_JWT_SECRET   # HMAC token impersonation admin (fail-closed si absent/défaut)
+WEBHOOK_SECRET_SQUARE      # clé signature webhook PSP (http.ts) — PLACEHOLDER à remplacer par la vraie clé Square
+WEBHOOK_SECRET_SUMUP       # idem SumUp
+WEBHOOK_SECRET_WORLDLINE   # idem Worldline
+# SQUARE_WEBHOOK_URL       # (à poser) URL exacte du webhook Square — signature = url+body
 ```
 
+⚠ **Ne jamais mettre un secret serveur en `VITE_*`** (Vite le bake dans le bundle frontend). Les secrets ci-dessus sont des env vars Convex, pas Vite.
 These must also be set on the prod deployment. `RESEND_API_KEY` déjà posée sur dev (`scintillating-viper-372`) **et** prod (`mellow-chinchilla-481`). DNS Resend (`splitzy.fr`) ajoutés sur IONOS — l'envoi réel depuis `noreply@splitzy.fr` ne marche qu'une fois le domaine vérifié côté Resend.
 
 ### Routing overview (current single-repo)
@@ -154,22 +158,24 @@ Every sensitive Convex mutation checks `ctx.auth.getUserIdentity()` → looks up
 | File | Key exports |
 |---|---|
 | `schema.ts` | Full DB schema |
-| `restaurants.ts` | `getTableContext`, `getByClerkId`, `getByMembership` (restaurant rattaché via `members.clerkUserId` — accès dashboard pour membre invité, pas dans `restaurants`), `getBySlug`, `create`, `update`, `setSuspended`, `deleteAll` |
+| `restaurants.ts` | `getTableContext` (projeté : strippe clerkUserId/kycStatus/siret/stripeAccountId/posProvider — Vuln 3), `getByClerkId`, `getByMembership`, `getBySlug` (projeté idem), `create` (accepte `plan?`), `update` (**ne prend plus `plan`** — anti self-upgrade, Vuln M1), `getById` (admin OU owner/membre — Vuln H2), `setSuspended`, `deleteAll` |
 | `members.ts` | `getTeamMembers`, `updateMemberRole`, `removeMember` — table `members` (équipe + RBAC) |
-| `invitations.ts` | `create` (action — token UUID + email Resend via `fetch`, **pas** SDK → 0 dépendance npm), `getByToken` (public), `listByRestaurant`, `accept` (upsert `members` + invitation→`accepted`), `insert` (internal) |
+| `invitations.ts` | `create` (action — token UUID + email Resend via `fetch`, **pas** SDK → 0 dépendance npm), `getByToken` (public), `listByRestaurant`, `accept` (**exige claim email du JWT === invité**, échoue si absent — Vuln 6 ; upsert `members` + invitation→`accepted`), `insert` (internal) |
 | `tables.ts` | `list`, `createBulk`, `updateStatus`, `resetToFree`, `importAmounts` |
 | `menuItems.ts` | `listByRestaurant`, `addItem`, `updateItem`, `deleteItem`, `replaceAll`, `syncFromSquare` |
-| `payments.ts` | `list`, `create` (accepte `paidItemNames?`), `getOverviewStats` |
+| `payments.ts` | `list`, `create` (status **"En attente"** seulement, jamais "Encaissé" sur affirmation client — Vuln 1), `confirmPayment` (**internalMutation**, seul passage à "Encaissé" + réconciliation table, appelé par http.ts après vérif signature PSP), `listByTable` (projeté : strippe phone/email/PSP/commission — Vuln 3), `getOverviewStats`, `updateStatus`, `purgeTestPayments` |
+| `http.ts` | **Webhooks PSP signés** : `/square-webhook` `/sumup-webhook` `/worldline-webhook`. Vérif HMAC-SHA256 avant traitement, 401 fail-closed. `payment.completed` → `internal.payments.confirmPayment` (match par provider+providerRef, vérif montant). Secrets `WEBHOOK_SECRET_*` |
 | `feedbacks.ts` | `list`, `create`, `markRead` |
 | `posIntegrations.ts` | `getByProvider`, `upsert`, `syncLive` |
 | `customers.ts` | `list`, `getByRestaurant`, `saveContact` (upsert phone+email, consolidation via `customerId`), `updateContact`, `unsubscribe` (public, sans auth — lien email), `getManyForCampaign` (internalQuery) |
 | `campaigns.ts` | `sendCampaign` (action `"use node"`, Resend — double check `email`+`marketingConsent` backend, footer désabonnement RGPD). ⚠ dépend du pkg `resend` — voir « Deps des actions Convex » |
+| `seed.ts` | `seedLeComptoir`, `seedScenarioComplet`, `clearSnackMomoFull`, `simulateClient` — **`internalMutation` uniquement** (jamais `mutation` publique). Seeders/test : injectent ou suppriment des `payments`/`feedbacks`. Exposés en `mutation` publique = faille (suppression/injection de données non authentifiée). Appelables seulement via `internal.seed.*` (autre fn Convex) ou `npx convex run` (clé deploy admin), **pas** depuis un client. Fix sécurité 2026-06-04 |
 
 ### Files to add (admin + interconnexion phases)
 
 | File | Purpose |
 |---|---|
-| `http.ts` | HTTP actions — Stripe webhook (`/stripe-webhook`), Mailgun inbound (`/mailgun-inbound`) |
+| `http.ts` | ✅ EXISTE (webhooks PSP signés — voir table ci-dessus). Stripe webhook (`/stripe-webhook`) + Mailgun inbound (`/mailgun-inbound`) restent à ajouter |
 | `crons.ts` | Scheduled jobs — `deliverMorningFeedbacks` (8h Paris), `checkDependencies` (every 30s) |
 | `auth.config.ts` | Clerk → Convex JWT config |
 | `users.ts` | `getByClerkId`, `upsert`, `list`, `updateRole` |
@@ -210,13 +216,16 @@ users            clerkUserId*, role*, email, firstName?, lastName?, totpEnabled?
 restaurantMembers restaurantId*, userId*, role   ⚠ legacy/inutilisé — l'UI Équipe + RBAC utilisent `members` ci-dessous
 members          restaurantId*, clerkUserId*, email, name, role (owner|manager|staff), status (active|pending), invitedAt, joinedAt?, clerkUserId? (rempli à l'acceptation d'invitation)
 restaurantInvitations restaurantId*, token* (UUID), email, role (gerant|manager|viewer), status (pending|accepted|expired), createdAt, expiresAt (=createdAt+7j)
-tables           restaurantId*, qrToken*, number, capacity, status, guests?, amountCents?, alert?
+tables           restaurantId*, number, capacity, status, guests?, durationMinutes?, amountCents?, paidCents?, paidTipCents?, orderItems?, alert?
+                 # ⚠ PAS de qrToken — entrée = /t/:slug/:tableNumber (public, slug énumérable). Aucun secret par table.
+                 # → inviolabilité totale du flux convive exigerait un secret porté par le QR ou une auth convive (résiduel sécurité).
+                 # updateStatus borne/assainit les orderItems (Vuln 2).
 menuCategories   restaurantId*, name, displayOrder?
 menuItems        restaurantId*, categoryId?, name, priceCents, emoji?, category?, isAvailable?, externalId?
 sessions         restaurantId*, tableId*, status, by_restaurant_status*, closedAt?, totalCents?
 diners           sessionId*, firstName, avatar?, joinedAt
 dinerItems       dinerId*, menuItemId*, qty, priceCents, status
-payments         restaurantId*, tableId, tableNumber, guests, subtotalCents, tipCents, commissionCents, totalCents, paymentMethod, status, createdAt*, dateLabel
+payments         restaurantId*, tableId(by_table*), tableNumber, guests, subtotalCents, tipCents, commissionCents, totalCents, paymentMethod, status (En attente|Encaissé|Remboursé), createdAt*, dateLabel, phone?, email?, provider?, providerRef?(by_provider_ref*), paidItemNames?
 transactions     restaurantId*, sessionId*, stripePaymentIntentId?, status, amountCents, tipCents?, commissionCents?, succeededAt*, failureCode?, paymentMethod?
 refunds          transactionId*, stripeRefundId?, amountCents, status, initiatedBy?
 disputes         transactionId*, stripeDisputeId?, amountCents, status, reason?, evidenceDueBy?
@@ -560,6 +569,21 @@ NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentio
 
 ## Known issues fixed (context for future sessions)
 
+- **Audit sécurité complet clôturé** (session 2026-06-09, score ~30→~92) :
+  - **Auth admin** : `isAdminAccess`/`resolveAdminUser` (`Splitzy/convex/lib.ts`) n'acceptent PLUS d'arg `authEmail` client (c'était la faille C1 = bypass total). Auth = identité Clerk réelle + rôle DB uniquement. `ensureSelfAdmin` idem (C2). **Ne jamais réintroduire un email/identité passé en arg comme preuve d'auth.**
+  - **Impersonation** (C3) : token signé HMAC-SHA256 vérifié (`admin.ts`), `IMPERSONATION_JWT_SECRET` fail-closed. `logImpersonation` = internalMutation (anti-forge audit, Vuln 8).
+  - **Paiement PSP** (Vuln 1) : `payments.create` → `"En attente"` seulement ; `"Encaissé"` UNIQUEMENT via `payments.confirmPayment` (internalMutation) appelé par `http.ts` (webhooks PSP signés). Voir tables `payments.ts` / `http.ts`.
+  - **Exposition data** (H2/Vuln 3) : `getById` gated, `getBySlug`/`getTableContext` projetés, `listByTable` strippe PII+PSP. `update` sans `plan` (M1). `tables.updateStatus` borne les inputs (Vuln 2). `users.upsert` exige `clerkUserId===identity.subject` (Vuln 5).
+  - **Clerk** (Vuln 4) : cutover prod sur `pk_live`/clerk.splitzy.fr, issuer dev retiré de la prod (voir section Clerk).
+  - **Secrets** : token Square roté, `sk_test` + tokens Square retirés de `.env.local`.
+  - **Résiduel** (pas un défaut code) : flux convive QR 100% public (pas de qrToken). Webhooks PSP : `WEBHOOK_SECRET_*` sont des placeholders à remplacer par les vraies clés de signature.
+
+- **Fix `restaurants:create` plan + durcissement seed.ts** (session 2026-06-04) :
+  - **`restaurants.create`** : ajout `plan: v.optional(v.string())` au validator (les 2 dirs `splitzy-client/convex/` + `Splitzy/convex/`). Aligne sur `update` qui l'avait déjà. `plan` n'est PAS une gate d'accès (lu seulement par analytics admin `billing.ts`/`admin.ts` côté `Splitzy/`) → pas de vecteur de privilège. L'`ArgumentValidationError: plan is required` historique venait d'un état déployé ancien, pas du CONVEX_URL (le bundle prod `www.splitzy.fr` bake bien `mellow-chinchilla-481`).
+  - **Topologie déploiement Convex confirmée** : **prod (`mellow-chinchilla-481`) = `splitzy-client/convex/` (subset, sans fns admin)** ; **dev (`scintillating-viper-372`) = `Splitzy/convex/` (superset, fns admin)**. L'admin tourne sur dev. ⚠ NE PAS déployer le superset `Splitzy/` en prod (ajoute 23 index admin inutiles) ni le subset en écrasant — déployer prod depuis `splitzy-client/` (`npx convex deploy --yes`, additif, `No indexes deleted`).
+  - **Sécurité seed.ts** : `seedLeComptoir`/`seedScenarioComplet`/`clearSnackMomoFull`/`simulateClient` étaient `mutation` **publiques** déployées en prod → n'importe quel client anonyme pouvait supprimer (`clearSnackMomoFull`) ou injecter (`seed*`/`simulateClient`) des `payments`/`feedbacks` via l'API Convex publique. Fix : converties en `internalMutation`. Vérif : `npx convex function-spec --prod` → les 4 = `{kind: internal}`. ⚠ `npx convex run seed:… --prod` les exécute quand même (clé deploy admin) — ce n'est PAS un chemin client ; tester la fermeture via `function-spec` ou l'API HTTP anonyme, pas via `convex run`.
+  - **Boutons « Mode Test » retirés de `Overview.tsx`** : `seedScenarioComplet`/`clearSnackMomoFull` étaient câblés à des boutons dashboard via `useMutation(api.seed.*)`. `internalMutation` retire ces fns de `api.*` → boutons + `generateTestPDF`/`SeedResult` supprimés (sinon typecheck casse, `noUnusedLocals: true`). Les boutons Simuler/Nettoyer d'`Analytics.tsx` sont indépendants (n'utilisent pas `api.seed`).
+
 - **Reçu PDF convive + feature Factures dashboard + Tiime** (session 2026-06-02) :
   - **Tiime** : compte créé sur `apps.tiime.fr` (company ID 576580, email `splitzy.contact@gmail.com`). Société : Splitzy, SAS, adresse temporaire 123 Rue de l'Innovation 75001 Paris (à mettre à jour dès réception SIRET). Numérotation factures : `2026-000001`. SIRET et TVA : N/C — à compléter dès immatriculation. Tiime est la plateforme d'émission des factures Splitzy → restaurants (commission mensuelle 1,5%). PDP agréée e-facturation sept. 2026.
   - **Légal factures** : seule facture à émettre = Splitzy → Restaurant (commission 1,5% + TVA). Les convives reçoivent un reçu PDF (justificatif de paiement, pas une facture TVA). Pas d'obligation de facture B2C. Worldline = PSP agréé qui couvre réglementairement la collecte de fonds pour compte de tiers (PSD2).
@@ -583,7 +607,7 @@ NB : dans les pages consumer le `#E8920A` hardcodé en inline style est intentio
   - `/privacy` (`PrivacyPage.tsx`, structure CNIL) + lien footer marketing (`Footer.tsx`) et footer discret des écrans client (`PrivacyFooterLink.tsx` dans Confirmation/Feedback/Profile, ouvre `target="_blank"`). Ajouté à `sitemap.xml`, non bloqué par `robots.txt`.
   - `Confirmation.tsx` : section CRM refondue — 2 champs (tel + email) toujours visibles, **1 seule** checkbox opt-in (jamais pré-cochée, apparaît dès qu'un champ est rempli), **1 seul** bouton « Enregistrer » → un seul `httpMutation('customers:saveContact', …)` ; état « Enregistré ✓ » vert après save. `canSave = (validPhone || validEmail) && consent && !saved`.
   - Campagne email : `convex/campaigns.ts` (`sendCampaign`, Resend), `customers.unsubscribe` + `getManyForCampaign`, page `/unsubscribe`, modale dans `Clients.tsx`. Voir « Clients — campagne email » et « Deps des actions Convex ».
-  - **Splitzy/ n'est PAS un repo git** : les changements `Splitzy/convex/` ne sont pas versionnés là ; seul le mirror `splitzy-client/convex/` est poussé (suffit pour capturer le code des fonctions).
+  - **Splitzy/ est un repo git** (vérifié 2026-06-04, remote `github.com/splitzycontact-hash/splitzy-convex`, branche `main`) — contredit une note antérieure « pas un repo git ». `splitzy-client/` a son propre remote (`…/splitzy`). Committer dans les deux quand on modifie `convex/` des deux côtés.
 - **Flow client iOS résilient au WS lent** (sauvegarde v11) : refonte complète du chemin critique pour ne plus dépendre du WebSocket Convex (cold start 15-30 s sur iOS). Voir section « iOS Safari — résilience réseau ». En résumé :
   - `payments:create` cassé en prod : `{ ...args }` dans `ctx.db.insert("payments", …)` incluait `paidItemNames` (absent du schema `payments`) → Convex rejetait **tous** les inserts → « Erreur de paiement ». Fix : `const { paidItemNames, ...paymentData } = args` avant l'insert ; `paidItemNames` sert ensuite à marquer `orderItems[].paid` (partiel géré via consommation de `remaining[]` pour les qty > 1).
   - Mutations `payments:create` / `tables:updateStatus` / `feedbacks:create` basculées sur `httpMutation` (`src/utils/convexHttp.ts`, `fetch keepalive`) — sinon perdues si l'onglet se ferme avant l'établissement du WS → le gérant ne voyait rien.
