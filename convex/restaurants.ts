@@ -21,7 +21,9 @@ export const update = mutation({
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     type: v.optional(v.string()),
-    plan: v.optional(v.string()),
+    // SECURITY (M1): `plan` retiré des champs modifiables par l'owner. Le plan
+    // ne doit changer que via billing/admin, sinon un gérant se met "pro"
+    // gratuitement (aucun contrôle de facturation côté serveur sur ce champ).
   },
   handler: async (ctx, { id, ...patch }) => {
     await requireRestaurantAccess(ctx, id, ["owner"])
@@ -32,7 +34,20 @@ export const update = mutation({
 export const getBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, { slug }) => {
-    return ctx.db.query("restaurants").withIndex("by_slug", q => q.eq("slug", slug)).unique()
+    // SECURITY (H2): query consumer ANONYME (par slug public, énumérable). On
+    // retire les champs sensibles owner/finance avant de renvoyer le doc :
+    // clerkUserId (id owner interne), kycStatus / siret / stripeAccountId
+    // (légal/financier), posProvider. Les champs d'affichage + plan/status
+    // (tier business, lu par le dashboard dev via slug) restent.
+    const doc = await ctx.db.query("restaurants").withIndex("by_slug", q => q.eq("slug", slug)).unique()
+    if (!doc) return null
+    const safe: Record<string, any> = { ...doc }
+    delete safe.clerkUserId
+    delete safe.kycStatus
+    delete safe.siret
+    delete safe.stripeAccountId
+    delete safe.posProvider
+    return safe
   },
 })
 
