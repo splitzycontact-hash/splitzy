@@ -136,6 +136,14 @@ export default defineSchema({
   posIntegrations: defineTable({
     restaurantId: v.id("restaurants"),
     provider: v.string(),
+    // SECURITY (Vuln 7 — risque acté/documenté) : apiKey/extraKey POS stockés en
+    // clair. Masqués en lecture API (posIntegrations.listByRestaurant/getByProvider
+    // strippent apiKey). Le chiffrement au repos exigerait de déplacer l'écriture
+    // dans une action (le runtime mutation Convex interdit l'IV aléatoire requis par
+    // AES-GCM — contrainte de déterminisme) ; à faire via une action + KMS si on
+    // élève l'exigence. PII clients (customers.phone/email) : volontairement en clair
+    // car la déduplication CRM se fait par contact ; conformité RGPD assurée par
+    // consentement explicite (marketingConsent) + lien de désabonnement.
     apiKey: v.string(),
     locationId: v.optional(v.string()),
     extraKey: v.optional(v.string()),

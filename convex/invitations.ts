@@ -1,7 +1,7 @@
 import { query, mutation, internalMutation, internalQuery, action } from "./_generated/server"
 import { internal } from "./_generated/api"
-import { v } from "convex/values"
-import { requireRestaurantAccess, requireIdentity } from "./authz"
+import { v, ConvexError } from "convex/values"
+import { requireRestaurantAccess } from "./authz"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Invitations d'équipe (dashboard gérant).
@@ -224,20 +224,47 @@ export const listByRestaurant = query({
 export const accept = mutation({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    const identity = await requireIdentity(ctx)
+    const identity = await ctx.auth.getUserIdentity()
+    // Diagnostic prod : on logge l'identité complète pour voir ce que le JWT
+    // Clerk transmet réellement (en particulier si le claim `email` est émis).
+    // Visible via `npx convex logs`. À retirer une fois le template JWT stabilisé.
+    console.log("[invitations.accept] identity:", JSON.stringify(identity))
+    if (!identity) {
+      // JWT Clerk non reçu côté Convex : template "convex" absent ou token pas
+      // encore rafraîchi. ConvexError → le message remonte au client (un
+      // `throw new Error` brut est masqué en "Server Error" en prod).
+      throw new ConvexError("Session non authentifiée — reconnectez-vous puis réessayez.")
+    }
     const clerkUserId = identity.subject
 
     const inv = await ctx.db
       .query("restaurantInvitations")
       .withIndex("by_token", q => q.eq("token", token))
       .first()
-    if (!inv || inv.status !== "pending" || inv.expiresAt < Date.now()) {
-      throw new Error("Invitation invalide ou expirée")
-    }
+    // Messages distincts (et en ConvexError) pour diagnostiquer côté client.
+    if (!inv) throw new ConvexError("Invitation introuvable.")
+    if (inv.status !== "pending") throw new ConvexError("Invitation déjà acceptée ou annulée.")
+    if (inv.expiresAt < Date.now()) throw new ConvexError("Invitation expirée.")
 
-    // L'invitation est nominative : l'email Clerk du caller doit correspondre.
-    if ((identity.email ?? "").toLowerCase() !== inv.email.toLowerCase()) {
-      throw new Error("Cette invitation ne correspond pas à votre adresse")
+    // L'invitation est nominative. Défense en profondeur : SI le JWT fournit le
+    // claim `email`, il doit correspondre à l'invité. S'il est absent (template
+    // Clerk "convex" sans claim email), on n'échoue PAS : la possession du token
+    // (secret, envoyé par email) + l'auth non usurpable via `identity.subject`
+    // suffisent. Évite de bloquer toutes les invitations sur un détail de JWT.
+    // SECURITY (Vuln 6) : l'invitation est nominative. Le claim email du JWT DOIT
+    // être présent ET correspondre à l'invité. On n'accepte plus le contournement
+    // "best-effort" (token + subject seuls) : un token intercepté/transféré ne doit
+    // pas permettre à un compte tiers d'accepter. Le template JWT Clerk "convex"
+    // émet le claim email sur les deux instances.
+    const identityEmail = (identity.email ?? "").toLowerCase()
+    if (!identityEmail) {
+      throw new ConvexError(
+        "Email manquant dans la session — reconnectez-vous. Si le problème persiste, " +
+        'le template JWT Clerk "convex" doit émettre le claim email.',
+      )
+    }
+    if (identityEmail !== inv.email.toLowerCase()) {
+      throw new ConvexError("Cette invitation ne correspond pas à votre adresse.")
     }
 
     const memberRole = inviteRoleToMemberRole(inv.role)
