@@ -14,6 +14,15 @@ const ROLE_LABEL: Record<string, string> = {
   gerant: 'Gérant', manager: 'Manager', viewer: 'Viewer',
 }
 
+// Une `ConvexError("msg")` côté serveur arrive ici avec son message dans
+// `err.data`. Un `throw new Error` brut est masqué ("Server Error") en prod →
+// fallback générique. Permet d'afficher la vraie cause à l'invité.
+function errMessage(err: unknown): string {
+  const data = (err as { data?: unknown })?.data
+  if (typeof data === 'string' && data) return data
+  return 'Cette invitation est invalide ou expirée.'
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-6 p-6">
@@ -86,9 +95,11 @@ function AcceptInviteInner() {
     setError(null)
     accept({ token })
       .then(() => navigate('/restaurant', { replace: true }))
-      .catch(() => {
-        autoAcceptDone.current = false
-        setError('Cette invitation est invalide ou expirée.')
+      .catch((err) => {
+        // On NE remet PAS autoAcceptDone à false : sinon l'effet se re-déclenche
+        // à chaque render (setError → re-render) et martèle Convex en boucle
+        // (15+ erreurs consécutives). Le réessai se fait via le bouton manuel.
+        setError(errMessage(err))
         setAccepting(false)
       })
   }, [authLoaded, isSignedIn, user, token, invitation, accept, navigate])
@@ -170,8 +181,8 @@ function AcceptInviteInner() {
     try {
       await accept({ token })
       navigate('/restaurant', { replace: true })
-    } catch {
-      setError('Cette invitation est invalide ou expirée.')
+    } catch (err) {
+      setError(errMessage(err))
       setAccepting(false)
     }
   }
