@@ -80,7 +80,16 @@ export const updateStatus = mutation({
         patch.paidTipCents = undefined
       }
     }
-    if (orderItems !== undefined) patch.orderItems = orderItems
+    // SECURITY (Vuln 2) : mutation convive ANONYME. On borne/assainit les entrées
+    // pour qu'un appelant non authentifié ne puisse pas injecter des orderItems
+    // démesurés ou négatifs (nb d'items, longueur de nom, qty, prix plafonnés).
+    if (orderItems !== undefined) {
+      patch.orderItems = orderItems.slice(0, 200).map(it => ({
+        name: String(it.name).slice(0, 120),
+        qty: Math.max(0, Math.min(999, Math.floor(it.qty))),
+        unitCents: Math.max(0, Math.min(100_000_000, Math.floor(it.unitCents))),
+      }))
+    }
     await ctx.db.patch(tableId, patch)
   },
 })

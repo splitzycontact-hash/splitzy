@@ -9,7 +9,15 @@ export const getTableContext = query({
     if (!restaurant) return null
     const tables = await ctx.db.query("tables").withIndex("by_restaurant", q => q.eq("restaurantId", restaurant._id)).collect()
     const table = tables.find(t => t.number === tableNumber) ?? null
-    return { restaurant, table }
+    // SECURITY (Vuln 3) : point d'entrée convive ANONYME (slug public). On retire
+    // les champs sensibles owner/finance du doc restaurant avant de le renvoyer.
+    const safeRestaurant = { ...restaurant }
+    delete safeRestaurant.clerkUserId
+    delete safeRestaurant.kycStatus
+    delete safeRestaurant.siret
+    delete safeRestaurant.stripeAccountId
+    delete safeRestaurant.posProvider
+    return { restaurant: safeRestaurant, table }
   },
 })
 
@@ -41,7 +49,7 @@ export const getBySlug = query({
     // (tier business, lu par le dashboard dev via slug) restent.
     const doc = await ctx.db.query("restaurants").withIndex("by_slug", q => q.eq("slug", slug)).unique()
     if (!doc) return null
-    const safe: Record<string, any> = { ...doc }
+    const safe = { ...doc }
     delete safe.clerkUserId
     delete safe.kycStatus
     delete safe.siret

@@ -16,7 +16,22 @@ export const list = query({
 export const listByTable = query({
   args: { tableId: v.id("tables") },
   handler: async (ctx, { tableId }) => {
-    return ctx.db.query("payments").withIndex("by_table", q => q.eq("tableId", tableId)).order("desc").collect()
+    const rows = await ctx.db.query("payments").withIndex("by_table", q => q.eq("tableId", tableId)).order("desc").collect()
+    // SECURITY (Vuln 3) : flux convive ANONYME (tableId dérivable d'un slug public).
+    // On retire les champs sensibles : contact (phone/email), détails PSP
+    // (provider/providerRef/paymentMethod) et commission. firstName/avatarIndex/
+    // subtotalCents restent — affichés sur /welcome (convives ayant payé).
+    return rows.map(r => {
+      const safe: Record<string, any> = { ...r }
+      delete safe.phone
+      delete safe.email
+      delete safe.provider
+      delete safe.providerRef
+      delete safe.paymentMethod
+      delete safe.commissionCents
+      delete safe.paidItemNames
+      return safe
+    })
   },
 })
 
