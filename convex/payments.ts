@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server"
+import { query, mutation, internalMutation } from "./_generated/server"
 import { v } from "convex/values"
 import { requireRestaurantAccess } from "./authz"
 
@@ -34,6 +34,11 @@ export const create = mutation({
     firstName: v.optional(v.string()),
     avatarIndex: v.optional(v.number()),
     paidItemNames: v.optional(v.array(v.string())),
+    // PSP réel : provider + référence de transaction renvoyés par le SDK de
+    // paiement. Le webhook PSP signé (http.ts) ré-émet cette référence pour
+    // confirmer l'encaissement. Absents en démo → ref serveur générée.
+    provider: v.optional(v.string()),
+    providerRef: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // CONVIVE PUBLIC : pas d'auth (le client n'est pas connecté). On durcit
@@ -51,47 +56,99 @@ export const create = mutation({
     const commissionCents = Math.round(subtotalCents * 0.015)
     const totalCents = subtotalCents + args.tipCents
 
-    // paidItemNames n'existe pas dans le schema payments — l'extraire avant l'insert.
-    // Les commissionCents/totalCents/subtotalCents client restent dans paymentData mais
-    // sont écrasés par les valeurs serveur recalculées ci-dessous (l'ordre des clés du
-    // spread garantit l'override).
-    const { paidItemNames, ...paymentData } = args
+    const { paidItemNames, provider, providerRef, ...paymentData } = args
     const now = Date.now()
     const d = new Date(now)
     const dateLabel = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
-    const paymentId = await ctx.db.insert("payments", { ...paymentData, subtotalCents, tipCents: args.tipCents, commissionCents, totalCents, status: "Encaissé", createdAt: now, dateLabel })
 
-    // Réconcilier la table : cumuler le payé sur la sitting courante + ajuster le statut.
-    // Le restant est calculé sur le sous-total (hors pourboire) ; les pourboires
-    // sont agrégés à part pour le dashboard. Jamais de throw : si la table a
-    // disparu on conserve quand même le ledger.
-    {
-      const paidCents = (table.paidCents ?? 0) + subtotalCents
-      const paidTipCents = (table.paidTipCents ?? 0) + args.tipCents
-      const billCents = table.amountCents ?? 0
-      const status = billCents > 0 && paidCents >= billCents ? "paid" as const : "payment" as const
-      const patch: Record<string, unknown> = { paidCents, paidTipCents, status }
-      if (status === "paid" && table.orderItems?.length) {
-        // Table entièrement soldée → tout marquer paid.
-        patch.orderItems = table.orderItems.map(item => ({ ...item, paid: true }))
-      } else if (paidItemNames && paidItemNames.length > 0 && table.orderItems?.length) {
-        // Paiement partiel "par article" → marquer uniquement les articles sélectionnés.
-        // remaining consommé en sens inverse pour gérer correctement les doublons (qty > 1).
-        const remaining = [...paidItemNames]
-        patch.orderItems = table.orderItems.map(item => {
-          if (item.paid) return item
-          let count = 0
-          for (let i = remaining.length - 1; i >= 0 && count < item.qty; i--) {
-            if (remaining[i] === item.name) { remaining.splice(i, 1); count++ }
-          }
-          if (count === 0) return item
-          if (count >= item.qty) return { ...item, paid: true }
-          return { ...item, qty: item.qty - count }
-        })
-      }
-      await ctx.db.patch(args.tableId, patch)
+    // SECURITY (Vuln 1) : on n'inscrit JAMAIS "Encaissé" sur la seule affirmation
+    // du client. Le paiement est créé "En attente" ; seul le webhook PSP signé
+    // (http.ts → confirmPayment) le passe à "Encaissé" ET crédite la table. La
+    // référence (echoed par le webhook) permet de matcher la confirmation ; à
+    // défaut de ref PSP réelle (démo), on en génère une côté serveur.
+    const ref = providerRef ?? crypto.randomUUID()
+    const paymentId = await ctx.db.insert("payments", {
+      ...paymentData,
+      subtotalCents,
+      tipCents: args.tipCents,
+      commissionCents,
+      totalCents,
+      status: "En attente",
+      createdAt: now,
+      dateLabel,
+      provider,
+      providerRef: ref,
+      paidItemNames,
+    })
+
+    // Table : paiement INITIÉ → statut "payment" (sans créditer paidCents : le
+    // crédit n'a lieu qu'à la confirmation PSP réelle dans confirmPayment).
+    if (table.status !== "paid") {
+      await ctx.db.patch(args.tableId, { status: "payment" })
     }
     return paymentId
+  },
+})
+
+// Réconciliation table appliquée UNIQUEMENT après confirmation PSP réelle.
+// Déplacée hors de create : un client ne peut plus créditer une table sans
+// règlement vérifié côté serveur.
+function reconcileTablePatch(
+  table: any,
+  subtotalCents: number,
+  tipCents: number,
+  paidItemNames: string[] | undefined,
+): Record<string, unknown> {
+  const paidCents = (table.paidCents ?? 0) + subtotalCents
+  const paidTipCents = (table.paidTipCents ?? 0) + tipCents
+  const billCents = table.amountCents ?? 0
+  const status = billCents > 0 && paidCents >= billCents ? "paid" as const : "payment" as const
+  const patch: Record<string, unknown> = { paidCents, paidTipCents, status }
+  if (status === "paid" && table.orderItems?.length) {
+    patch.orderItems = table.orderItems.map((item: any) => ({ ...item, paid: true }))
+  } else if (paidItemNames && paidItemNames.length > 0 && table.orderItems?.length) {
+    const remaining = [...paidItemNames]
+    patch.orderItems = table.orderItems.map((item: any) => {
+      if (item.paid) return item
+      let count = 0
+      for (let i = remaining.length - 1; i >= 0 && count < item.qty; i--) {
+        if (remaining[i] === item.name) { remaining.splice(i, 1); count++ }
+      }
+      if (count === 0) return item
+      if (count >= item.qty) return { ...item, paid: true }
+      return { ...item, qty: item.qty - count }
+    })
+  }
+  return patch
+}
+
+// SECURITY (Vuln 1) : seul point de passage à "Encaissé". Appelé EXCLUSIVEMENT
+// par http.ts après vérification de la signature du webhook PSP. internalMutation
+// = inatteignable depuis un client public.
+export const confirmPayment = internalMutation({
+  args: { provider: v.string(), providerRef: v.string(), amountCents: v.number() },
+  handler: async (ctx, { provider, providerRef, amountCents }) => {
+    const pmt = await ctx.db
+      .query("payments")
+      .withIndex("by_provider_ref", q => q.eq("provider", provider).eq("providerRef", providerRef))
+      .first()
+    if (!pmt) {
+      console.warn(`[webhook] confirmPayment: aucun paiement en attente pour ${provider}/${providerRef}`)
+      return { ok: false, reason: "not_found" }
+    }
+    // Idempotent : les PSP renvoient le webhook plusieurs fois.
+    if (pmt.status === "Encaissé") return { ok: true, reason: "already_confirmed" }
+    // Le montant réellement réglé doit correspondre au total attendu.
+    if (amountCents !== pmt.totalCents) {
+      console.error(`[webhook] montant divergent ${provider}/${providerRef}: reçu ${amountCents}, attendu ${pmt.totalCents}`)
+      return { ok: false, reason: "amount_mismatch" }
+    }
+    await ctx.db.patch(pmt._id, { status: "Encaissé" })
+    const table = await ctx.db.get(pmt.tableId)
+    if (table) {
+      await ctx.db.patch(pmt.tableId, reconcileTablePatch(table, pmt.subtotalCents, pmt.tipCents, pmt.paidItemNames))
+    }
+    return { ok: true }
   },
 })
 

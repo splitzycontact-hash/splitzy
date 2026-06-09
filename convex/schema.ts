@@ -109,7 +109,14 @@ export default defineSchema({
     status: v.union(v.literal("Encaissé"), v.literal("En attente"), v.literal("Remboursé")),
     createdAt: v.number(),
     dateLabel: v.string(),
-  }).index("by_restaurant", ["restaurantId"]).index("by_table", ["tableId"]),
+    // PSP (Vuln 1) : paiement créé "En attente" par le client ; passé "Encaissé"
+    // uniquement par le webhook PSP signé (http.ts → confirmPayment), matché sur
+    // (provider, providerRef). paidItemNames persisté pour la réconciliation table
+    // au moment de la confirmation (et non plus à la création).
+    provider: v.optional(v.string()),
+    providerRef: v.optional(v.string()),
+    paidItemNames: v.optional(v.array(v.string())),
+  }).index("by_restaurant", ["restaurantId"]).index("by_table", ["tableId"]).index("by_provider_ref", ["provider", "providerRef"]),
 
   feedbacks: defineTable({
     restaurantId: v.id("restaurants"),
