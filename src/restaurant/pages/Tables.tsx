@@ -19,7 +19,8 @@ type FilterKey   = 'all' | TableStatus
 type TableData = {
   id: number; status: TableStatus
   guests?: number; durationMinutes?: number
-  amountCents?: number; paidCents?: number
+  amountCents?: number; paidCents?: number; paidTipCents?: number
+  paidGuests?: number
   alert?: boolean; convexId: Id<'tables'> | null
 }
 type SimItem = { name: string; qty: number; unitCents: number }
@@ -154,23 +155,25 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
           </div>
         ) : status === 'payment' ? (
           <>
-            {/* Amount row */}
+            {/* Amount row — valeurs réelles uniquement (paidCents = sous-total
+                encaissé hors pourboire, même convention que la vue convive) */}
             <div className="flex items-baseline gap-2 mb-2.5">
               <span className="font-extrabold text-[22px] tabular-nums tracking-[-0.025em] ds-text-accent" style={{ fontFamily: 'Inter, sans-serif' }}>
-                {paid > 0 ? formatEur(paid) : formatEur(total / 2)}
+                {formatEur(paid)}
               </span>
               <span className="text-[12px] ds-text-secondary">
-                sur {formatEur(total > 0 ? total : 4600)} · reste {formatEur(total > 0 ? total - paid : 2400)}
+                sur {formatEur(total)} · reste {formatEur(Math.max(0, total - paid))}
+                {(table.paidTipCents ?? 0) > 0 && <> · +{formatEur(table.paidTipCents!)} pourboire</>}
               </span>
             </div>
             {/* Progress bar */}
             <div className="mb-2">
               <div className="h-[5px] rounded-full overflow-hidden" style={{ background: 'var(--ds-bg-subtle)' }}>
-                <div className="h-full rounded-full" style={{ width: `${paidPct || 48}%`, background: '#E8920A' }} />
+                <div className="h-full rounded-full" style={{ width: `${Math.min(100, paidPct)}%`, background: '#E8920A' }} />
               </div>
               <div className="flex items-center justify-between mt-1.5 text-[11px]" style={{ color: 'var(--ds-text-tertiary)' }}>
-                <span>{Math.round(guests * (paidPct || 48) / 100)} / {guests} convives ont payé</span>
-                <span><strong>{paidPct || 48}%</strong></span>
+                <span>{table.paidGuests ?? 0} / {guests} convives ont payé</span>
+                <span><strong>{paidPct}%</strong></span>
               </div>
             </div>
             {/* Diner segments */}
@@ -179,7 +182,7 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
                 <div
                   key={i}
                   className="flex-1 h-[4px] rounded-full"
-                  style={{ background: i < Math.round(guests * (paidPct || 48) / 100) ? '#E8920A' : 'var(--ds-bg-subtle)' }}
+                  style={{ background: i < Math.min(guests, table.paidGuests ?? 0) ? '#E8920A' : 'var(--ds-bg-subtle)' }}
                 />
               ))}
             </div>
@@ -188,9 +191,13 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
           <>
             <div className="flex items-baseline gap-2 mb-2.5">
               <span className="font-extrabold text-[22px] tabular-nums tracking-[-0.025em]" style={{ color: '#22C55E', fontFamily: 'Inter, sans-serif' }}>
-                {total > 0 ? formatEur(total) : '88 €'}
+                {formatEur(total)}
               </span>
-              <span className="text-[12px]" style={{ color: '#71717A' }}>+ 8 € pourboire (10%)</span>
+              {(table.paidTipCents ?? 0) > 0 && (
+                <span className="text-[12px]" style={{ color: '#71717A' }}>
+                  + {formatEur(table.paidTipCents!)} pourboire{total > 0 ? ` (${Math.round((table.paidTipCents! / total) * 100)}%)` : ''}
+                </span>
+              )}
             </div>
             <div className="space-y-1 mb-2">
               {PAID_ORDER.lines.map(line => (
@@ -307,8 +314,9 @@ export function Tables() {
   const [sendLoading, setSendLoading] = useState(false)
 
   const restaurantId = useRestaurantId()
-  const rawTables = useQuery(api.tables.list,              restaurantId ? { restaurantId } : 'skip')
-  const rawMenu   = useQuery(api.menuItems.listByRestaurant, restaurantId ? { restaurantId } : 'skip')
+  const rawTables   = useQuery(api.tables.list,              restaurantId ? { restaurantId } : 'skip')
+  const rawMenu     = useQuery(api.menuItems.listByRestaurant, restaurantId ? { restaurantId } : 'skip')
+  const rawPayments = useQuery(api.payments.list,            restaurantId ? { restaurantId } : 'skip')
   const resetToFree  = useMutation(api.tables.resetToFree)
   const updateStatus = useMutation(api.tables.updateStatus)
 
@@ -316,14 +324,32 @@ export function Tables() {
 
   type ConvexTable = {
     _id: Id<'tables'>; number: number; status: TableStatus;
-    guests?: number; durationMinutes?: number; amountCents?: number; paidCents?: number; alert?: boolean
+    guests?: number; durationMinutes?: number; amountCents?: number; paidCents?: number; paidTipCents?: number; alert?: boolean
+  }
+
+  // Convives payeurs de la sitting courante : paiements Encaissé de la table,
+  // du plus récent au plus ancien (payments.list est trié desc), cumulés
+  // jusqu'à couvrir table.paidCents — même reconstruction que /welcome côté
+  // client. Évite de compter les paiements de sittings précédentes.
+  const sittingPayerCount = (tableId: Id<'tables'>, paidCents: number): number => {
+    if (!paidCents || !rawPayments) return 0
+    let cumul = 0, count = 0
+    for (const p of rawPayments) {
+      if (p.tableId !== tableId || p.status !== 'Encaissé') continue
+      cumul += p.subtotalCents
+      count++
+      if (cumul >= paidCents) break
+    }
+    return count
   }
 
   const tables: TableData[] = rawTables
     ? (rawTables as ConvexTable[]).map(t => ({
         id: t.number, status: t.status, guests: t.guests,
         durationMinutes: t.durationMinutes, amountCents: t.amountCents,
-        paidCents: t.paidCents, alert: t.alert, convexId: t._id,
+        paidCents: t.paidCents, paidTipCents: t.paidTipCents,
+        paidGuests: sittingPayerCount(t._id, t.paidCents ?? 0),
+        alert: t.alert, convexId: t._id,
       }))
     : []
 

@@ -1,5 +1,6 @@
 import { query, mutation, internalMutation } from "./_generated/server"
 import { v } from "convex/values"
+import { internal } from "./_generated/api"
 import { requireRestaurantAccess } from "./authz"
 
 export const list = query({
@@ -82,6 +83,16 @@ export const create = mutation({
     // référence (echoed par le webhook) permet de matcher la confirmation ; à
     // défaut de ref PSP réelle (démo), on en génère une côté serveur.
     const ref = providerRef ?? crypto.randomUUID()
+    // DÉMO (aucun PSP réel branché) : sans `provider` fourni par un SDK de
+    // paiement, aucun webhook ne viendra jamais confirmer ce paiement — il
+    // resterait "En attente" pour toujours et le dashboard n'afficherait rien
+    // (table.paidCents jamais crédité). On marque le paiement provider="demo"
+    // et on programme la confirmation serveur via le MÊME chemin que le
+    // webhook (confirmPayment : idempotent + montant vérifié + réconciliation
+    // table). ⚠ À RETIRER au branchement d'un vrai PSP : un paiement réel doit
+    // arriver avec provider+providerRef et n'être confirmé QUE par http.ts
+    // (webhook signé) — jamais auto-confirmé sur l'affirmation du client.
+    const effectiveProvider = provider ?? "demo"
     const paymentId = await ctx.db.insert("payments", {
       ...paymentData,
       subtotalCents,
@@ -91,10 +102,17 @@ export const create = mutation({
       status: "En attente",
       createdAt: now,
       dateLabel,
-      provider,
+      provider: effectiveProvider,
       providerRef: ref,
       paidItemNames,
     })
+    if (!provider) {
+      await ctx.scheduler.runAfter(0, internal.payments.confirmPayment, {
+        provider: "demo",
+        providerRef: ref,
+        amountCents: totalCents,
+      })
+    }
 
     // Table : paiement INITIÉ → statut "payment" (sans créditer paidCents : le
     // crédit n'a lieu qu'à la confirmation PSP réelle dans confirmPayment).
@@ -102,6 +120,58 @@ export const create = mutation({
       await ctx.db.patch(args.tableId, { status: "payment" })
     }
     return paymentId
+  },
+})
+
+// Outil admin (CLI `npx convex run` uniquement — internalMutation) : rattrape
+// les paiements démo créés AVANT le déploiement de l'auto-confirmation
+// (restés "En attente" sans provider, aucun webhook ne viendra). Confirme +
+// réconcilie la table seulement si la sitting est encore en cours et que le
+// sous-total tient dans le restant dû (sinon paiement d'une sitting passée :
+// marqué "Encaissé" sans toucher la table).
+export const backfillDemoPending = internalMutation({
+  args: { restaurantId: v.id("restaurants"), sinceCreatedAt: v.optional(v.number()) },
+  handler: async (ctx, { restaurantId, sinceCreatedAt }) => {
+    const rows = await ctx.db
+      .query("payments")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
+      .collect()
+    const targets = rows.filter(p =>
+      p.status === "En attente" && !p.provider && p.createdAt >= (sinceCreatedAt ?? 0)
+    )
+    let reconciled = 0
+    for (const p of targets) {
+      await ctx.db.patch(p._id, { provider: "demo", status: "Encaissé" })
+      const table = await ctx.db.get(p.tableId)
+      const remaining = table ? (table.amountCents ?? 0) - (table.paidCents ?? 0) : 0
+      if (
+        table &&
+        (table.status === "payment" || table.status === "dining") &&
+        remaining > 0 && p.subtotalCents <= remaining
+      ) {
+        await ctx.db.patch(p.tableId, reconcileTablePatch(table, p.subtotalCents, p.tipCents, p.paidItemNames))
+        reconciled++
+      }
+    }
+    return { confirmed: targets.length, reconciled }
+  },
+})
+
+// Outil admin (CLI uniquement) : purge les paiements de test antérieurs à un
+// timestamp pour un restaurant donné (nettoyage CRM/analytics des données de
+// démo résiduelles). Irréversible — vérifier la cible avant exécution.
+export const purgeStaleTestPayments = internalMutation({
+  args: { restaurantId: v.id("restaurants"), beforeCreatedAt: v.number() },
+  handler: async (ctx, { restaurantId, beforeCreatedAt }) => {
+    const rows = await ctx.db
+      .query("payments")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
+      .collect()
+    const targets = rows.filter(p => p.createdAt < beforeCreatedAt)
+    for (const p of targets) {
+      await ctx.db.delete(p._id)
+    }
+    return { deleted: targets.length }
   },
 })
 
