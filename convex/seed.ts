@@ -434,3 +434,17 @@ export const seedAuditScenario = internalMutation({
     return { message: "✅ Scénario audit monté", restaurantId: restaurant._id }
   },
 })
+
+// Purge ciblée de données de test : suppression par _id explicite,
+// uniquement via CLI/dashboard (internalMutation).
+export const purgeTestRows = internalMutation({
+  args: {
+    paymentIds: v.array(v.id("payments")),
+    feedbackIds: v.array(v.id("feedbacks")),
+  },
+  handler: async (ctx, { paymentIds, feedbackIds }) => {
+    for (const id of paymentIds) await ctx.db.delete(id)
+    for (const id of feedbackIds) await ctx.db.delete(id)
+    return { payments: paymentIds.length, feedbacks: feedbackIds.length }
+  },
+})
