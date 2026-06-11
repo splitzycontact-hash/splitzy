@@ -17,6 +17,12 @@ import { useRestaurant, useRestaurantId, useRestaurantRole } from '../context/Re
 import { assignEmoji, normalizeCategoryId } from '../../utils/menuEmoji'
 import { generateBillingInvoicePDF, downloadAllInvoices, type BillingInvoiceData } from '../../utils/generateBillingInvoice'
 
+// MFA désactivé : nécessite upgrade Clerk plan Pro (TOTP/Backup codes
+// non dispo sur Hobby). Réactiver en passant FEATURE_MFA_ENABLED à true
+// une fois le plan Clerk upgradé + toggles MFA réactivés sur
+// dashboard.clerk.com (instance clerk.splitzy.fr).
+const FEATURE_MFA_ENABLED = false
+
 type SectionKey = 'restaurant' | 'menu' | 'qr' | 'notifications' | 'pos' | 'billing' | 'team' | 'account' | 'plan'
 
 const SUB_NAV: { key: SectionKey; label: string; icon: React.ElementType; pendingDot?: boolean }[] = [
@@ -2649,7 +2655,10 @@ function AccountSection({
         </div>
       </div>
 
-      {/* Security block */}
+      {/* Security block — masqué tant que FEATURE_MFA_ENABLED est false (la
+          section ne contient que le bloc 2FA, on cache donc le panneau entier
+          y compris le titre "Sécurité" pour éviter un titre orphelin) */}
+      {FEATURE_MFA_ENABLED && (
       <div className="ds-panel">
         <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
           <div className="font-bold text-[13.5px] ds-text-primary flex items-center gap-2">
@@ -2673,6 +2682,7 @@ function AccountSection({
           </div>
         </div>
       </div>
+      )}
 
       {/* Danger zone */}
       <div className="ds-panel" style={{ borderColor: '#FECACA' }}>
