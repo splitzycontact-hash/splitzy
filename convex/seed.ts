@@ -1,3 +1,4 @@
+import { v } from "convex/values"
 import { internalMutation } from "./_generated/server"
 
 export const seedLeComptoir = internalMutation({
@@ -324,5 +325,112 @@ export const simulateClient = internalMutation({
       tableId: table._id,
       totalCents: total,
     }
+  },
+})
+
+// Scénario de vérification "audit anti-mock" : monte sur un restaurant donné
+// l'ensemble des états réels à contrôler visuellement (table occupée avec
+// commande, paiement partiel avec pourboire, table réglée, table en repas
+// sans commande caisse, tables libres) + paiements J et J-1 + feedbacks.
+// internalMutation uniquement — jamais exposable côté client.
+export const seedAuditScenario = internalMutation({
+  args: { slug: v.string() },
+  handler: async (ctx, { slug }) => {
+    const restaurant = await ctx.db
+      .query("restaurants")
+      .withIndex("by_slug", q => q.eq("slug", slug))
+      .first()
+    if (!restaurant) throw new Error(`Restaurant '${slug}' introuvable`)
+
+    const tables = await ctx.db
+      .query("tables")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurant._id))
+      .collect()
+    const byNum = (n: number) => tables.find(t => t.number === n)
+    const t1 = byNum(1), t2 = byNum(2), t3 = byNum(3), t4 = byNum(4)
+    if (!t1 || !t2 || !t3 || !t4) throw new Error("Tables 1-4 requises")
+
+    const now = Date.now()
+    const d = new Date(now)
+    const hhmm = `${String(d.getHours()).padStart(2, '0')}h${String(d.getMinutes()).padStart(2, '0')}`
+    const dl = (ts: number) => {
+      const x = new Date(ts)
+      return `${String(x.getDate()).padStart(2, '0')}/${String(x.getMonth() + 1).padStart(2, '0')}`
+    }
+
+    // T1 — en repas, commande caisse complète
+    await ctx.db.patch(t1._id, {
+      status: "dining", guests: 4, durationMinutes: 35,
+      amountCents: 8600, paidCents: 0, paidTipCents: 0,
+      orderItems: [
+        { name: "Burger maison", qty: 2, unitCents: 1600 },
+        { name: "Salade César", qty: 1, unitCents: 1400 },
+        { name: "Limonade", qty: 4, unitCents: 400 },
+        { name: "Tiramisu", qty: 2, unitCents: 1100 },
+      ],
+      alert: false,
+    })
+
+    // T2 — paiement partiel avec pourboire (2 convives sur 3 ont payé)
+    await ctx.db.patch(t2._id, {
+      status: "payment", guests: 3, durationMinutes: 78,
+      amountCents: 6300, paidCents: 4200, paidTipCents: 420,
+      orderItems: [
+        { name: "Pizza margherita", qty: 2, unitCents: 1300, paid: true },
+        { name: "Pâtes truffe", qty: 1, unitCents: 1600, paid: true },
+        { name: "Vin rouge (verre)", qty: 3, unitCents: 700 },
+      ],
+      alert: false,
+    })
+    await ctx.db.insert("payments", {
+      restaurantId: restaurant._id, tableId: t2._id, tableNumber: 2,
+      guests: 2, subtotalCents: 4200, tipCents: 420,
+      commissionCents: Math.round(4200 * 0.015), totalCents: 4620,
+      paymentMethod: "card", status: "Encaissé", createdAt: now - 600000, dateLabel: dl(now),
+    })
+
+    // T3 — réglée intégralement
+    await ctx.db.patch(t3._id, {
+      status: "paid", guests: 2, durationMinutes: 95,
+      amountCents: 5400, paidCents: 5400, paidTipCents: 540,
+      alert: false,
+    })
+    await ctx.db.insert("payments", {
+      restaurantId: restaurant._id, tableId: t3._id, tableNumber: 3,
+      guests: 2, subtotalCents: 5400, tipCents: 540,
+      commissionCents: Math.round(5400 * 0.015), totalCents: 5940,
+      paymentMethod: "card", status: "Encaissé", createdAt: now - 1800000, dateLabel: dl(now),
+    })
+
+    // T4 — en repas SANS commande caisse (cas "données absentes")
+    await ctx.db.patch(t4._id, {
+      status: "dining", guests: 0, durationMinutes: 0,
+      amountCents: 0, paidCents: 0, paidTipCents: 0,
+      orderItems: [], alert: false,
+    })
+
+    // Paiement d'HIER pour la comparaison "vs hier" de la Vue d'ensemble
+    await ctx.db.insert("payments", {
+      restaurantId: restaurant._id, tableId: t3._id, tableNumber: 3,
+      guests: 3, subtotalCents: 7800, tipCents: 700,
+      commissionCents: Math.round(7800 * 0.015), totalCents: 8500,
+      paymentMethod: "card", status: "Encaissé", createdAt: now - 86400000, dateLabel: dl(now - 86400000),
+    })
+
+    // Feedbacks réels (un positif, un négatif)
+    await ctx.db.insert("feedbacks", {
+      restaurantId: restaurant._id, tableId: t3._id, tableNumber: 3,
+      stars: 5, tags: ["😊 Super ambiance"],
+      text: "Très bon moment, paiement super simple.",
+      isNew: true, createdAt: now - 1700000, timeLabel: `aujourd'hui ${hhmm}`,
+    })
+    await ctx.db.insert("feedbacks", {
+      restaurantId: restaurant._id, tableId: t2._id, tableNumber: 2,
+      stars: 2, tags: ["⏱ Service lent"],
+      text: "Attente trop longue entre les plats.",
+      isNew: true, createdAt: now - 1600000, timeLabel: `aujourd'hui ${hhmm}`,
+    })
+
+    return { message: "✅ Scénario audit monté", restaurantId: restaurant._id }
   },
 })

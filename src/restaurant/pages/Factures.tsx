@@ -9,7 +9,7 @@ import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId, useRestaurant, useRestaurantRole } from '../context/RestaurantContext'
 import {
   Printer, Search, SlidersHorizontal, LayoutGrid, List,
-  X, ChevronLeft, ChevronRight, Euro, HandCoins, Percent, CreditCard, CheckCircle, Clock, RotateCcw, AlertCircle, FileText, Mail, Trash2, Check, Info, Download,
+  X, Euro, HandCoins, Percent, CreditCard, CheckCircle, Clock, RotateCcw, AlertCircle, FileText, Mail, Trash2, Check, Info, Download,
 } from 'lucide-react'
 
 // ─── À REMPLACER par query Convex + Tiime API quand SIRET obtenu ───────────
@@ -33,10 +33,10 @@ const SPLITZY_COMPANY_CONFIG = {
   tvaRate: 0.20,
 }
 
-const MOCK_SPLITZY_INVOICES: SplitzyInvoice[] = [
-  { id: '1', number: '2026-000001', period: 'Avril 2026', issuedAt: '01/05/2026', dueAt: '15/05/2026', amountHT: 48.50, tva: 9.70, amountTTC: 58.20, status: 'Payée', tiimePdfUrl: null },
-  { id: '2', number: '2026-000002', period: 'Mai 2026', issuedAt: '01/06/2026', dueAt: '15/06/2026', amountHT: 62.30, tva: 12.46, amountTTC: 74.76, status: 'En attente', tiimePdfUrl: null },
-]
+// Aucune facture émise pour l'instant (SIRET en cours). Quand Tiime sera
+// branché : remplacer par une query Convex / API Tiime — ne jamais remettre
+// de fausses factures ici, elles s'affichaient comme réelles aux gérants.
+const SPLITZY_INVOICES: SplitzyInvoice[] = []
 // ────────────────────────────────────────────────────────────────────────────
 
 type PeriodKey = 'today' | 'week' | 'month' | 'quarter' | 'custom'
@@ -73,25 +73,20 @@ const STATUS_STYLE: Record<RowStatus, { bg: string; color: string }> = {
   'Partiel':   { bg: 'var(--ds-accent-soft)',   color: 'var(--ds-accent-strong)' },
 }
 
-const DAY_LABELS: Record<string, string> = {
-  '28/05': "Aujourd'hui · jeudi 29 mai",
-  '27/05': 'Hier · mercredi 28 mai',
-  '26/05': 'Mardi 27 mai',
+// Libellé de groupe de jour dérivé de la date réelle (dd/mm)
+function dayLabel(d: string): string {
+  const [dd, mm] = d.split('/').map(Number)
+  if (!dd || !mm) return d
+  const now = new Date()
+  const date = new Date(now.getFullYear(), mm - 1, dd)
+  if (date > now) date.setFullYear(date.getFullYear() - 1)
+  const sameDay = (a: Date, b: Date) => a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()
+  const yesterday = new Date(now.getTime() - 86400000)
+  const full = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  if (sameDay(date, now)) return `Aujourd'hui · ${full}`
+  if (sameDay(date, yesterday)) return `Hier · ${full}`
+  return full.charAt(0).toUpperCase() + full.slice(1)
 }
-
-// Static demo rows that complement real Convex data
-const DEMO_ROWS: LocalRow[] = [
-  { d:'28/05', time:'13:42', table:'T2', guests:2, method:'apay', ref:'SPZ-26052828-0042', amount:52.80, tip:4.80, fee:0.72, status:'Encaissé' },
-  { d:'28/05', time:'13:28', table:'T6', guests:3, method:'card', ref:'SPZ-26052828-0041', amount:84.20, tip:7.50, fee:1.41, status:'Encaissé' },
-  { d:'28/05', time:'12:54', table:'T2', guests:2, method:'gpay', ref:'SPZ-26052828-0040', amount:22.00, tip:2.00, fee:0.30, status:'Encaissé' },
-  { d:'28/05', time:'12:18', table:'T4', guests:4, method:'apay', ref:'SPZ-26052828-0038', amount:118.50, tip:12.00, fee:1.93, status:'Partiel', partialPaid:88 },
-  { d:'27/05', time:'22:14', table:'T1', guests:2, method:'card', ref:'SPZ-26052728-0037', amount:24.20, tip:2.20, fee:0.33, status:'Encaissé' },
-  { d:'27/05', time:'21:48', table:'T1', guests:5, method:'apay', ref:'SPZ-26052728-0036', amount:73.70, tip:6.70, fee:1.01, status:'Encaissé' },
-  { d:'27/05', time:'20:55', table:'T3', guests:4, method:'card', ref:'SPZ-26052728-0034', amount:142.80, tip:14.80, fee:2.29, status:'Encaissé' },
-  { d:'27/05', time:'19:58', table:'T3', guests:3, method:'card', ref:'SPZ-26052728-0032', amount:55.00, tip:5.00, fee:0.75, status:'Remboursé' },
-  { d:'26/05', time:'22:01', table:'T5', guests:6, method:'card', ref:'SPZ-26052628-0030', amount:218.40, tip:22.00, fee:3.43, status:'Encaissé' },
-  { d:'26/05', time:'20:48', table:'T4', guests:3, method:'card', ref:'SPZ-26052628-0028', amount:76.20, tip:0, fee:1.04, status:'En attente' },
-]
 
 type ConvexPayment = {
   _id: string
@@ -284,7 +279,7 @@ function Drawer({ row, restaurantId, restaurantName, onClose }: {
             </div>
             <div className="flex items-center gap-2 mt-2">
               <StatusBadge status={row.status} />
-              <span className="text-[12px] ds-text-tertiary">{DAY_LABELS[row.d] ?? row.d} · {row.time}</span>
+              <span className="text-[12px] ds-text-tertiary">{dayLabel(row.d)} · {row.time}</span>
             </div>
           </div>
 
@@ -425,7 +420,7 @@ function SplitzyStatusBadge({ status }: { status: SplitzyInvoice['status'] }) {
 const SPLITZY_GRID = '130px 1fr 110px 90px 120px 120px 170px'
 
 function SplitzyInvoicesTab() {
-  const invoices = MOCK_SPLITZY_INVOICES
+  const invoices = SPLITZY_INVOICES
   const totalTTC   = invoices.reduce((s, i) => s + i.amountTTC, 0)
   const paidTTC    = invoices.filter(i => i.status === 'Payée').reduce((s, i) => s + i.amountTTC, 0)
   const pendingTTC = invoices.filter(i => i.status === 'En attente').reduce((s, i) => s + i.amountTTC, 0)
@@ -506,6 +501,11 @@ function SplitzyInvoicesTab() {
         </div>
 
         {/* Rows */}
+        {invoices.length === 0 && (
+          <div className="px-5 py-10 text-center text-[12.5px]" style={{ color: 'var(--ds-text-tertiary)' }}>
+            Aucune facture émise pour le moment — la première facture de commission arrivera ici en début de mois.
+          </div>
+        )}
         {invoices.map((inv, i) => (
           <div
             key={inv.id}
@@ -585,15 +585,16 @@ export function Factures() {
   }, [openDropdown])
   const rawPayments = useQuery(api.payments.list, restaurantId ? { restaurantId } : 'skip')
 
-  // Map Convex payments or use demo rows
-  const rows: LocalRow[] = rawPayments != null
-    ? (rawPayments as ConvexPayment[]).map((p, i) => ({
+  const isLoadingPayments = rawPayments === undefined
+  // Données réelles uniquement — pas de lignes démo (faux chiffres en prod)
+  const rows: LocalRow[] = (rawPayments != null)
+    ? (rawPayments as ConvexPayment[]).map(p => ({
         d: p.dateLabel,
         time: new Date(p.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
         table: `T${p.tableNumber}`,
         guests: p.guests,
         method: 'card' as PayMethod,
-        ref: `SPZ-${String(i).padStart(8, '0')}`,
+        ref: `SPZ-${p._id.slice(-8).toUpperCase()}`,
         amount: p.totalCents / 100,
         tip: p.tipCents / 100,
         fee: p.commissionCents / 100,
@@ -601,7 +602,7 @@ export function Factures() {
         paymentId: p._id,
         tableNumber: p.tableNumber,
       }))
-    : DEMO_ROWS
+    : []
 
   const filteredRows = rows.filter(r => {
     const matchSearch = !search || r.table.toLowerCase().includes(search.toLowerCase()) || r.ref.includes(search)
@@ -614,6 +615,17 @@ export function Factures() {
 
   const encaisse   = rows.filter(r => r.status === 'Encaissé')
   const caGros     = encaisse.reduce((s, r) => s + r.amount, 0)
+
+  // Variation réelle vs les 7 jours précédents (null si pas de base → "—")
+  const nowTs = Date.now()
+  const allEnc = (rawPayments ?? []) as ConvexPayment[]
+  const thisWeekCA = allEnc.filter(p => p.status === 'Encaissé' && p.createdAt >= nowTs - 7 * 86400000).reduce((s, p) => s + p.totalCents, 0)
+  const prevWeekCA = allEnc.filter(p => p.status === 'Encaissé' && p.createdAt >= nowTs - 14 * 86400000 && p.createdAt < nowTs - 7 * 86400000).reduce((s, p) => s + p.totalCents, 0)
+  const weekDelta = prevWeekCA > 0 ? Math.round(((thisWeekCA - prevWeekCA) / prevWeekCA) * 100) : null
+
+  // Prochain lundi (jour de virement)
+  const nextMonday = new Date(nowTs + ((8 - new Date(nowTs).getDay()) % 7 || 7) * 86400000)
+  const nextMondayLabel = nextMonday.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
   const pourboires = encaisse.reduce((s, r) => s + r.tip, 0)
   const commission = encaisse.reduce((s, r) => s + r.fee, 0)
   const net        = caGros - commission + pourboires
@@ -694,7 +706,9 @@ export function Factures() {
               {fmt(caGros)} €
             </div>
             <div className="text-[11.5px] ds-text-tertiary">
-              <span className="font-semibold" style={{ color: 'var(--ds-success-strong)' }}>+14,2%</span> vs semaine préc.
+              {weekDelta !== null
+                ? <><span className="font-semibold" style={{ color: weekDelta >= 0 ? 'var(--ds-success-strong)' : 'var(--ds-error-strong)' }}>{weekDelta >= 0 ? '+' : ''}{weekDelta}%</span> vs semaine préc.</>
+                : <>pas de comparaison disponible</>}
             </div>
           </div>
 
@@ -708,7 +722,7 @@ export function Factures() {
               {fmt(pourboires)} €
             </div>
             <div className="text-[11.5px] ds-text-tertiary">
-              {caGros > 0 ? ((pourboires / caGros) * 100).toFixed(1) : '9,1'}% du CA · moy. client
+              {caGros > 0 ? ((pourboires / caGros) * 100).toFixed(1).replace('.', ',') + '% du CA · moy. client' : '— aucune donnée'}
             </div>
           </div>
 
@@ -740,7 +754,7 @@ export function Factures() {
               >
                 Virement
               </span>
-              prévu lundi 1<sup>er</sup> juin
+              prévu {nextMondayLabel}
             </div>
           </div>
         </section>
@@ -892,7 +906,7 @@ export function Factures() {
           {gridView && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-5">
               {filteredRows.length === 0 ? (
-                <div className="col-span-3 py-10 text-center text-[13px] ds-text-tertiary">Aucune transaction.</div>
+                <div className="col-span-3 py-10 text-center text-[13px] ds-text-tertiary">{isLoadingPayments ? 'Chargement des transactions…' : 'Aucune transaction.'}</div>
               ) : filteredRows.map((row, i) => {
                 const ml = METHOD_LABELS[row.method]
                 return (
@@ -942,7 +956,7 @@ export function Factures() {
 
           {/* Grouped rows */}
           {Object.entries(grouped).length === 0 ? (
-            <div className="py-12 text-center text-[13px] ds-text-tertiary">Aucune transaction pour cette période.</div>
+            <div className="py-12 text-center text-[13px] ds-text-tertiary">{isLoadingPayments ? 'Chargement des transactions…' : 'Aucune transaction pour cette période.'}</div>
           ) : (
             Object.entries(grouped).map(([day, dayRows]) => {
               const dayTotal = dayRows.filter(r => r.status !== 'Remboursé').reduce((s, r) => s + r.amount, 0)
@@ -954,7 +968,7 @@ export function Factures() {
                     className="flex items-center gap-2 px-5 py-2.5 text-[12px]"
                     style={{ background: 'var(--ds-bg-base)', borderBottom: '1px solid var(--ds-border)', borderTop: '1px solid var(--ds-border)' }}
                   >
-                    <span className="font-semibold ds-text-primary">{DAY_LABELS[day] ?? day}</span>
+                    <span className="font-semibold ds-text-primary">{dayLabel(day)}</span>
                     <span className="ds-text-tertiary">·</span>
                     <span className="ds-text-secondary">{dayRows.length} transactions</span>
                     <div className="ml-auto flex items-center gap-4">
@@ -1040,28 +1054,7 @@ export function Factures() {
             <span className="text-[12px] ds-text-tertiary">
               <strong className="ds-text-primary tabular-nums">{filteredRows.length}</strong> transactions · {fmt(caGros)} € au total
             </span>
-            <div className="flex items-center gap-1">
-              <button className="w-7 h-7 rounded-md flex items-center justify-center transition-colors" style={{ color: 'var(--ds-text-tertiary)' }}>
-                <ChevronLeft size={14} />
-              </button>
-              {[1, 2, 3].map(p => (
-                <button
-                  key={p}
-                  className="w-7 h-7 rounded-md text-[12px] font-medium transition-colors"
-                  style={{
-                    background: p === 1 ? '#E8920A' : 'none',
-                    color: p === 1 ? 'white' : 'var(--ds-text-secondary)',
-                  }}
-                >
-                  {p}
-                </button>
-              ))}
-              <span className="px-1 ds-text-tertiary text-[12px]">…</span>
-              <button className="w-7 h-7 rounded-md text-[12px] font-medium ds-text-secondary">9</button>
-              <button className="w-7 h-7 rounded-md flex items-center justify-center transition-colors" style={{ color: 'var(--ds-text-tertiary)' }}>
-                <ChevronRight size={14} />
-              </button>
-            </div>
+
           </div>
           </>
           )}

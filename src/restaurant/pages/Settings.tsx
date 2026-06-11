@@ -1362,12 +1362,10 @@ const PLANS = [
   },
 ]
 
-const MOCK_INVOICES = [
-  { id: 'INV-2025-004', date: '01 avr. 2025', amountCents: 2900, plan: 'Pro', status: 'Payée' },
-  { id: 'INV-2025-003', date: '01 mar. 2025', amountCents: 2900, plan: 'Pro', status: 'Payée' },
-  { id: 'INV-2025-002', date: '01 fév. 2025', amountCents: 2900, plan: 'Pro', status: 'Payée' },
-  { id: 'INV-2025-001', date: '01 jan. 2025', amountCents: 0,    plan: 'Starter', status: 'Gratuit' },
-]
+// Aucune facture d'abonnement émise (billing pas encore branché). Quand le
+// billing réel arrivera : query Convex — ne jamais remettre de fausses
+// factures ici, elles étaient affichées et téléchargeables comme réelles.
+const SUBSCRIPTION_INVOICES: { id: string; date: string; amountCents: number; plan: string; status: string }[] = []
 
 function formatEurCents(cents: number) {
   if (cents === 0) return '0,00 €'
@@ -1679,8 +1677,9 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
       <div className="bg-white rounded-xl border border-border shadow-card p-6">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-bold text-dark">Historique des factures</h3>
+          {SUBSCRIPTION_INVOICES.length > 0 && (
           <button
-            onClick={() => downloadAllInvoices(MOCK_INVOICES.map(inv => ({
+            onClick={() => downloadAllInvoices(SUBSCRIPTION_INVOICES.map(inv => ({
               id: inv.id,
               date: inv.date,
               plan: inv.plan,
@@ -1693,9 +1692,15 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
           >
             <Download size={12} /> Tout télécharger
           </button>
+          )}
         </div>
         <div className="divide-y divide-border">
-          {MOCK_INVOICES.map(inv => {
+          {SUBSCRIPTION_INVOICES.length === 0 && (
+            <div className="py-8 text-center text-xs text-muted">
+              Aucune facture pour le moment — vos factures d'abonnement apparaîtront ici.
+            </div>
+          )}
+          {SUBSCRIPTION_INVOICES.map(inv => {
             const invoiceData: BillingInvoiceData = {
               id: inv.id,
               date: inv.date,

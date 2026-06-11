@@ -804,7 +804,7 @@ export function MenuPage() {
           style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
         >
           {[
-            { icon: Clock,       label: 'Articles disponibles',   value: String(okCount || demoTotal),           sub: hasLive ? `${convexItems.length} au total` : 'données démo', accent: false },
+            { icon: Clock,       label: 'Articles disponibles',   value: String(hasLive ? okCount : demoTotal),           sub: hasLive ? `${convexItems.length} au total` : 'données démo', accent: false },
             { icon: BarChart3,   label: 'CA généré par la carte', value: ca28 > 0 ? `${ca28.toFixed(2).replace('.', ',')}€` : '0€', sub: '28 derniers jours', accent: true },
             { icon: AlertCircle, label: 'Articles en rupture',    value: String(outCount),                       sub: outCount > 0 ? `${outCount} non dispo.` : 'Tous disponibles', error: outCount > 0 },
             { icon: Check,       label: 'Catégories actives',     value: String(hasLive ? displayCategories.filter(c => byCategory[c]?.length).length : DEMO_ITEMS.length), sub: 'dans la carte' },

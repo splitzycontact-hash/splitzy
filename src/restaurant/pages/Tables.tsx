@@ -12,6 +12,7 @@ import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
 import { formatEur } from '../../utils/formatCurrency'
+import { paidPct, perGuestCents, avgBasketCents } from '../lib/billing'
 
 type TableStatus = 'free' | 'dining' | 'payment' | 'paid'
 type FilterKey   = 'all' | TableStatus
@@ -24,14 +25,6 @@ type TableData = {
   alert?: boolean; convexId: Id<'tables'> | null
 }
 type SimItem = { name: string; qty: number; unitCents: number }
-
-// Order summary breakdown for demo cards (when real data absent)
-const DEMO_ORDER: Record<number, { lines: { label: string; amount: string }[]; lastAction: string }> = {
-  3: { lines: [{ label: '3 entrées', amount: '21 €' }, { label: '5 plats', amount: '34 €' }, { label: '2 boissons', amount: '8 €' }], lastAction: 'Plats servis il y a 14 min' },
-  4: { lines: [{ label: '3 plats', amount: '24 €' }, { label: '1 café', amount: '3 €' }], lastAction: 'Aucune nouvelle commande depuis 32 min · proposer dessert ?' },
-}
-const PAID_ORDER = { lines: [{ label: 'Plats principaux', amount: '54 €' }, { label: 'Boissons', amount: '22 €' }, { label: 'Desserts', amount: '12 €' }], feedback: 'Feedback laissé · 5 ★ · « parfait »' }
-const FREE_SINCE: Record<number, string> = { 5:'1h08', 6:'2h14', 7:'47 min', 8:'3h02', 9:'4h18', 10:'5h36' }
 
 function durationLabel(minutes?: number): string {
   if (!minutes) return ''
@@ -89,10 +82,10 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
   const { status, id } = table
   const paid    = table.paidCents   ?? 0
   const total   = table.amountCents ?? 0
-  const paidPct = total > 0 ? Math.round((paid / total) * 100) : 0
-  const guests  = table.guests ?? 4
-
-  const demoOrder = DEMO_ORDER[id]
+  const pct     = paidPct(paid, total)
+  // guests = 0 si inconnu — ne jamais inventer un nombre de convives
+  const guests  = table.guests ?? 0
+  const perGuest = perGuestCents(total, guests)
 
   return (
     <article
@@ -169,23 +162,25 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
             {/* Progress bar */}
             <div className="mb-2">
               <div className="h-[5px] rounded-full overflow-hidden" style={{ background: 'var(--ds-bg-subtle)' }}>
-                <div className="h-full rounded-full" style={{ width: `${Math.min(100, paidPct)}%`, background: '#E8920A' }} />
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#E8920A' }} />
               </div>
               <div className="flex items-center justify-between mt-1.5 text-[11px]" style={{ color: 'var(--ds-text-tertiary)' }}>
-                <span>{table.paidGuests ?? 0} / {guests} convives ont payé</span>
-                <span><strong>{paidPct}%</strong></span>
+                <span>{guests > 0 ? `${table.paidGuests ?? 0} / ${guests} convives ont payé` : 'Convives —'}</span>
+                <span><strong>{pct}%</strong></span>
               </div>
             </div>
             {/* Diner segments */}
-            <div className="flex gap-1">
-              {Array.from({ length: guests }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex-1 h-[4px] rounded-full"
-                  style={{ background: i < Math.min(guests, table.paidGuests ?? 0) ? '#E8920A' : 'var(--ds-bg-subtle)' }}
-                />
-              ))}
-            </div>
+            {guests > 0 && (
+              <div className="flex gap-1">
+                {Array.from({ length: guests }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 h-[4px] rounded-full"
+                    style={{ background: i < Math.min(guests, table.paidGuests ?? 0) ? '#E8920A' : 'var(--ds-bg-subtle)' }}
+                  />
+                ))}
+              </div>
+            )}
           </>
         ) : status === 'paid' ? (
           <>
@@ -199,47 +194,24 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
                 </span>
               )}
             </div>
-            <div className="space-y-1 mb-2">
-              {PAID_ORDER.lines.map(line => (
-                <div key={line.label} className="flex justify-between text-[12px]" style={{ color: '#A1A1AA' }}>
-                  <span>{line.label}</span><span>{line.amount}</span>
-                </div>
-              ))}
-            </div>
             <div className="flex items-center gap-1.5 text-[12px]" style={{ color: '#A1A1AA' }}>
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#22C55E' }} />
-              {PAID_ORDER.feedback}
+              Addition réglée via Splitzy
             </div>
           </>
         ) : ( // dining
           <>
             <div className="flex items-baseline gap-2 mb-2.5">
               <span className="font-extrabold text-[22px] tabular-nums tracking-[-0.025em]" style={{ color: '#FAFAFA', fontFamily: 'Inter, sans-serif' }}>
-                {total > 0 ? formatEur(total) : demoOrder ? (demoOrder.lines.reduce((s, l) => s + parseInt(l.amount), 0) + ' €') : '63 €'}
+                {total > 0 ? formatEur(total) : '—'}
               </span>
               <span className="text-[12px]" style={{ color: '#71717A' }}>
-                addition en cours · {total > 0 && guests > 0 ? formatEur(Math.round(total / guests)) : '12,60 €'} / couvert
+                addition en cours{perGuest !== null && <> · {formatEur(perGuest)} / couvert</>}
               </span>
             </div>
-            {demoOrder && (
-              <div className="space-y-1 mb-2">
-                {demoOrder.lines.map(line => (
-                  <div key={line.label} className="flex justify-between text-[12px]" style={{ color: '#A1A1AA' }}>
-                    <span>{line.label}</span><span>{line.amount}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {demoOrder && (
-              <div
-                className="flex items-center gap-1.5 text-[12px]"
-                style={{ color: table.alert ? 'var(--ds-accent-strong)' : '#71717A' }}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: table.alert ? 'var(--ds-warning)' : '#71717A' }}
-                />
-                {demoOrder.lastAction}
+            {total === 0 && (
+              <div className="text-[12px]" style={{ color: '#71717A' }}>
+                En attente de la commande (caisse)
               </div>
             )}
           </>
@@ -263,13 +235,13 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
           }}
         >
           {status === 'paid' ? (
-            <><CheckCircle2 size={12} style={{ color: '#22C55E' }} />Réglée à 10:34</>
+            <><CheckCircle2 size={12} style={{ color: '#22C55E' }} />Réglée</>
           ) : status === 'free' ? (
-            <>Libre depuis {FREE_SINCE[id] ?? '—'}</>
+            <>Libre</>
           ) : table.alert ? (
             <><AlertTriangle size={12} />{durationLabel(table.durationMinutes)} · au-delà moy.</>
           ) : (
-            <><Timer size={12} />{durationLabel(table.durationMinutes) || '42 min'}</>
+            <><Timer size={12} />{durationLabel(table.durationMinutes) || '—'}</>
           )}
         </span>
         <div className="flex items-center gap-1">
@@ -375,12 +347,11 @@ export function Tables() {
   const activeTables  = tables.filter(t => t.status !== 'free')
   const caService     = activeTables.reduce((s, t) => s + (t.paidCents ?? 0), 0)
   const totalGuests   = activeTables.reduce((s, t) => s + (t.guests ?? 0), 0)
+  // null si pas de données — la strip affiche "—" plutôt qu'un chiffre inventé
   const avgDur        = activeTables.filter(t => t.durationMinutes).length > 0
     ? Math.round(activeTables.reduce((s, t) => s + (t.durationMinutes ?? 0), 0) / activeTables.filter(t => t.durationMinutes).length)
-    : 48
-  const avgBill       = totalGuests > 0
-    ? Math.round(activeTables.reduce((s, t) => s + (t.amountCents ?? 0), 0) / totalGuests / 100)
-    : 24
+    : null
+  const avgBill       = avgBasketCents(activeTables.reduce((s, t) => s + (t.amountCents ?? 0), 0), totalGuests)
 
   // Floor map mini-cells
   const floorCells = tables.slice(0, 10).map(t => ({
@@ -434,8 +405,8 @@ export function Tables() {
           {[
             { label: 'CA du service',      value: formatEur(caService), accent: true, sub: `${tables.filter(t => t.status === 'payment').length} table(s) en paiement` },
             { label: 'Couverts en salle',  value: String(totalGuests),  sub: `sur ${activeTables.length} tables actives` },
-            { label: 'Durée moy. à table', value: `${avgDur} min`,      sub: 'objectif 60 min' },
-            { label: 'Panier moy.',        value: `${avgBill}€`,        sub: 'par couvert' },
+            { label: 'Durée moy. à table', value: avgDur !== null ? `${avgDur} min` : '—', sub: 'objectif 60 min' },
+            { label: 'Panier moy.',        value: avgBill !== null ? formatEur(avgBill) : '—', sub: 'par couvert' },
           ].map((cell, i) => (
             <div key={i} className="flex flex-col gap-1 px-[18px] py-3.5" style={{ borderRight: i < 3 ? `1px solid var(--ds-border)` : 'none' }}>
               <div className="text-[10.5px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">{cell.label}</div>

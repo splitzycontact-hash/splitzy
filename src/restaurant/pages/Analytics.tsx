@@ -241,6 +241,7 @@ export function Analytics() {
   const restaurant     = useRestaurant()
   const rawPayments    = useQuery(api.payments.list,              restaurantId ? { restaurantId } : 'skip')
   const rawFeedbacks   = useQuery(api.feedbacks.list,             restaurantId ? { restaurantId } : 'skip')
+  const rawTables      = useQuery(api.tables.list,                restaurantId ? { restaurantId } : 'skip')
   const latestInsights = useQuery(api.insights.getLatestInsights, restaurantId ? { restaurantId } : 'skip')
   const isPro          = restaurant?.plan === 'pro'
 
@@ -439,7 +440,13 @@ export function Analytics() {
 
   const tipVsBase = tipsTotal > 0 ? Math.round((parseFloat(avgTipPct) - 6.2) / 6.2 * 100) : 0
 
-  const moSince = Math.max(1, Math.round((Date.now() - new Date('2025-10-01').getTime()) / (30.5 * 86400000)))
+  // Date d'activation réelle = premier paiement encaissé (null si aucun)
+  const firstPaymentAt = allEncaisse.length > 0
+    ? allEncaisse.reduce((min, p) => Math.min(min, p.createdAt), Infinity)
+    : null
+  const moSince = firstPaymentAt !== null
+    ? Math.max(1, Math.round((Date.now() - firstPaymentAt) / (30.5 * 86400000)))
+    : 0
   const invest = moSince * 99
   const aSub = allEncaisse.reduce((s, p) => s + p.subtotalCents, 0)
   const aTips = allEncaisse.reduce((s, p) => s + p.tipCents, 0)
@@ -451,6 +458,12 @@ export function Analytics() {
   const roi = extraTip + rotGain + googGain
   const roiMult = invest > 0 && roi > 0 ? (roi / invest).toFixed(1) : '0'
   const fmtR = (n: number) => Math.round(n).toLocaleString('fr-FR') + '€'
+
+  const liveTables = (rawTables ?? []) as { status: string; durationMinutes?: number }[]
+  const tablesWithDur = liveTables.filter(t => t.status !== 'free' && (t.durationMinutes ?? 0) > 0)
+  const avgTableMin = tablesWithDur.length > 0
+    ? Math.round(tablesWithDur.reduce((s, t) => s + (t.durationMinutes ?? 0), 0) / tablesWithDur.length)
+    : null
 
   const prevWeekTotal    = prevEncaisse.reduce((s, p) => s + p.totalCents, 0)
   const prevTotalTickets = prevEncaisse.length
@@ -577,8 +590,8 @@ export function Analytics() {
             },
             {
               label: 'Temps moyen / table', accent: false,
-              value: '42', suffix: 'min',
-              delta: '−6 min', up: false, vs: 'rotation +14%',
+              value: avgTableMin !== null ? String(avgTableMin) : '—', suffix: avgTableMin !== null ? 'min' : '',
+              delta: 'service en cours', up: true, vs: '',
               spark: 'M0 6 L8 8 L16 9 L24 12 L32 11 L40 14 L48 16 L60 17',
               sparkColor: '#22C55E',
             },
@@ -632,7 +645,7 @@ export function Analytics() {
               <div className="hidden md:flex items-center gap-6">
                 <div><div className="text-[10.5px] ds-text-tertiary uppercase tracking-[0.07em]">Pic</div><div className="font-semibold text-[13px] ds-text-primary">{chartPic.total.toFixed(2)}€ <span className="text-[11px] ds-text-tertiary font-normal">· {chartPic.day}</span></div></div>
                 <div><div className="text-[10.5px] ds-text-tertiary uppercase tracking-[0.07em]">Jour moyen</div><div className="font-semibold text-[13px] ds-text-primary">{chartAvg.toFixed(2)}€</div></div>
-                <div><div className="text-[10.5px] ds-text-tertiary uppercase tracking-[0.07em]">Tendance</div><div className="font-semibold text-[13px]" style={{ color: 'var(--ds-success-strong)' }}>+18,4%</div></div>
+                <div><div className="text-[10.5px] ds-text-tertiary uppercase tracking-[0.07em]">Tendance</div><div className="font-semibold text-[13px]" style={{ color: caDelta !== null && caDelta < 0 ? 'var(--ds-error-strong)' : 'var(--ds-success-strong)' }}>{caDelta !== null ? `${caDelta > 0 ? '+' : ''}${caDelta.toFixed(1).replace('.', ',')}%` : '—'}</div></div>
               </div>
               {/* Legend */}
               <div className="flex items-center gap-3">
@@ -808,7 +821,9 @@ export function Analytics() {
               <span className="ds-text-secondary">Panier moyen restaurant</span>
               <span className="font-semibold ds-text-primary tabular-nums">
                 {avgBasket > 0 ? `${avgBasket.toFixed(2).replace('.', ',')}€` : '—'}
-                <span className="ml-1.5 text-[11.5px] font-semibold" style={{ color: 'var(--ds-success-strong)' }}>+5,7%</span>
+                {basketDelta !== null && (
+                  <span className="ml-1.5 text-[11.5px] font-semibold" style={{ color: basketDelta >= 0 ? 'var(--ds-success-strong)' : 'var(--ds-error-strong)' }}>{basketDelta > 0 ? '+' : ''}{basketDelta.toFixed(1).replace('.', ',')}%</span>
+                )}
               </span>
             </div>
           </div>
@@ -954,7 +969,7 @@ export function Analytics() {
                   className="text-[10.5px] font-semibold px-2 py-[3px] rounded-full"
                   style={{ background: 'rgba(232,146,10,0.15)', color: '#F5A030' }}
                 >
-                  {'ROI · ' + moSince + ' mois'}
+                  {moSince > 0 ? `Estimation · ${moSince} mois` : 'Estimation'}
                 </span>
               </div>
               <div
@@ -964,7 +979,9 @@ export function Analytics() {
                 {allEncaisse.length > 0 ? fmtR(roi) : '0€'}
               </div>
               <div className="text-[12px] mt-2" style={{ color: '#71717A' }}>
-                Activation le 1<sup>er</sup> oct. 2025 · {roiMult}× l'investissement
+                {firstPaymentAt !== null
+                  ? <>Depuis le {new Date(firstPaymentAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })} · ~{roiMult}× l'investissement (estimation)</>
+                  : <>Aucun paiement encaissé pour le moment</>}
               </div>
               <div className="mt-5 space-y-2.5 border-t pt-4" style={{ borderColor: '#27272A' }}>
                 {[

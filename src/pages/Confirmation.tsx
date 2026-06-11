@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
-import { MENU_ITEMS } from '../data/menu'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
 import { httpMutation } from '../utils/convexHttp'
@@ -42,10 +41,10 @@ export function Confirmation() {
     setSaved(true)
   }
 
-  const selectedMenuItems = state.selectedItems.map(sel => {
-    const item = MENU_ITEMS.find(m => m.id === sel.menuItemId)
-    return { sel, item }
-  }).filter(({ item }) => !!item)
+  // Les articles viennent du state (nom + prix réels de la commande),
+  // jamais d'un menu statique : les ids réels sont `order-…` et ne
+  // correspondent à aucune liste codée en dur.
+  const selectedMenuItems = state.selectedItems
 
   const totalStr = formatEur(total).replace('€', '')
 
@@ -130,13 +129,12 @@ export function Confirmation() {
           </div>
 
           {/* Items (item mode only) */}
-          {state.splitMode === 'item' && selectedMenuItems.map(({ sel, item }) => {
-            if (!item) return null
-            const linePrice = Math.round(item.price / sel.splitFactor)
+          {state.splitMode === 'item' && selectedMenuItems.map(sel => {
+            const linePrice = Math.round(sel.priceCents / sel.splitFactor)
             return (
               <div key={sel.menuItemId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', gap: 8 }}>
                 <span style={{ fontSize: 13.5, color: '#52525B', fontWeight: 500 }}>
-                  {item.emoji ? `${item.emoji} ` : ''}{item.name}
+                  {sel.name}
                   {sel.splitFactor > 1 && <span style={{ fontSize: 11, color: '#A1A1AA', marginLeft: 4 }}>÷{sel.splitFactor}</span>}
                 </span>
                 <span style={{ fontSize: 13.5, color: '#52525B', fontWeight: 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>

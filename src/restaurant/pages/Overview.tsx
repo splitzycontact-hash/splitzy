@@ -4,6 +4,7 @@ import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import { formatEur } from '../../utils/formatCurrency'
+import { deltaPct } from '../lib/billing'
 import {
   Euro, Grid3x3, HandCoins, Sparkles, Star,
   Activity, ArrowRight, TrendingUp, CheckCircle2,
@@ -154,23 +155,6 @@ function TableCardSmall({ table }: { table: ConvexTable }) {
   )
 }
 
-// ── Demo activity items (mixed types matching Claude Design reference) ──
-const DEMO_ACTIVITIES = [
-  { dot: 'success', table: 'T2', action: 'Paiement encaissé', meta: '· 4 conv. · part. par article', amount: '+ 52,80 €', amountColor: 'var(--ds-success-strong)', time: '10:34' },
-  { dot: 'warning', table: 'T1', action: 'En paiement',       meta: '· 22 € sur 46 € réglés (2/4 conv.)', amount: '22,00 €', amountColor: 'var(--ds-text-tertiary)', time: '10:28' },
-  { dot: 'success', table: 'T2', action: 'Pourboire ajouté',  meta: "· 10% sur l'addition",          amount: '+ 4,80 €', amountColor: 'var(--ds-success-strong)', time: '10:26' },
-  { dot: 'error',   table: 'T4', action: 'Feedback intercepté', meta: "· « Service un peu lent » · 2 ★", amount: 'privé',  amountColor: 'var(--ds-text-tertiary)', time: '10:14' },
-  { dot: 'neutral', table: 'T2', action: 'Commande validée',  meta: '· 4 plats, 4 boissons',          amount: '88,00 €', amountColor: 'var(--ds-text-tertiary)', time: '09:48' },
-  { dot: 'neutral', table: 'T3', action: 'QR code scanné',    meta: '· nouvelle session ouverte',     amount: '—',       amountColor: 'var(--ds-text-tertiary)', time: '09:42' },
-]
-
-const DOT_COLORS: Record<string, string> = {
-  success: 'var(--ds-success)',
-  warning: 'var(--ds-warning)',
-  error:   'var(--ds-error)',
-  neutral: 'var(--ds-text-tertiary)',
-}
-
 // ── Activity row ────────────────────────────────────────────────
 function ActivityRow({ payment, isLast }: { payment: ConvexPayment; isLast: boolean }) {
   return (
@@ -195,34 +179,6 @@ function ActivityRow({ payment, isLast }: { payment: ConvexPayment; isLast: bool
       </span>
       <span className="text-[11.5px] tabular-nums" style={{ color: 'var(--ds-text-tertiary)', fontFamily: 'monospace' }}>
         {payment.dateLabel}
-      </span>
-    </div>
-  )
-}
-
-function DemoActivityRow({ item, isLast }: { item: typeof DEMO_ACTIVITIES[0]; isLast: boolean }) {
-  return (
-    <div
-      className="grid gap-3.5 items-center py-[11px]"
-      style={{
-        gridTemplateColumns: '14px 36px 1fr auto auto',
-        borderBottom: isLast ? 'none' : `1px solid var(--ds-border)`,
-        fontSize: '13px',
-      }}
-    >
-      <span className="w-[7px] h-[7px] rounded-full justify-self-center" style={{ background: DOT_COLORS[item.dot] ?? 'var(--ds-text-tertiary)' }} />
-      <span className="font-semibold text-[11.5px] px-[7px] py-[3px] rounded-[5px] text-center tabular-nums" style={{ background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-primary)' }}>
-        {item.table}
-      </span>
-      <span style={{ color: 'var(--ds-text-primary)', fontWeight: 500 }}>
-        {item.action}{' '}
-        <span style={{ color: 'var(--ds-text-tertiary)', fontWeight: 400 }}>{item.meta}</span>
-      </span>
-      <span className="font-bold tabular-nums" style={{ color: item.amountColor, fontSize: '13px' }}>
-        {item.amount}
-      </span>
-      <span className="text-[11.5px] tabular-nums" style={{ color: 'var(--ds-text-tertiary)', fontFamily: 'monospace' }}>
-        {item.time}
       </span>
     </div>
   )
@@ -342,6 +298,22 @@ export function Overview() {
   const payments = (rawPayments ?? []) as ConvexPayment[]
   const recentPayments = payments.slice(0, 6)
 
+  // ── Croissance réelle vs hier (null si pas de CA hier → "—") ──
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
+  const startOfYesterday = startOfToday.getTime() - 86400000
+  const yesterdayCA = payments
+    .filter(p => p.status === 'Encaissé' && p.createdAt >= startOfYesterday && p.createdAt < startOfToday.getTime())
+    .reduce((s, p) => s + p.totalCents, 0)
+  const caDeltaPct = deltaPct(caTotal, yesterdayCA)
+
+  // ── Réputation réelle (score = note moyenne ramenée sur 100) ──
+  const negCount  = feedbacks.filter(f => f.stars <= 3).length
+  const topCount  = feedbacks.filter(f => f.stars >= 5).length
+  const avgNum    = avgRating !== null ? parseFloat(avgRating) : null
+  const repScore  = avgNum !== null ? Math.round(avgNum * 20) : null
+  const notePct      = avgNum !== null ? Math.round((avgNum / 5) * 100) : 0
+  const interceptPct = feedbacks.length > 0 ? Math.round((negCount / feedbacks.length) * 100) : 0
+
   return (
     <RestaurantLayout>
       <PageHeader
@@ -376,14 +348,19 @@ export function Overview() {
               </div>
             </div>
             <div className="flex items-center gap-1.5 text-[12px] ds-text-secondary">
-              {caTotal > 0 ? (
+              {caTotal > 0 && caDeltaPct !== null ? (
                 <>
-                  <span className="inline-flex items-center gap-0.5 font-semibold ds-text-success-strong">
+                  <span
+                    className={`inline-flex items-center gap-0.5 font-semibold ${caDeltaPct >= 0 ? 'ds-text-success-strong' : ''}`}
+                    style={caDeltaPct < 0 ? { color: 'var(--ds-error-strong)' } : undefined}
+                  >
                     <TrendingUp size={12} />
-                    +{Math.round((caTotal / Math.max(caTotal * 0.88, 1) - 1) * 100)}%
+                    {caDeltaPct >= 0 ? '+' : ''}{caDeltaPct}%
                   </span>
                   <span>vs hier</span>
                 </>
+              ) : caTotal > 0 ? (
+                <span>Pas de CA hier pour comparer</span>
               ) : (
                 <span>Aucune vente aujourd'hui</span>
               )}
@@ -433,7 +410,7 @@ export function Overview() {
             </div>
           </div>
 
-          {/* Score Splitzy — placeholder Phase 1 */}
+          {/* Score Splitzy — dérivé des feedbacks réels ("—" si aucun) */}
           <div className="ds-panel flex flex-col gap-3 p-5 min-h-[132px] relative overflow-hidden">
             <div
               className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
@@ -450,24 +427,25 @@ export function Overview() {
                   <circle cx="36" cy="36" r="28" fill="none" stroke="var(--ds-bg-subtle)" strokeWidth="6"
                     strokeLinecap="round" strokeDasharray="132 176" strokeDashoffset="0" />
                   <circle cx="36" cy="36" r="28" fill="none" stroke="#E8920A" strokeWidth="6"
-                    strokeLinecap="round" strokeDasharray="115 176" strokeDashoffset="0" />
+                    strokeLinecap="round" strokeDasharray={`${Math.round(((repScore ?? 0) / 100) * 132)} 176`} strokeDashoffset="0" />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-0">
                   <div
                     className="font-black leading-none tabular-nums tracking-[-0.04em]"
                     style={{ fontSize: '20px', color: 'var(--ds-text-primary)', fontFamily: 'Inter, sans-serif' }}
                   >
-                    87
+                    {repScore ?? '—'}
                   </div>
                   <div className="text-[9.5px] font-semibold ds-text-tertiary mt-[2px]">/ 100</div>
                 </div>
               </div>
               <div className="flex flex-col gap-1 min-w-0 flex-1">
-                <div className="font-bold text-[13px] tracking-[-0.015em] ds-text-primary">Très bon</div>
+                <div className="font-bold text-[13px] tracking-[-0.015em] ds-text-primary">
+                  {repScore === null ? 'Aucun feedback' : repScore >= 80 ? 'Très bon' : repScore >= 60 ? 'Bon' : 'À surveiller'}
+                </div>
                 {[
-                  { label: 'Note', pct: 84 },
-                  { label: 'Google', pct: 78 },
-                  { label: 'Intercep.', pct: 92 },
+                  { label: 'Note', pct: notePct },
+                  { label: 'Intercep.', pct: interceptPct },
                 ].map(row => (
                   <div key={row.label} className="flex items-center gap-1.5 text-[10.5px] ds-text-tertiary">
                     <span className="w-[38px] flex-shrink-0">{row.label}</span>
@@ -606,15 +584,19 @@ export function Overview() {
               <div className="px-5 pt-4 pb-[18px]">
                 <div className="grid grid-cols-2 gap-3.5 mb-3">
                   {[
+                    // Pas d'intégration Google Business : aucune note Google réelle à
+                    // afficher — "—" tant que la connexion n'existe pas.
                     {
                       label: 'Note Google',
-                      value: avgRating ? String(avgRating) : '4,3',
-                      delta: '+0,1 ce mois',
+                      value: '—',
+                      delta: 'non connecté',
+                      hasDelta: false,
                     },
                     {
                       label: 'Note Splitzy',
-                      value: avgRating ?? '4,7',
-                      delta: '+0,3 ce mois',
+                      value: avgRating ?? '—',
+                      delta: `${feedbacks.length} avis`,
+                      hasDelta: feedbacks.length > 0,
                     },
                   ].map(cell => (
                     <div
@@ -632,8 +614,10 @@ export function Overview() {
                         {cell.value}
                         <Star size={18} fill="#E8920A" style={{ color: '#E8920A' }} />
                       </div>
-                      <div className="flex items-center gap-[3px] mt-1 text-[11.5px] font-semibold ds-text-success-strong">
-                        <TrendingUp size={11} />
+                      <div
+                        className={`flex items-center gap-[3px] mt-1 text-[11.5px] font-semibold ${cell.hasDelta ? 'ds-text-success-strong' : 'ds-text-tertiary'}`}
+                      >
+                        {cell.hasDelta && <TrendingUp size={11} />}
                         {cell.delta}
                       </div>
                     </div>
@@ -652,7 +636,7 @@ export function Overview() {
                       className="font-extrabold text-[18px] leading-none tabular-nums tracking-[-0.02em]"
                       style={{ color: 'var(--ds-error)', fontFamily: 'Inter, sans-serif' }}
                     >
-                      {feedbacks.filter(f => f.stars <= 3).length || 12}
+                      {negCount}
                     </span>
                     <span className="text-[11px] leading-[1.3] ds-text-secondary">
                       Feedbacks<br />interceptés
@@ -664,7 +648,7 @@ export function Overview() {
                       className="font-extrabold text-[18px] leading-none tabular-nums tracking-[-0.02em]"
                       style={{ color: 'var(--ds-success)', fontFamily: 'Inter, sans-serif' }}
                     >
-                      {feedbacks.filter(f => f.stars >= 5).length || 4}
+                      {topCount}
                     </span>
                     <span className="text-[11px] leading-[1.3] ds-text-secondary">
                       Transformés<br />en 5★ Google
@@ -691,9 +675,11 @@ export function Overview() {
               ? recentPayments.slice(0, 6).map((p, i) => (
                   <ActivityRow key={i} payment={p} isLast={i === Math.min(recentPayments.length, 6) - 1} />
                 ))
-              : DEMO_ACTIVITIES.map((item, i) => (
-                  <DemoActivityRow key={i} item={item} isLast={i === DEMO_ACTIVITIES.length - 1} />
-                ))
+              : (
+                <div className="py-8 text-center text-[12.5px]" style={{ color: 'var(--ds-text-tertiary)' }}>
+                  Aucune activité pour le moment — les paiements Splitzy apparaîtront ici en temps réel.
+                </div>
+              )
             }
           </div>
         </Panel>

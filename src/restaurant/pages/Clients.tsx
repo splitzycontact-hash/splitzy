@@ -975,16 +975,9 @@ export function Clients() {
             ))
           )}
 
-          {/* Pagination */}
+          {/* Footer (pas de pagination factice — tout est affiché) */}
           <div className="flex items-center justify-between px-5 py-3 border-t" style={{ borderColor: 'var(--ds-border)' }}>
             <span className="text-[12px] ds-text-tertiary">{visible.length} clients</span>
-            <div className="flex items-center gap-1">
-              {[1, 2].map(p => (
-                <button key={p} className="w-7 h-7 rounded-md text-[12px] font-medium" style={{ background: p === 1 ? '#E8920A' : 'none', color: p === 1 ? 'white' : 'var(--ds-text-secondary)' }}>
-                  {p}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
