@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
@@ -26,9 +26,34 @@ type ConvexPayment = {
   createdAt: number; status: string; guests: number; tableNumber: number
 }
 
+// Mesure la largeur réelle du conteneur pour rendre les SVG de charts à l'échelle
+// 1:1 (viewBox = pixels). Sans ça, preserveAspectRatio="none" étire les <text>.
+function useMeasuredWidth(fallback: number) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(fallback)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width
+      if (w) setWidth(Math.round(w))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return [ref, width] as const
+}
+
+// Géométrie du graphe CA principal (coordonnées = pixels réels)
+const CHART_H = 220
+const CHART_BASE = 188
+const CHART_SPAN = 148
+const CHART_PAD_L = 46
+const CHART_PAD_R = 16
+
 function Sparkline({ path, color = '#E8920A' }: { path: string; color?: string }) {
   return (
-    <svg width="60" height="22" viewBox="0 0 60 22" fill="none" style={{ position: 'absolute', bottom: 14, right: 14, opacity: 0.9 }}>
+    <svg width="60" height="22" viewBox="0 0 60 22" fill="none" className="hidden sm:block" style={{ position: 'absolute', bottom: 14, right: 14, opacity: 0.9 }}>
       <path d={path} stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
     </svg>
   )
@@ -237,6 +262,8 @@ export function Analytics() {
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd]     = useState('')
   const [hovered, setHovered]         = useState<{ x: number; y: number; day: string; total: number } | null>(null)
+  const [chartRef, chartW]            = useMeasuredWidth(920)
+  const [tipsRef, tipsW]              = useMeasuredWidth(300)
   const restaurantId   = useRestaurantId()
   const restaurant     = useRestaurant()
   const rawPayments    = useQuery(api.payments.list,              restaurantId ? { restaurantId } : 'skip')
@@ -355,12 +382,13 @@ export function Analytics() {
   const chartMax = Math.max(...chartDays.map(d => d.total), 1)
   const chartPic = chartDays.reduce((m, d) => d.total > m.total ? d : m, { day: '—', total: 0 })
   const chartAvg = chartDays.length > 0 ? chartDays.reduce((s, d) => s + d.total, 0) / chartDays.length : 0
+  const chartPlotW = Math.max(chartW - CHART_PAD_L - CHART_PAD_R, 1)
   const chartPts = chartDays.map((d, i) => ({
-    x: Math.round(40 + (i / Math.max(chartDays.length - 1, 1)) * 860),
-    y: Math.round(210 - (d.total / chartMax) * 170),
+    x: Math.round(CHART_PAD_L + (i / Math.max(chartDays.length - 1, 1)) * chartPlotW),
+    y: Math.round(CHART_BASE - (d.total / chartMax) * CHART_SPAN),
   }))
   const chartLinePath = smoothLinePath(chartPts)
-  const chartAreaPath = smoothAreaPath(chartPts, 210)
+  const chartAreaPath = smoothAreaPath(chartPts, CHART_BASE)
   const MONTH_NAMES_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
   const MONTH_NAMES_SHORT = ['Jan.','Fév.','Mars','Avr.','Mai','Juin','Juil.','Août','Sep.','Oct.','Nov.','Déc.']
 
@@ -411,7 +439,7 @@ export function Analytics() {
     if (period === 'year') return `Comparaison ${now.getFullYear()} vs. ${now.getFullYear() - 1}`
     return 'Évolution de la période sélectionnée'
   })()
-  const tooltipX = hovered ? Math.min(Math.max(hovered.x, 50), 870) : 0
+  const tooltipX = hovered ? Math.min(Math.max(hovered.x, 50), chartW - 50) : 0
   const tooltipY = hovered ? Math.max(hovered.y - 42, 8) : 0
 
   const weekTotal = encaisse.reduce((s, p) => s + p.totalCents, 0)
@@ -436,7 +464,7 @@ export function Analytics() {
     return sub > 0 ? w.reduce((a, p) => a + p.tipCents, 0) / sub * 100 : 0
   }), [allEncaisse])
   const twMax = Math.max(...tipWkly, 0.1)
-  const twPath = tipWkly.map((v, i) => (i ? 'L' : 'M') + (i / 11 * 300).toFixed(1) + ' ' + (65 - v / twMax * 55).toFixed(1)).join(' ')
+  const twPath = tipWkly.map((v, i) => (i ? 'L' : 'M') + (i / 11 * tipsW).toFixed(1) + ' ' + (57 - v / twMax * 48).toFixed(1)).join(' ')
 
   const tipVsBase = tipsTotal > 0 ? Math.round((parseFloat(avgTipPct) - 6.2) / 6.2 * 100) : 0
 
@@ -604,7 +632,7 @@ export function Analytics() {
               <div className="text-[11px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">{kpi.label}</div>
               <div
                 className="font-extrabold tabular-nums leading-none tracking-[-0.035em] mt-auto"
-                style={{ fontSize: '28px', color: kpi.accent ? 'var(--ds-accent)' : 'var(--ds-text-primary)', fontFamily: 'Inter, sans-serif' }}
+                style={{ fontSize: '28px', color: kpi.accent ? 'var(--ds-accent)' : 'var(--ds-text-primary)' }}
               >
                 {kpi.value}
                 {'suffix' in kpi && kpi.suffix && (
@@ -666,11 +694,11 @@ export function Analytics() {
               </div>
             </div>
           </div>
-          <div className="p-5 pb-2">
+          <div className="p-5 pb-2" ref={chartRef}>
             <svg
-              viewBox="0 0 920 260"
+              viewBox={`0 0 ${chartW} ${CHART_H}`}
               preserveAspectRatio="none"
-              style={{ width: '100%', height: '220px', display: 'block' }}
+              style={{ width: '100%', height: `${CHART_H}px`, display: 'block', fontVariantNumeric: 'tabular-nums' }}
               onMouseLeave={() => setHovered(null)}
             >
               <defs>
@@ -693,26 +721,26 @@ export function Analytics() {
                   </feMerge>
                 </filter>
               </defs>
-              <rect width="920" height="220" y="10" fill="url(#analyticsGrid)" />
+              <rect width={chartW} height={CHART_BASE - 8} y="8" fill="url(#analyticsGrid)" />
               {chartDays.length > 0 && (
-                <g fontFamily="Inter" fontSize="10.5" fill="var(--ds-text-tertiary)">
+                <g fontSize="10" fill="var(--ds-text-tertiary)">
                   {[1, 0.75, 0.5, 0.25, 0].map((f, i) => {
                     const val = chartMax * f
-                    const y = Math.round(210 - f * 170) + 4
+                    const y = Math.round(CHART_BASE - f * CHART_SPAN) + 3
                     const label = val >= 1000 ? `${(val / 1000).toFixed(1)}k€` : `${Math.round(val)}€`
                     return <text key={i} x="8" y={y}>{label}</text>
                   })}
                 </g>
               )}
-              <line x1="40" y1="210" x2="900" y2="210" stroke="var(--ds-border)" strokeWidth="1" />
+              <line x1={CHART_PAD_L - 6} y1={CHART_BASE} x2={chartW - CHART_PAD_R} y2={CHART_BASE} stroke="var(--ds-border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
               {chartDays.length === 0 ? (
                 <g>
-                  <circle cx="460" cy="105" r="28" fill="var(--ds-bg-subtle)" />
-                  <text x="460" y="101" textAnchor="middle" fontFamily="Inter" fontSize="18" fill="var(--ds-border-strong)">📊</text>
-                  <text x="460" y="130" textAnchor="middle" fontFamily="Inter" fontSize="13" fontWeight="600" fill="var(--ds-text-secondary)">
+                  <circle cx={chartW / 2} cy="92" r="28" fill="var(--ds-bg-subtle)" />
+                  <text x={chartW / 2} y="98" textAnchor="middle" fontSize="18" fill="var(--ds-border-strong)">📊</text>
+                  <text x={chartW / 2} y="140" textAnchor="middle" fontSize="13" fontWeight="600" fill="var(--ds-text-secondary)">
                     Aucune donnée pour cette période
                   </text>
-                  <text x="460" y="148" textAnchor="middle" fontFamily="Inter" fontSize="11" fill="var(--ds-text-tertiary)">
+                  <text x={chartW / 2} y="158" textAnchor="middle" fontSize="11" fill="var(--ds-text-tertiary)">
                     Les données apparaîtront au fil des paiements
                   </text>
                 </g>
@@ -728,6 +756,7 @@ export function Analytics() {
                     strokeLinejoin="round"
                     strokeDasharray={isShowingPrev ? '6 3' : undefined}
                     filter={isShowingPrev ? undefined : 'url(#lineGlow)'}
+                    vectorEffect="non-scaling-stroke"
                   />
                   {chartPts.map((pt, i) => (
                     <circle
@@ -748,28 +777,28 @@ export function Analytics() {
                   ))}
                   {hovered && (
                     <>
-                      <circle cx={hovered.x} cy={hovered.y} r="5" fill="white" stroke={isShowingPrev ? '#71717A' : '#E8920A'} strokeWidth="2.5" />
-                      <line x1={hovered.x} y1={hovered.y + 7} x2={hovered.x} y2="210"
-                        stroke={isShowingPrev ? '#71717A' : '#E8920A'} strokeWidth="1" strokeDasharray="3 3" opacity="0.4" />
+                      <circle cx={hovered.x} cy={hovered.y} r="5" fill="var(--ds-bg-surface)" stroke={isShowingPrev ? '#71717A' : '#E8920A'} strokeWidth="2.5" />
+                      <line x1={hovered.x} y1={hovered.y + 7} x2={hovered.x} y2={CHART_BASE}
+                        stroke={isShowingPrev ? '#71717A' : '#E8920A'} strokeWidth="1" strokeDasharray="3 3" opacity="0.4" vectorEffect="non-scaling-stroke" />
                       <rect x={tooltipX - 44} y={tooltipY} width="88" height="36" rx="8"
                         fill="#18181B" stroke={isShowingPrev ? '#3F3F46' : '#E8920A'} strokeWidth="1" opacity="0.95" />
                       <text x={tooltipX} y={tooltipY + 14} textAnchor="middle"
-                        fontFamily="Inter" fontSize="12" fontWeight="700"
+                        fontSize="12" fontWeight="700"
                         fill={isShowingPrev ? '#A1A1AA' : '#E8920A'}>
                         {hovered.total.toFixed(2)}€
                       </text>
                       <text x={tooltipX} y={tooltipY + 27} textAnchor="middle"
-                        fontFamily="Inter" fontSize="10" fill="#71717A">
+                        fontSize="10" fill="#A1A1AA">
                         {hovered.day}
                       </text>
                     </>
                   )}
-                  <g fontFamily="Inter" fontSize="10" fill="var(--ds-text-tertiary)">
+                  <g fontSize="10" fill="var(--ds-text-tertiary)">
                     {chartPts.map((pt, i) => {
                       const step = Math.max(1, Math.ceil(chartDays.length / 7))
                       if (i % step !== 0 && i !== chartPts.length - 1) return null
                       return (
-                        <text key={i} x={pt.x} y="232" textAnchor="middle">
+                        <text key={i} x={pt.x} y={CHART_BASE + 18} textAnchor="middle">
                           {chartDays[i].day.split('/')[0]}
                         </text>
                       )
@@ -800,7 +829,7 @@ export function Analytics() {
                 <div key={row.t} className="flex items-center gap-3">
                   <span
                     className="font-bold text-[11.5px] w-7 text-center rounded-[5px] py-[2px] flex-shrink-0"
-                    style={{ background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-primary)', fontFamily: 'Inter, sans-serif' }}
+                    style={{ background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-primary)' }}
                   >
                     {row.t}
                   </span>
@@ -849,7 +878,7 @@ export function Analytics() {
                 <div className="w-7" />
                 <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${HEAT_HOURS.length}, 1fr)` }}>
                   {HEAT_HOURS.map(h => (
-                    <div key={h} className="text-center text-[9.5px] ds-text-tertiary">{h}</div>
+                    <div key={h} className="text-center text-[10px] tabular-nums ds-text-tertiary">{h}</div>
                   ))}
                 </div>
               </div>
@@ -911,7 +940,7 @@ export function Analytics() {
                 <div>
                   <div
                     className="font-extrabold tabular-nums leading-none tracking-[-0.04em]"
-                    style={{ fontSize: '40px', color: 'var(--ds-accent)', fontFamily: 'Inter, sans-serif' }}
+                    style={{ fontSize: '40px', color: 'var(--ds-accent)' }}
                   >
                     {avgTipPct}%
                   </div>
@@ -921,19 +950,19 @@ export function Analytics() {
                     <span className="ds-text-tertiary">{tipVsBase > 0 ? '+' + tipVsBase + '%' : '—'} vs. avant Splitzy</span>
                   </div>
                 </div>
-                <div className="flex-1">
-                  <svg viewBox="0 0 300 80" preserveAspectRatio="none" style={{ width: '100%', height: '70px' }}>
+                <div className="flex-1" ref={tipsRef}>
+                  <svg viewBox={`0 0 ${tipsW} 70`} preserveAspectRatio="none" style={{ width: '100%', height: '70px', display: 'block', fontVariantNumeric: 'tabular-nums', overflow: 'visible' }}>
                     <defs>
                       <linearGradient id="tipsFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#E8920A" stopOpacity="0.2" />
                         <stop offset="100%" stopColor="#E8920A" stopOpacity="0" />
                       </linearGradient>
                     </defs>
-                    <line x1="0" y1="55" x2="300" y2="55" stroke="var(--ds-border)" strokeWidth="1" strokeDasharray="2 3" />
-                    <text x="300" y="52" fontFamily="Inter" fontSize="9.5" fill="var(--ds-text-tertiary)" textAnchor="end">secteur 6,2%</text>
-                    <path d={twPath + ' L300 80 L0 80 Z'} fill="url(#tipsFill)" />
-                    <path d={twPath} stroke="#E8920A" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="300" cy={String((65 - tipWkly[11] / twMax * 55).toFixed(1))} r="3.5" fill="white" stroke="#E8920A" strokeWidth="2" />
+                    <line x1="0" y1="48" x2={tipsW} y2="48" stroke="var(--ds-border)" strokeWidth="1" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+                    <text x={tipsW} y="44" fontSize="10" fill="var(--ds-text-tertiary)" textAnchor="end">secteur 6,2%</text>
+                    <path d={twPath + ` L${tipsW} 70 L0 70 Z`} fill="url(#tipsFill)" />
+                    <path d={twPath} stroke="#E8920A" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                    <circle cx={tipsW} cy={(57 - tipWkly[11] / twMax * 48).toFixed(1)} r="3.5" fill="var(--ds-bg-surface)" stroke="#E8920A" strokeWidth="2" />
                   </svg>
                 </div>
               </div>
@@ -974,7 +1003,7 @@ export function Analytics() {
               </div>
               <div
                 className="font-extrabold tracking-[-0.04em] leading-none tabular-nums"
-                style={{ fontSize: '48px', color: 'white', fontFamily: 'Inter, sans-serif' }}
+                style={{ fontSize: '48px', color: 'white' }}
               >
                 {allEncaisse.length > 0 ? fmtR(roi) : '0€'}
               </div>
