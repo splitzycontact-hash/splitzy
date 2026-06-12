@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 import {
-  X, RefreshCw, Eye, Send, MoreHorizontal, Plus, Bell,
+  X, RefreshCw, Eye, Send, Plus, Minus, Bell,
   RotateCcw, Receipt, Play, Timer, AlertTriangle, CheckCircle2,
-  QrCode, Search,
+  QrCode, Search, Trash2,
 } from 'lucide-react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -12,19 +12,23 @@ import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
 import { formatEur } from '../../utils/formatCurrency'
-import { paidPct, perGuestCents, avgBasketCents } from '../lib/billing'
+import { paidPct, perGuestCents, avgBasketCents, remainingCents } from '../lib/billing'
 
 type TableStatus = 'free' | 'dining' | 'payment' | 'paid'
 type FilterKey   = 'all' | TableStatus
 
+type OrderLine = { name: string; qty: number; unitCents: number; paid?: boolean }
 type TableData = {
   id: number; status: TableStatus
   guests?: number; durationMinutes?: number
   amountCents?: number; paidCents?: number; paidTipCents?: number
   paidGuests?: number
+  sittingStartedAt?: number
+  orderItems?: OrderLine[]
   alert?: boolean; convexId: Id<'tables'> | null
 }
 type SimItem = { name: string; qty: number; unitCents: number }
+type MenuDoc = { name: string; priceCents: number; category?: string; emoji?: string; isAvailable?: boolean }
 
 function durationLabel(minutes?: number): string {
   if (!minutes) return ''
@@ -32,6 +36,27 @@ function durationLabel(minutes?: number): string {
   const h = Math.floor(minutes / 60); const m = minutes % 60
   return m > 0 ? `${h}h${String(m).padStart(2,'0')}` : `${h}h`
 }
+
+function startTimeLabel(ts: number): string {
+  return new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  entrees: 'Entrées', plats: 'Plats', desserts: 'Desserts', boissons: 'Boissons',
+}
+
+// Carte démo affichée dans le modal "Ajouter un article" quand le restaurant
+// n'a aucun menu Convex (même convention que DEMO_ITEMS de MenuPage : données
+// d'illustration, bannière explicite). L'ajout n'écrit que des lignes de
+// commande (snapshot nom/prix) — il ne crée jamais d'articles dans `menuItems`.
+const DEMO_MENU: MenuDoc[] = [
+  { name: 'Momos Poulet',            priceCents: 890,  category: 'entrees',  emoji: '🥗' },
+  { name: 'Nems Boeuf',              priceCents: 790,  category: 'entrees',  emoji: '🥗' },
+  { name: 'Pad thaï crevettes',      priceCents: 1490, category: 'plats',    emoji: '🍽' },
+  { name: 'Bo bun boeuf',            priceCents: 1390, category: 'plats',    emoji: '🍽' },
+  { name: 'Mochi glacés (3 pièces)', priceCents: 650,  category: 'desserts', emoji: '🍮' },
+  { name: 'Thé vert japonais',       priceCents: 550,  category: 'boissons', emoji: '🍷' },
+]
 
 function generateOrder(menu: { name: string; priceCents: number }[]): SimItem[] {
   if (menu.length === 0) return []
@@ -115,7 +140,7 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
           </div>
           <div className="text-[11.5px] mt-0.5" style={{ color: status === 'dining' || status === 'paid' ? '#71717A' : 'var(--ds-text-tertiary)' }}>
             {guests} convives · Salle
-            {status !== 'free' && <span> · {status === 'paid' ? '10h34' : '09:58'}</span>}
+            {status !== 'free' && table.sittingStartedAt && <span> · {startTimeLabel(table.sittingStartedAt)}</span>}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -246,16 +271,16 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
         </span>
         <div className="flex items-center gap-1">
           {status === 'payment' ? (
-            <><IconBtn icon={Eye} label="Voir" onClick={onView} /><IconBtn icon={Send} label="Relancer" onClick={onSend} /><IconBtn icon={MoreHorizontal} label="Options" /></>
+            <><IconBtn icon={Eye} label="Voir" onClick={onView} />{role !== 'viewer' && <IconBtn icon={Plus} label="Ajouter" onClick={onAdd} />}<IconBtn icon={Send} label="Relancer" onClick={onSend} /></>
           ) : status === 'paid' ? (
             <><IconBtn icon={Eye} label="Voir" onClick={onView} /><IconBtn icon={Receipt} label="Reçu" /><IconBtn icon={RotateCcw} label="Libérer" /></>
           ) : status === 'dining' && table.alert ? (
-            <><IconBtn icon={Bell} label="Notifier" /><IconBtn icon={Send} label="Relancer" onClick={onSend} /><IconBtn icon={MoreHorizontal} label="Options" /></>
+            <><IconBtn icon={Bell} label="Notifier" />{role !== 'viewer' && <IconBtn icon={Plus} label="Ajouter" onClick={onAdd} />}<IconBtn icon={Send} label="Relancer" onClick={onSend} /></>
           ) : status === 'dining' ? (
-            <><IconBtn icon={Eye} label="Voir" onClick={onView} /><IconBtn icon={Plus} label="Ajouter" onClick={onAdd} /><IconBtn icon={Send} label="Demander paiement" onClick={onSend} /></>
-          ) : (
-            <IconBtn icon={Play} label="Ouvrir" />
-          )}
+            <><IconBtn icon={Eye} label="Voir" onClick={onView} />{role !== 'viewer' && <IconBtn icon={Plus} label="Ajouter" onClick={onAdd} />}<IconBtn icon={Send} label="Demander paiement" onClick={onSend} /></>
+          ) : role !== 'viewer' ? (
+            <IconBtn icon={Play} label="Ouvrir" onClick={onAdd} />
+          ) : null}
         </div>
       </div>
 
@@ -292,11 +317,12 @@ export function Tables() {
   const resetToFree  = useMutation(api.tables.resetToFree)
   const updateStatus = useMutation(api.tables.updateStatus)
 
-  const menu = (rawMenu ?? []) as { name: string; priceCents: number }[]
+  const menu = (rawMenu ?? []) as MenuDoc[]
 
   type ConvexTable = {
     _id: Id<'tables'>; number: number; status: TableStatus;
-    guests?: number; durationMinutes?: number; amountCents?: number; paidCents?: number; paidTipCents?: number; alert?: boolean
+    guests?: number; durationMinutes?: number; amountCents?: number; paidCents?: number; paidTipCents?: number;
+    sittingStartedAt?: number; orderItems?: OrderLine[]; alert?: boolean
   }
 
   // Convives payeurs de la sitting courante : paiements Encaissé de la table,
@@ -321,6 +347,7 @@ export function Tables() {
         durationMinutes: t.durationMinutes, amountCents: t.amountCents,
         paidCents: t.paidCents, paidTipCents: t.paidTipCents,
         paidGuests: sittingPayerCount(t._id, t.paidCents ?? 0),
+        sittingStartedAt: t.sittingStartedAt, orderItems: t.orderItems,
         alert: t.alert, convexId: t._id,
       }))
     : []
@@ -375,6 +402,9 @@ export function Tables() {
   }
   const simTotal = simItems.reduce((s, i) => s + i.qty * i.unitCents, 0)
   const liveSelected = selectedTable ? (tables.find(t => t.convexId === selectedTable.convexId) ?? selectedTable) : null
+  // Version live de la table du modal d'ajout — les lignes/montants restent
+  // frais pendant que le modal est ouvert (ajouts/retraits réactifs).
+  const liveAdd = addModal ? (tables.find(t => t.convexId === addModal.convexId) ?? addModal) : null
 
   return (
     <RestaurantLayout>
@@ -560,27 +590,16 @@ export function Tables() {
           </m.div>
         )}
       </AnimatePresence>
-      {/* Phase 2 modal */}
+      {/* Add item modal */}
       <AnimatePresence>
-        {addModal && (
-          <m.div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={e => { if (e.target === e.currentTarget) setAddModal(null) }}>
-            <m.div className="rounded-2xl overflow-hidden w-[380px] max-w-full" style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }} initial={{ scale: 0.95, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 12 }} transition={{ type: 'spring', stiffness: 300, damping: 28 }}>
-              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
-                <span className="text-sm font-bold ds-text-primary">Ajouter un article — Table {addModal.id}</span>
-                <button onClick={() => setAddModal(null)} className="ds-text-tertiary hover:ds-text-primary"><X size={16} /></button>
-              </div>
-              <div className="px-5 py-8 flex flex-col items-center gap-3 text-center">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--ds-accent-soft)' }}>
-                  <Plus size={20} style={{ color: '#E8920A' }} />
-                </div>
-                <p className="text-sm ds-text-primary font-semibold">Fonctionnalité Phase 2</p>
-                <p className="text-[13px] ds-text-secondary leading-[1.5] max-w-[260px]">L'ajout d'articles depuis le dashboard arrivera dans une prochaine version. Les commandes sont saisies via Square ou le menu QR.</p>
-              </div>
-              <div className="px-5 pb-5">
-                <button onClick={() => setAddModal(null)} className="w-full rounded-xl text-sm font-semibold py-2.5" style={{ background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-secondary)' }}>Fermer</button>
-              </div>
-            </m.div>
-          </m.div>
+        {liveAdd && (
+          <AddItemModal
+            key={String(liveAdd.convexId)}
+            table={liveAdd}
+            menu={menu}
+            menuLoading={rawMenu === undefined}
+            onClose={() => setAddModal(null)}
+          />
         )}
       </AnimatePresence>
 
@@ -640,5 +659,268 @@ export function Tables() {
         )}
       </AnimatePresence>
     </RestaurantLayout>
+  )
+}
+
+// ── Modal "Ajouter un article" ────────────────────────────────
+// Menu réel du restaurant (Convex), recherche, quantités, commande en cours
+// avec annulation de lignes non payées. Table libre → ouverture de la sitting
+// (couverts + heure de début). Table réglée → refus : la sitting est close et
+// réconciliée avec les paiements ; il faut libérer la table pour repartir
+// propre. Menu vide → carte démo DEMO_MENU avec bannière (cohérent MenuPage).
+function AddItemModal({ table, menu, menuLoading, onClose }: {
+  table: TableData; menu: MenuDoc[]; menuLoading: boolean; onClose: () => void
+}) {
+  const [search, setSearch]     = useState('')
+  const [selection, setSel]     = useState<Record<string, number>>({})
+  const [guests, setGuests]     = useState(2)
+  const [submitting, setSubmit] = useState(false)
+  const [error, setError]       = useState<string | null>(null)
+
+  const addOrderItems   = useMutation(api.tables.addOrderItems)
+  const removeOrderItem = useMutation(api.tables.removeOrderItem)
+  const resetToFree     = useMutation(api.tables.resetToFree)
+
+  const isPaid  = table.status === 'paid'
+  const isFree  = table.status === 'free'
+  const paid    = table.paidCents ?? 0
+  const total   = table.amountCents ?? 0
+  const rest    = remainingCents(total, paid)
+
+  // Articles disponibles uniquement ; menu vide → carte démo (bannière dédiée)
+  const liveMenu = menu.filter(it => it.isAvailable !== false)
+  const hasLiveMenu = liveMenu.length > 0
+  const sourceMenu = hasLiveMenu ? liveMenu : DEMO_MENU
+
+  const itemKey = (it: MenuDoc) => `${it.name}|${it.priceCents}`
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return q ? sourceMenu.filter(it => it.name.toLowerCase().includes(q)) : sourceMenu
+  }, [sourceMenu, search])
+
+  const grouped = useMemo(() => {
+    const order = ['entrees', 'plats', 'desserts', 'boissons']
+    const byCat = new Map<string, MenuDoc[]>()
+    for (const it of visible) {
+      const cat = it.category && CATEGORY_LABELS[it.category] ? it.category : 'plats'
+      byCat.set(cat, [...(byCat.get(cat) ?? []), it])
+    }
+    return order.filter(c => byCat.has(c)).map(c => ({ cat: c, items: byCat.get(c)! }))
+  }, [visible])
+
+  const setQty = (key: string, qty: number) => {
+    setSel(prev => {
+      const next = { ...prev }
+      if (qty <= 0) delete next[key]
+      else next[key] = Math.min(99, qty)
+      return next
+    })
+  }
+
+  const pickedCount = Object.values(selection).reduce((s, q) => s + q, 0)
+  const pickedCents = sourceMenu.reduce((s, it) => s + (selection[itemKey(it)] ?? 0) * it.priceCents, 0)
+
+  async function confirm() {
+    if (!table.convexId || pickedCount === 0) return
+    const items = sourceMenu
+      .filter(it => (selection[itemKey(it)] ?? 0) > 0)
+      .map(it => ({ name: it.name, qty: selection[itemKey(it)], unitCents: it.priceCents }))
+    setSubmit(true); setError(null)
+    try {
+      await addOrderItems({
+        tableId: table.convexId,
+        items,
+        ...(isFree ? { guests } : {}),
+      })
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur lors de l'ajout")
+    } finally { setSubmit(false) }
+  }
+
+  async function removeLine(index: number, line: OrderLine) {
+    if (!table.convexId) return
+    setError(null)
+    try {
+      await removeOrderItem({
+        tableId: table.convexId,
+        index, name: line.name, unitCents: line.unitCents,
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Annulation impossible')
+    }
+  }
+
+  return (
+    <m.div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <m.div className="rounded-2xl overflow-hidden w-[440px] max-w-full flex flex-col" style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)', maxHeight: 'min(640px, calc(100vh - 48px))' }} initial={{ scale: 0.95, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 12 }} transition={{ type: 'spring', stiffness: 300, damping: 28 }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+          <div className="flex items-center gap-2.5">
+            <span className="text-sm font-bold ds-text-primary">Ajouter un article — Table {table.id}</span>
+            <StatusBadge status={table.status} />
+          </div>
+          <button onClick={onClose} className="ds-text-tertiary hover:ds-text-primary" aria-label="Fermer"><X size={16} /></button>
+        </div>
+
+        {isPaid ? (
+          <>
+            <div className="px-5 py-7 flex flex-col items-center gap-3 text-center">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--ds-success-soft)' }}>
+                <CheckCircle2 size={20} style={{ color: '#22C55E' }} />
+              </div>
+              <p className="text-sm ds-text-primary font-semibold">Table déjà réglée</p>
+              <p className="text-[13px] ds-text-secondary leading-[1.5] max-w-[300px]">
+                L'addition de cette sitting est close et réconciliée avec les paiements.
+                Libérez la table pour démarrer une nouvelle commande.
+              </p>
+            </div>
+            <div className="flex gap-2 px-5 pb-5">
+              <button onClick={onClose} className="flex-1 rounded-xl border text-sm font-semibold py-2.5" style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}>Fermer</button>
+              <button
+                onClick={() => { if (table.convexId) resetToFree({ tableId: table.convexId }).catch(() => {}) }}
+                className="flex-1 rounded-xl text-white text-sm font-semibold py-2.5"
+                style={{ background: '#E8920A' }}
+              >
+                Libérer la table
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{ overscrollBehavior: 'contain' }}>
+              {/* Contexte table */}
+              {isFree ? (
+                <div className="p-3 rounded-[10px] border space-y-2.5" style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}>
+                  <div className="text-[12.5px] ds-text-secondary">Table libre — valider l'ajout ouvre la table (statut <strong>En repas</strong>).</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12.5px] font-semibold ds-text-primary">Couverts</span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setGuests(g => Math.max(1, g - 1))} className="w-7 h-7 rounded-[7px] border flex items-center justify-center" style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }} aria-label="Moins de couverts"><Minus size={13} /></button>
+                      <span className="w-6 text-center text-sm font-bold ds-text-primary tabular-nums">{guests}</span>
+                      <button onClick={() => setGuests(g => Math.min(12, g + 1))} className="w-7 h-7 rounded-[7px] border flex items-center justify-center" style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }} aria-label="Plus de couverts"><Plus size={13} /></button>
+                    </div>
+                  </div>
+                </div>
+              ) : paid > 0 ? (
+                <div className="p-3 rounded-[10px] border" style={{ background: 'var(--ds-accent-soft)', borderColor: '#F5DDB3' }}>
+                  <span className="text-[12.5px]" style={{ color: 'var(--ds-accent-strong)' }}>
+                    Déjà encaissé <strong>{formatEur(paid)}</strong> sur {formatEur(total)} — reste <strong>{formatEur(rest)}</strong>. Les ajouts augmentent le reste à payer.
+                  </span>
+                </div>
+              ) : null}
+
+              {/* Commande en cours */}
+              {(table.orderItems?.length ?? 0) > 0 && (
+                <div>
+                  <div className="text-[10.5px] font-semibold uppercase tracking-[0.09em] ds-text-secondary mb-2">Commande en cours · {formatEur(total)}</div>
+                  <div className="rounded-[10px] border divide-y" style={{ borderColor: 'var(--ds-border)' }}>
+                    {table.orderItems!.map((line, i) => (
+                      <div key={`${line.name}-${i}`} className="flex items-center gap-2 px-3 py-2" style={{ borderColor: 'var(--ds-border)', opacity: line.paid ? 0.55 : 1 }}>
+                        <span className="flex-1 text-[13px] ds-text-primary font-medium truncate">
+                          {line.name} <span className="ds-text-tertiary font-normal">×{line.qty}</span>
+                        </span>
+                        {line.paid && (
+                          <span className="text-[10.5px] font-semibold px-1.5 py-[2px] rounded-full" style={{ background: 'var(--ds-success-soft)', color: 'var(--ds-success-strong)' }}>Payé</span>
+                        )}
+                        <span className="text-[13px] font-semibold ds-text-primary tabular-nums">{formatEur(line.qty * line.unitCents)}</span>
+                        {!line.paid && (
+                          <button onClick={() => removeLine(i, line)} className="w-6 h-6 rounded-[6px] flex items-center justify-center ds-text-tertiary hover:text-red-500" aria-label={`Annuler ${line.name}`}>
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Bannière démo */}
+              {!menuLoading && !hasLiveMenu && (
+                <div className="flex items-center gap-2 p-3 rounded-[10px] border" style={{ background: 'rgba(245,158,11,0.06)', borderColor: '#FBBF24' }}>
+                  <span className="rounded px-1.5 py-0.5 text-white text-[10px] font-bold flex-shrink-0" style={{ background: '#FBBF24' }}>DÉMO</span>
+                  <span className="text-[12px]" style={{ color: '#92400E' }}>Carte d'exemple — synchronisez votre menu (Square ou page Menu) pour vos vrais articles.</span>
+                </div>
+              )}
+
+              {/* Recherche */}
+              <div className="flex items-center gap-2 h-9 px-3 rounded-[10px] border" style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}>
+                <Search size={13} style={{ color: 'var(--ds-text-tertiary)', flexShrink: 0 }} />
+                <input
+                  type="text" value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Rechercher un article…"
+                  className="flex-1 bg-transparent border-none outline-none text-[13px] min-w-0"
+                  style={{ color: 'var(--ds-text-primary)' }}
+                />
+              </div>
+
+              {/* Menu */}
+              {menuLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#E8920A', borderTopColor: 'transparent' }} />
+                </div>
+              ) : grouped.length === 0 ? (
+                <div className="py-8 text-center text-[13px] ds-text-tertiary">—</div>
+              ) : (
+                grouped.map(({ cat, items }) => (
+                  <div key={cat}>
+                    <div className="text-[10.5px] font-semibold uppercase tracking-[0.09em] ds-text-secondary mb-2">{CATEGORY_LABELS[cat]}</div>
+                    <div className="rounded-[10px] border divide-y" style={{ borderColor: 'var(--ds-border)' }}>
+                      {items.map(it => {
+                        const key = itemKey(it)
+                        const qty = selection[key] ?? 0
+                        return (
+                          <div key={key} className="flex items-center gap-2.5 px-3 py-2" style={{ borderColor: 'var(--ds-border)' }}>
+                            <span className="flex-1 min-w-0 text-[13px] ds-text-primary font-medium truncate">
+                              {it.emoji ? `${it.emoji} ` : ''}{it.name}
+                            </span>
+                            <span className="text-[12.5px] ds-text-secondary tabular-nums flex-shrink-0">{formatEur(it.priceCents)}</span>
+                            {qty === 0 ? (
+                              <button
+                                onClick={() => setQty(key, 1)}
+                                className="h-7 px-2.5 rounded-[7px] border text-[12px] font-semibold flex items-center gap-1 flex-shrink-0"
+                                style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
+                                aria-label={`Ajouter ${it.name}`}
+                              >
+                                <Plus size={12} /> Ajouter
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <button onClick={() => setQty(key, qty - 1)} className="w-7 h-7 rounded-[7px] border flex items-center justify-center" style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }} aria-label={`Diminuer ${it.name}`}><Minus size={13} /></button>
+                                <span className="w-5 text-center text-[13px] font-bold ds-text-accent tabular-nums">{qty}</span>
+                                <button onClick={() => setQty(key, qty + 1)} className="w-7 h-7 rounded-[7px] border flex items-center justify-center" style={{ background: 'var(--ds-accent-soft)', borderColor: '#F5DDB3', color: 'var(--ds-accent-strong)' }} aria-label={`Augmenter ${it.name}`}><Plus size={13} /></button>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 border-t space-y-2.5" style={{ borderColor: 'var(--ds-border)' }}>
+              {error && (
+                <div className="flex items-center gap-2 text-[12.5px] font-medium" style={{ color: '#DC2626' }}>
+                  <AlertTriangle size={13} className="flex-shrink-0" />{error}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button onClick={onClose} className="flex-1 rounded-xl border text-sm font-semibold py-2.5" style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}>Annuler</button>
+                <button
+                  onClick={confirm}
+                  disabled={submitting || pickedCount === 0}
+                  className="flex-[1.4] rounded-xl text-white text-sm font-semibold py-2.5 disabled:opacity-50"
+                  style={{ background: '#E8920A' }}
+                >
+                  {submitting ? 'Ajout…' : pickedCount === 0 ? 'Ajouter' : `Ajouter ${pickedCount} article${pickedCount > 1 ? 's' : ''} · ${formatEur(pickedCents)}`}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </m.div>
+    </m.div>
   )
 }

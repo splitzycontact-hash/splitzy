@@ -81,6 +81,10 @@ export default defineSchema({
     // et au démarrage d'une nouvelle sitting). Détail des paiements dans `payments`.
     paidCents: v.optional(v.number()),
     paidTipCents: v.optional(v.number()),
+    // Ouverture de la sitting courante (epoch ms) — posé quand le gérant ouvre
+    // une table libre via tables.addOrderItems, effacé au resetToFree.
+    // Optionnel : les sittings ouvertes par la caisse ou un scan QR n'en ont pas.
+    sittingStartedAt: v.optional(v.number()),
     orderItems: v.optional(v.array(v.object({
       name: v.string(),
       qty: v.number(),

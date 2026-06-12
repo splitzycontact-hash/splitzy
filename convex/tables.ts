@@ -108,7 +108,113 @@ export const resetToFree = mutation({
       alert: undefined,
       paidCents: undefined,
       paidTipCents: undefined,
+      sittingStartedAt: undefined,
     })
+  },
+})
+
+// Ajout d'articles depuis le dashboard (modal "Ajouter un article").
+// Mutation AUTHENTIFIÉE (owner/manager) — contrairement à updateStatus qui est
+// le chemin convive anonyme. Les lignes sont fusionnées avec la commande en
+// cours (même nom + même prix unitaire + non payée → qty cumulée) et
+// amountCents est incrémenté du montant ajouté (et non recalculé depuis les
+// lignes : une commande importée de la caisse peut avoir un amountCents sans
+// orderItems détaillés — on préserve cet écart).
+//
+// Table libre → ouverture d'une nouvelle sitting : status "dining",
+// sittingStartedAt = maintenant, couverts si fournis, compteurs de paiement
+// remis à zéro. Table réglée → refus explicite : la sitting est close et les
+// paiements réconciliés ; rouvrir corromprait paidCents. Le gérant doit
+// libérer la table d'abord (nouvelle sitting propre).
+export const addOrderItems = mutation({
+  args: {
+    tableId: v.id("tables"),
+    items: v.array(v.object({
+      name: v.string(),
+      qty: v.number(),
+      unitCents: v.number(),
+    })),
+    guests: v.optional(v.number()),
+  },
+  handler: async (ctx, { tableId, items, guests }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+    if (table.status === "paid") {
+      throw new Error("Table déjà réglée — libérez la table pour démarrer une nouvelle commande")
+    }
+    // Mêmes bornes que updateStatus (Vuln 2) : nom 120 chars, qty 1-999,
+    // prix 0-1M€. Les lignes à qty nulle après floor sont ignorées.
+    const clean = items.slice(0, 200)
+      .map(it => ({
+        name: String(it.name).slice(0, 120),
+        qty: Math.max(0, Math.min(999, Math.floor(it.qty))),
+        unitCents: Math.max(0, Math.min(100_000_000, Math.floor(it.unitCents))),
+      }))
+      .filter(it => it.qty > 0)
+    if (clean.length === 0) throw new Error("Aucun article à ajouter")
+
+    const opening = table.status === "free"
+    const addedCents = clean.reduce((s, it) => s + it.qty * it.unitCents, 0)
+    const merged = (opening ? [] : (table.orderItems ?? [])).map(l => ({ ...l }))
+    for (const it of clean) {
+      const existing = merged.find(l => !l.paid && l.name === it.name && l.unitCents === it.unitCents)
+      if (existing) existing.qty = Math.min(999, existing.qty + it.qty)
+      else merged.push({ name: it.name, qty: it.qty, unitCents: it.unitCents })
+    }
+
+    const patch: Record<string, unknown> = {
+      orderItems: merged,
+      amountCents: (opening ? 0 : (table.amountCents ?? 0)) + addedCents,
+    }
+    if (opening) {
+      patch.status = "dining"
+      patch.sittingStartedAt = Date.now()
+      patch.paidCents = undefined
+      patch.paidTipCents = undefined
+      patch.alert = undefined
+    }
+    if (guests !== undefined) patch.guests = Math.max(0, Math.min(99, Math.floor(guests)))
+    await ctx.db.patch(tableId, patch)
+  },
+})
+
+// Annulation d'une ligne (ou d'une partie de sa quantité) AVANT paiement.
+// Refusé : table réglée, ligne déjà payée, ou retrait qui ferait passer le
+// total sous le montant déjà encaissé (le reste à payer ne peut pas être
+// négatif — billing.remainingCents serait faussé).
+// `name`/`unitCents` re-vérifiés contre l'index pour éviter qu'une UI
+// périmée ne supprime la mauvaise ligne après modification concurrente.
+export const removeOrderItem = mutation({
+  args: {
+    tableId: v.id("tables"),
+    index: v.number(),
+    name: v.string(),
+    unitCents: v.number(),
+    qty: v.optional(v.number()),
+  },
+  handler: async (ctx, { tableId, index, name, unitCents, qty }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+    if (table.status === "paid") throw new Error("Table déjà réglée — aucune modification possible")
+
+    const lines = (table.orderItems ?? []).map(l => ({ ...l }))
+    const line = lines[index]
+    if (!line || line.name !== name || line.unitCents !== unitCents) {
+      throw new Error("Commande modifiée entre-temps — réessayez")
+    }
+    if (line.paid) throw new Error("Article déjà payé — annulation impossible")
+
+    const removeQty = Math.max(1, Math.min(Math.floor(qty ?? line.qty), line.qty))
+    const newTotal = Math.max(0, (table.amountCents ?? 0) - removeQty * line.unitCents)
+    if (newTotal < (table.paidCents ?? 0)) {
+      throw new Error("Retrait impossible — le montant déjà encaissé dépasserait le total")
+    }
+
+    line.qty -= removeQty
+    const remaining = lines.filter(l => l.qty > 0)
+    await ctx.db.patch(tableId, { orderItems: remaining, amountCents: newTotal })
   },
 })
 
