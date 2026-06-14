@@ -22,6 +22,9 @@ type PlanningRow = {
   respondedAt: number | null
   sentAt: number
   subject: string
+  counterProposedStart: string
+  counterProposedEnd: string
+  counterMessage: string
 }
 
 // Convocations d'un restaurant dont shiftDate ∈ [dateFrom, dateTo]. La comparaison
@@ -57,6 +60,9 @@ async function collectRows(
         respondedAt: c.respondedAt ?? null,
         sentAt: c.sentAt,
         subject: c.subject,
+        counterProposedStart: c.counterProposedStart ?? "",
+        counterProposedEnd: c.counterProposedEnd ?? "",
+        counterMessage: c.counterMessage ?? "",
       }
     }),
   )

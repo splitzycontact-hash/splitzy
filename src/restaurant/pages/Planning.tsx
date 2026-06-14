@@ -1,8 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { useQuery, useAction } from 'convex/react'
+import { useQuery, useAction, useMutation } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { toast } from 'sonner'
-import { CalendarDays, Plus, Check, X, Clock, Mail, CalendarClock, Hourglass, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays, Plus, Check, X, Clock, Mail, CalendarClock, Hourglass, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
@@ -131,7 +131,14 @@ export function Planning() {
     const list = rows ?? []
     const confirmed = list.filter(r => r.response === 'accepted').length
     const declined = list.filter(r => r.response === 'declined').length
-    return { total: list.length, confirmed, declined, pending: list.length - confirmed - declined }
+    const counter = list.filter(r => r.response === 'counter_proposed').length
+    return {
+      total: list.length,
+      confirmed,
+      declined,
+      counter,
+      pending: list.length - confirmed - declined - counter,
+    }
   }, [rows])
 
   return (
@@ -193,19 +200,20 @@ export function Planning() {
 
         {/* Cartes résumé — calculées depuis les données de la période */}
         <section
-          className="grid grid-cols-2 md:grid-cols-4 border rounded-[12px] overflow-hidden"
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 border rounded-[12px] overflow-hidden"
           style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
         >
-          {[
+          {([
             { icon: CalendarDays, label: 'Extras convoqués', value: stats.total, color: 'var(--ds-text-primary)' },
             { icon: Check, label: 'Ont confirmé', value: stats.confirmed, color: 'var(--ds-success-strong)' },
             { icon: X, label: 'Ont décliné', value: stats.declined, color: 'var(--ds-error-strong)' },
+            { icon: RefreshCw, label: 'Contre-propositions', value: stats.counter, color: '#F59E0B' },
             { icon: Hourglass, label: 'En attente', value: stats.pending, color: 'var(--ds-text-secondary)' },
-          ].map((kpi, i) => (
+          ] as const).map((kpi, i, arr) => (
             <div
               key={i}
               className="flex flex-col gap-1 px-5 py-4"
-              style={{ borderRight: i < 3 ? '1px solid var(--ds-border)' : 'none' }}
+              style={{ borderRight: i < arr.length - 1 ? '1px solid var(--ds-border)' : 'none' }}
             >
               <div className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">
                 <kpi.icon size={12} style={{ color: 'var(--ds-text-tertiary)' }} />
@@ -262,6 +270,31 @@ function WeekGrid({
   const dateFrom = ymd(days[0])
   const dateTo = ymd(days[6])
   const todayIso = ymd(new Date())
+
+  // Contre-proposition sélectionnée → popover de décision (accepter / décliner).
+  const [selectedCounter, setSelectedCounter] = useState<PlanningRow | null>(null)
+  const acceptCounter = useMutation(api.extras.acceptCounter)
+  const declineCounter = useMutation(api.extras.declineCounter)
+  const [deciding, setDeciding] = useState(false)
+
+  async function decide(convoId: Id<'extraConvocations'>, action: 'accept' | 'decline') {
+    if (deciding) return
+    setDeciding(true)
+    try {
+      if (action === 'accept') {
+        await acceptCounter({ convoId })
+        toast.success('Créneau accepté — l\'extra a été notifié')
+      } else {
+        await declineCounter({ convoId })
+        toast.success('Contre-proposition déclinée')
+      }
+      setSelectedCounter(null)
+    } catch {
+      toast.error('Échec de l\'enregistrement de la réponse')
+    } finally {
+      setDeciding(false)
+    }
+  }
 
   const rows = useQuery(
     api.planning.getByPeriod,
@@ -403,7 +436,7 @@ function WeekGrid({
                           className="border-l p-1.5 flex items-stretch min-h-[52px]"
                           style={{ borderColor: 'var(--ds-border)', background: isToday ? todayColBg : undefined }}
                         >
-                          <StatusCell conv={ex.byDate.get(ymd(d))} onResend={onResend} resendingId={resendingId} />
+                          <StatusCell conv={ex.byDate.get(ymd(d))} onResend={onResend} resendingId={resendingId} onCounterClick={setSelectedCounter} />
                         </div>
                       )
                     })}
@@ -444,9 +477,103 @@ function WeekGrid({
           label="En attente"
           swatch={<span className="w-3 h-3 rounded-[3px] border border-dashed" style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)' }} />}
         />
+        <LegendItem
+          label="Contre-proposition"
+          swatch={<span className="w-3 h-3 rounded-[3px] border border-dashed" style={{ background: 'rgba(245,158,11,0.12)', borderColor: '#F59E0B' }} />}
+        />
         <LegendItem label="Pas convoqué" swatch={<span className="ds-text-tertiary text-[13px] leading-none">—</span>} />
       </div>
+
+      {selectedCounter && (
+        <CounterDecisionModal
+          row={selectedCounter}
+          deciding={deciding}
+          onAccept={() => decide(selectedCounter.convocationId, 'accept')}
+          onDecline={() => decide(selectedCounter.convocationId, 'decline')}
+          onClose={() => { if (!deciding) setSelectedCounter(null) }}
+        />
+      )}
     </section>
+  )
+}
+
+// Popover de décision sur une contre-proposition d'horaire (accepter / décliner).
+function CounterDecisionModal({
+  row,
+  deciding,
+  onAccept,
+  onDecline,
+  onClose,
+}: {
+  row: PlanningRow
+  deciding: boolean
+  onAccept: () => void
+  onDecline: () => void
+  onClose: () => void
+}) {
+  const extraName = `${row.firstName} ${row.lastName}`.trim() || 'cet extra'
+  const dateLabel = (() => {
+    const [y, m, d] = row.shiftDate.split('-')
+    return y && m && d ? `${d}/${m}/${y}` : row.shiftDate
+  })()
+  const original = timeLabel(row.shiftStart, row.shiftEnd) || '—'
+  const proposed =
+    row.counterProposedStart
+      ? `${frTime(row.counterProposedStart)}–${frTime(row.counterProposedEnd)}`
+      : '—'
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        className="relative rounded-2xl w-[360px] max-w-full"
+        style={{ background: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
+      >
+        <button
+          onClick={onClose}
+          disabled={deciding}
+          aria-label="Fermer"
+          className="absolute top-3 right-3 ds-text-tertiary hover:ds-text-primary disabled:opacity-50"
+        >
+          <X size={16} />
+        </button>
+        <div className="px-5 pt-5 pb-2">
+          <div className="text-[15px] font-bold ds-text-primary pr-6">
+            Contre-proposition de {extraName}
+          </div>
+        </div>
+        <div className="px-5 py-3 space-y-2 text-[13px] ds-text-secondary">
+          <div>📅 <span className="font-medium ds-text-primary">Date :</span> {dateLabel}</div>
+          <div>⏰ <span className="font-medium ds-text-primary">Horaire demandé :</span> {original}</div>
+          <div>🔄 <span className="font-medium" style={{ color: '#B45309' }}>Proposé :</span> {proposed}</div>
+          {row.counterMessage && (
+            <div className="rounded-lg px-3 py-2" style={{ background: 'rgba(245,158,11,0.08)' }}>
+              💬 « {row.counterMessage} »
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 px-5 py-4">
+          <button
+            onClick={onDecline}
+            disabled={deciding}
+            className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-colors disabled:opacity-50"
+            style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+          >
+            ✗ Décliner
+          </button>
+          <button
+            onClick={onAccept}
+            disabled={deciding}
+            className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
+            style={{ background: '#F59E0B' }}
+          >
+            {deciding ? 'Envoi…' : '✓ Accepter ce créneau'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -455,10 +582,12 @@ function StatusCell({
   conv,
   onResend,
   resendingId,
+  onCounterClick,
 }: {
   conv: PlanningRow | undefined
   onResend: (id: Id<'extraConvocations'>, firstName: string) => void
   resendingId: string | null
+  onCounterClick: (row: PlanningRow) => void
 }) {
   if (!conv) {
     return (
@@ -487,6 +616,22 @@ function StatusCell({
       >
         <span className="text-[11px] font-medium">✗ Non dispo</span>
       </div>
+    )
+  }
+  if (conv.response === 'counter_proposed') {
+    const proposed = conv.counterProposedStart
+      ? `${frTime(conv.counterProposedStart)}–${frTime(conv.counterProposedEnd)}`
+      : ''
+    return (
+      <button
+        onClick={() => onCounterClick(conv)}
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+        style={{ background: 'rgba(245,158,11,0.12)', border: '1px dashed #F59E0B', borderRadius: 6, padding: 4 }}
+      >
+        <span style={{ fontSize: 14 }}>🔄</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: '#92400E' }}>Contre-prop.</span>
+        {proposed && <span style={{ fontSize: 10, color: '#B45309' }}>{proposed}</span>}
+      </button>
     )
   }
   // En attente (response 'pending' ou null)
