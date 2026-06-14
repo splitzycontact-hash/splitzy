@@ -22,6 +22,7 @@ import type * as invitations from "../invitations.js";
 import type * as members from "../members.js";
 import type * as menuItems from "../menuItems.js";
 import type * as payments from "../payments.js";
+import type * as planning from "../planning.js";
 import type * as posIntegrations from "../posIntegrations.js";
 import type * as restaurants from "../restaurants.js";
 import type * as seed from "../seed.js";
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   members: typeof members;
   menuItems: typeof menuItems;
   payments: typeof payments;
+  planning: typeof planning;
   posIntegrations: typeof posIntegrations;
   restaurants: typeof restaurants;
   seed: typeof seed;

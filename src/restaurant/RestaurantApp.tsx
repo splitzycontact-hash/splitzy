@@ -15,6 +15,7 @@ import { Factures } from './pages/Factures'
 import { Integrations } from './pages/Integrations'
 import { MenuPage } from './pages/MenuPage'
 import { Clients } from './pages/Clients'
+import { Planning } from './pages/Planning'
 import { Settings } from './pages/Settings'
 
 const clerkReady = (() => {
@@ -79,6 +80,7 @@ export function RestaurantApp() {
                       <Route path="/integrations" element={<RoleGuard allowed={['owner']}><Integrations /></RoleGuard>} />
                       <Route path="/menu"         element={<MenuPage />} />
                       <Route path="/clients"      element={<RoleGuard allowed={['owner', 'manager']}><Clients /></RoleGuard>} />
+                      <Route path="/planning"     element={<RoleGuard allowed={['owner', 'manager']}><Planning /></RoleGuard>} />
                       <Route path="/settings"     element={<RoleGuard allowed={['owner', 'manager']}><Settings /></RoleGuard>} />
                       {/* Legacy redirect */}
                       <Route path="/feedbacks"    element={<Navigate to="/restaurant/reputation" replace />} />
