@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
+import type { ReportRange } from '../lib/reportPeriod'
 
 interface PrintContextValue {
+  // Ouvre le sélecteur de période (avant l'aperçu du rapport).
   openPrint: () => void
 }
 
@@ -18,11 +20,26 @@ export function PrintProvider({ children, onOpen }: { children: ReactNode; onOpe
   )
 }
 
+// État du flux d'impression : d'abord le sélecteur de période, puis l'aperçu du
+// rapport avec la plage choisie. Fermer le sélecteur sans choisir = aucun rapport.
 export function usePrintState() {
-  const [isOpen, setIsOpen] = useState(false)
+  const [selectorOpen, setSelectorOpen] = useState(false)
+  const [range, setRange] = useState<ReportRange | null>(null)
+
   return {
-    isOpen,
-    open: () => setIsOpen(true),
-    close: () => setIsOpen(false),
+    selectorOpen,
+    range,
+    reportOpen: range !== null,
+    // Clic sur « Imprimer rapport » → ouvre le sélecteur.
+    openSelector: () => setSelectorOpen(true),
+    // Choix d'une période (raccourci ou custom confirmé) → ferme le sélecteur, ouvre l'aperçu.
+    chooseRange: (r: ReportRange) => {
+      setSelectorOpen(false)
+      setRange(r)
+    },
+    // Ferme le sélecteur sans rien ouvrir.
+    closeSelector: () => setSelectorOpen(false),
+    // Ferme l'aperçu du rapport.
+    closeReport: () => setRange(null),
   }
 }

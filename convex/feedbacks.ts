@@ -3,10 +3,18 @@ import { v } from "convex/values"
 import { requireRestaurantAccess } from "./authz"
 
 export const list = query({
-  args: { restaurantId: v.id("restaurants") },
-  handler: async (ctx, { restaurantId }) => {
+  // `from`/`to` (ms epoch, optionnels) filtrent par createdAt sur [from, to).
+  // Rétrocompat : sans ces args, retourne tous les feedbacks (comportement existant).
+  args: {
+    restaurantId: v.id("restaurants"),
+    from: v.optional(v.number()),
+    to: v.optional(v.number()),
+  },
+  handler: async (ctx, { restaurantId, from, to }) => {
     await requireRestaurantAccess(ctx, restaurantId)
-    return ctx.db.query("feedbacks").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).order("desc").collect()
+    const rows = await ctx.db.query("feedbacks").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).order("desc").collect()
+    if (from === undefined && to === undefined) return rows
+    return rows.filter(r => (from === undefined || r.createdAt >= from) && (to === undefined || r.createdAt < to))
   },
 })
 

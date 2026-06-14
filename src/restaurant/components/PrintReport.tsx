@@ -4,9 +4,18 @@ import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useRestaurant, useRestaurantId } from '../context/RestaurantContext'
 import { formatEur } from '../../utils/formatCurrency'
+import {
+  reportHeaderTitle,
+  reportPeriodLabel,
+  buildBuckets,
+  rangeDays,
+  BUCKET_GRANULARITY,
+  type ReportRange,
+} from '../lib/reportPeriod'
 
 interface PrintReportProps {
   open: boolean
+  range: ReportRange | null
   onClose: () => void
 }
 
@@ -46,16 +55,22 @@ function Stars({ n }: { n: number }) {
   )
 }
 
-function ReportContent() {
+function ReportContent({ range }: { range: ReportRange }) {
   const restaurant   = useRestaurant()
   const restaurantId = useRestaurantId()
-  const rawPayments  = useQuery(api.payments.list,  restaurantId ? { restaurantId } : 'skip')
+  // Queries filtrées par la plage choisie (args from/to rétrocompatibles).
+  const rawPayments  = useQuery(api.payments.list,  restaurantId ? { restaurantId, from: range.from, to: range.to } : 'skip')
   const rawTables    = useQuery(api.tables.list,    restaurantId ? { restaurantId } : 'skip')
-  const rawFeedbacks = useQuery(api.feedbacks.list, restaurantId ? { restaurantId } : 'skip')
+  const rawFeedbacks = useQuery(api.feedbacks.list, restaurantId ? { restaurantId, from: range.from, to: range.to } : 'skip')
 
-  const today = new Date()
-  const dateStr = today.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-  const timeStr = today.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  const now = new Date()
+  const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+
+  const isSingleDay = rangeDays(range) <= 1
+  const granularity = BUCKET_GRANULARITY(range)
+  const headerTitle = reportHeaderTitle(range)
+  const periodLabel = reportPeriodLabel(range)
 
   if (rawPayments === undefined || rawTables === undefined || rawFeedbacks === undefined) {
     return (
@@ -65,17 +80,16 @@ function ReportContent() {
     )
   }
 
+  // Toutes les lignes renvoyées sont déjà dans la plage [from, to).
   const payments  = rawPayments as PaymentRow[]
   const tables    = rawTables as TableRow[]
   const feedbacks = rawFeedbacks as FeedbackRow[]
 
-  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
-  const encaisse      = payments.filter(p => p.status === 'Encaissé')
-  const todayEncaisse = encaisse.filter(p => p.createdAt >= startOfToday.getTime())
-  const caToday   = todayEncaisse.reduce((s, p) => s + p.totalCents, 0)
-  const tipsToday = todayEncaisse.reduce((s, p) => s + p.tipCents, 0)
-  const subToday  = todayEncaisse.reduce((s, p) => s + p.subtotalCents, 0)
-  const tipPctToday = subToday > 0 ? ((tipsToday / subToday) * 100).toFixed(1).replace('.', ',') : null
+  const encaisse       = payments.filter(p => p.status === 'Encaissé')
+  const caPeriod   = encaisse.reduce((s, p) => s + p.totalCents, 0)
+  const tipsPeriod = encaisse.reduce((s, p) => s + p.tipCents, 0)
+  const subPeriod  = encaisse.reduce((s, p) => s + p.subtotalCents, 0)
+  const tipPctPeriod = subPeriod > 0 ? ((tipsPeriod / subPeriod) * 100).toFixed(1).replace('.', ',') : null
 
   const diningCount  = tables.filter(t => t.status === 'dining').length
   const paymentCount = tables.filter(t => t.status === 'payment').length
@@ -92,28 +106,17 @@ function ReportContent() {
     count: feedbacks.filter(f => f.stars === s).length,
   }))
 
-  // Revenus des 7 derniers jours (jours vides inclus, à 0)
-  const weekDays: { day: string; date: string; totalCents: number }[] = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(startOfToday.getTime() - i * 86400000)
-    const dayStart = d.getTime()
-    const dayEnd = dayStart + 86400000
-    weekDays.push({
-      day: d.toLocaleDateString('fr-FR', { weekday: 'short' }),
-      date: d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
-      totalCents: encaisse.filter(p => p.createdAt >= dayStart && p.createdAt < dayEnd).reduce((s, p) => s + p.totalCents, 0),
-    })
-  }
-  const weekTotal = weekDays.reduce((s, d) => s + d.totalCents, 0)
-  const weekStart = startOfToday.getTime() - 6 * 86400000
-  const weekEncaisse = encaisse.filter(p => p.createdAt >= weekStart)
-  const weekTips = weekEncaisse.reduce((s, p) => s + p.tipCents, 0)
-  const weekComm = weekEncaisse.reduce((s, p) => s + p.commissionCents, 0)
+  // Revenus agrégés par jour (≤31j) ou par semaine (>31j) ; vide pour un seul jour.
+  const buckets = buildBuckets(range).map(b => ({
+    ...b,
+    totalCents: encaisse
+      .filter(p => p.createdAt >= b.from && p.createdAt < b.to)
+      .reduce((s, p) => s + p.totalCents, 0),
+  }))
+  const periodComm = encaisse.reduce((s, p) => s + p.commissionCents, 0)
 
-  // Transactions des 7 derniers jours, plus récentes en premier
-  const txRows = payments
-    .filter(p => p.createdAt >= weekStart)
-    .sort((a, b) => b.createdAt - a.createdAt)
+  // Transactions de la période, plus récentes en premier
+  const txRows = [...payments].sort((a, b) => b.createdAt - a.createdAt)
   const txEncaisse = txRows.filter(r => r.status === 'Encaissé')
   const totalEncaisse = txEncaisse.reduce((s, r) => s + r.totalCents, 0)
   const totalTips = txEncaisse.reduce((s, r) => s + r.tipCents, 0)
@@ -153,59 +156,64 @@ function ReportContent() {
       </div>
 
       <div style={{ marginBottom: 32 }}>
-        <div style={{ fontSize: 20, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>Rapport de service</div>
-        <div style={{ fontSize: 13, color: '#6b7280', marginTop: 3 }}>
-          {dateStr} · Généré à {timeStr}
+        <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: '#9ca3af' }}>Rapport de service</div>
+        <div style={{ fontSize: 22, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 }}>{headerTitle}</div>
+        <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+          Généré le {dateStr} à {timeStr}
         </div>
       </div>
 
       {/* ── SECTION 1 : KPIs ── */}
-      <SectionTitle>Performances du jour</SectionTitle>
+      <SectionTitle>{isSingleDay ? 'Performances du jour' : 'Performances de la période'}</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 28 }}>
-        <KpiCard label="CA DU JOUR" value={formatEur(caToday)} sub={`${todayEncaisse.length} paiement${todayEncaisse.length > 1 ? 's' : ''} encaissé${todayEncaisse.length > 1 ? 's' : ''}`} accent="#E8920A" />
+        <KpiCard label={isSingleDay ? 'CA DU JOUR' : 'CA DE LA PÉRIODE'} value={formatEur(caPeriod)} sub={`${encaisse.length} paiement${encaisse.length > 1 ? 's' : ''} encaissé${encaisse.length > 1 ? 's' : ''}`} accent="#E8920A" />
         <KpiCard label="TABLES ACTIVES" value={`${activeCount} / ${tables.length}`} sub={`${paymentCount} en paiement`} accent="#111827" />
         <KpiCard label="NOTE MOYENNE" value={`${avgStars} / 5`} sub={`${feedbacks.length} avis reçus`} accent="#b88500" />
-        <KpiCard label="POURBOIRES" value={formatEur(tipsToday)} sub={tipPctToday !== null ? `moy. ${tipPctToday}% du ticket` : 'aucun aujourd’hui'} accent="#16a34a" />
+        <KpiCard label="POURBOIRES" value={formatEur(tipsPeriod)} sub={tipPctPeriod !== null ? `moy. ${tipPctPeriod}% du ticket` : 'aucun sur la période'} accent="#16a34a" />
       </div>
 
-      {/* ── SECTION 2 : Revenus 7 jours ── */}
-      <SectionTitle>Revenus des 7 derniers jours</SectionTitle>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
-        <thead>
-          <tr style={{ background: '#111827', color: 'white' }}>
-            <Th>Jour</Th>
-            <Th>Date</Th>
-            <Th align="right">CA journalier</Th>
-            <Th align="right">Part période</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {weekDays.map((row, i) => {
-            const pct = weekTotal > 0 ? ((row.totalCents / weekTotal) * 100).toFixed(1) : '0.0'
-            return (
-              <tr key={i} style={{ background: i % 2 ? '#f9fafb' : 'white', borderBottom: '1px solid #e5e7eb' }}>
-                <Td bold>{row.day}</Td>
-                <Td muted>{row.date}</Td>
-                <Td align="right" bold>{formatEur(row.totalCents)}</Td>
-                <Td align="right" muted>{pct.replace('.', ',')}%</Td>
+      {/* ── SECTION 2 : Revenus par jour/semaine (omise pour un jour unique) ── */}
+      {!isSingleDay && (
+        <>
+          <SectionTitle>{granularity === 'week' ? 'Revenus par semaine' : 'Revenus par jour'}</SectionTitle>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
+            <thead>
+              <tr style={{ background: '#111827', color: 'white' }}>
+                <Th>{granularity === 'week' ? 'Semaine' : 'Jour'}</Th>
+                <Th>{granularity === 'week' ? 'Fin' : 'Date'}</Th>
+                <Th align="right">{granularity === 'week' ? 'CA hebdo.' : 'CA journalier'}</Th>
+                <Th align="right">Part période</Th>
               </tr>
-            )
-          })}
-        </tbody>
-        <tfoot>
-          <tr style={{ borderTop: '2px solid #111827', background: '#fffbf2' }}>
-            <td colSpan={2} style={{ padding: '10px 12px', fontWeight: 800, fontSize: 13 }}>TOTAL 7 JOURS</td>
-            <td style={{ padding: '10px 12px', fontWeight: 900, textAlign: 'right', fontSize: 15, color: '#E8920A' }}>{formatEur(weekTotal)}</td>
-            <td style={{ padding: '10px 12px', fontWeight: 800, textAlign: 'right', color: '#6b7280' }}>100%</td>
-          </tr>
-        </tfoot>
-      </table>
-      <div style={{ display: 'flex', gap: 24, marginBottom: 32, padding: '12px 16px', background: '#f9fafb', borderRadius: 8, fontSize: 12 }}>
-        <SummaryItem label="CA brut" value={formatEur(weekTotal)} color="#E8920A" />
-        <SummaryItem label="Pourboires équipe" value={formatEur(weekTips)} color="#16a34a" />
-        <SummaryItem label="Commission Splitzy (1,5%)" value={formatEur(weekComm)} color="#9ca3af" />
-        <SummaryItem label="Net restaurateur" value={formatEur(weekTotal - weekComm)} color="#111827" />
-      </div>
+            </thead>
+            <tbody>
+              {buckets.map((row, i) => {
+                const pct = caPeriod > 0 ? ((row.totalCents / caPeriod) * 100).toFixed(1) : '0.0'
+                return (
+                  <tr key={i} style={{ background: i % 2 ? '#f9fafb' : 'white', borderBottom: '1px solid #e5e7eb' }}>
+                    <Td bold>{row.label}</Td>
+                    <Td muted>{row.sublabel}</Td>
+                    <Td align="right" bold>{formatEur(row.totalCents)}</Td>
+                    <Td align="right" muted>{pct.replace('.', ',')}%</Td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '2px solid #111827', background: '#fffbf2' }}>
+                <td colSpan={2} style={{ padding: '10px 12px', fontWeight: 800, fontSize: 13 }}>TOTAL PÉRIODE</td>
+                <td style={{ padding: '10px 12px', fontWeight: 900, textAlign: 'right', fontSize: 15, color: '#E8920A' }}>{formatEur(caPeriod)}</td>
+                <td style={{ padding: '10px 12px', fontWeight: 800, textAlign: 'right', color: '#6b7280' }}>100%</td>
+              </tr>
+            </tfoot>
+          </table>
+          <div style={{ display: 'flex', gap: 24, marginBottom: 32, padding: '12px 16px', background: '#f9fafb', borderRadius: 8, fontSize: 12 }}>
+            <SummaryItem label="CA brut" value={formatEur(caPeriod)} color="#E8920A" />
+            <SummaryItem label="Pourboires équipe" value={formatEur(tipsPeriod)} color="#16a34a" />
+            <SummaryItem label="Commission Splitzy (1,5%)" value={formatEur(periodComm)} color="#9ca3af" />
+            <SummaryItem label="Net restaurateur" value={formatEur(caPeriod - periodComm)} color="#111827" />
+          </div>
+        </>
+      )}
 
       {/* ── SECTION 3 : Tables ── */}
       <div className="print-break" />
@@ -340,7 +348,7 @@ function ReportContent() {
 
       {/* ── SECTION 5 : Transactions ── */}
       <div className="print-break" />
-      <SectionTitle>Récapitulatif des transactions — 7 derniers jours ({txRows.length})</SectionTitle>
+      <SectionTitle>Récapitulatif des transactions — {periodLabel.replace(/^Rapport d[eu] /, '')} ({txRows.length})</SectionTitle>
       {txRows.length === 0 ? (
         <EmptyNote>Aucune transaction sur la période.</EmptyNote>
       ) : (
@@ -499,9 +507,9 @@ function countTags(feedbacks: FeedbackRow[]) {
 
 /* ── Main export ── */
 
-export function PrintReport({ open, onClose }: PrintReportProps) {
+export function PrintReport({ open, range, onClose }: PrintReportProps) {
   const restaurant = useRestaurant()
-  if (!open) return null
+  if (!open || !range) return null
 
   const handlePrint = () => window.print()
 
@@ -583,7 +591,7 @@ export function PrintReport({ open, onClose }: PrintReportProps) {
             minHeight: 600,
           }}
         >
-          <ReportContent />
+          <ReportContent range={range} />
         </div>
       </div>
     </div>,

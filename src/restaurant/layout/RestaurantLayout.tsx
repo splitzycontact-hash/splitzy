@@ -10,6 +10,7 @@ import { api } from '../../../convex/_generated/api'
 import { Sidebar } from './Sidebar'
 import { PrintProvider, usePrintState } from '../context/PrintContext'
 import { PrintReport } from '../components/PrintReport'
+import { ReportPeriodSelector } from '../components/ReportPeriodSelector'
 import { ThemeProvider, useTheme } from '../context/ThemeContext'
 import { useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
 import type { RestaurantRole } from '../lib/roles'
@@ -81,7 +82,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const print = usePrintState()
 
   return (
-    <PrintProvider onOpen={print.open}>
+    <PrintProvider onOpen={print.openSelector}>
       <div
         className="restaurant-root flex h-[100dvh] w-full overflow-hidden"
         data-theme={theme}
@@ -92,7 +93,12 @@ function LayoutInner({ children }: { children: ReactNode }) {
           {children}
         </div>
         <MobileBottomNav />
-        <PrintReport open={print.isOpen} onClose={print.close} />
+        <ReportPeriodSelector
+          open={print.selectorOpen}
+          onClose={print.closeSelector}
+          onChoose={print.chooseRange}
+        />
+        <PrintReport open={print.reportOpen} range={print.range} onClose={print.closeReport} />
       </div>
     </PrintProvider>
   )
