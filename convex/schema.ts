@@ -232,9 +232,26 @@ export default defineSchema({
     // response : "pending" à l'envoi, figé à "accepted"/"declined" à la 1ʳᵉ réponse (définitive).
     responseToken: v.optional(v.string()),
     response: v.optional(
-      v.union(v.literal("pending"), v.literal("accepted"), v.literal("declined")),
+      v.union(
+        v.literal("pending"),
+        v.literal("accepted"),
+        v.literal("declined"),
+        v.literal("counter_proposed"),
+      ),
     ),
     respondedAt: v.optional(v.number()),
+    // Contre-proposition d'horaire par l'extra. Si l'extra propose un autre créneau,
+    // response passe à "counter_proposed" et ces champs portent le créneau souhaité.
+    // managerResponseToken : secret d'URL pour la décision du gérant (accept/decline)
+    // depuis l'email de contre-proposition (endpoint /api/manager-counter).
+    counterProposedStart: v.optional(v.string()),   // "12:00"
+    counterProposedEnd: v.optional(v.string()),     // "14:00"
+    counterMessage: v.optional(v.string()),
+    managerResponseToken: v.optional(v.string()),
+    managerResponse: v.optional(
+      v.union(v.literal("accepted"), v.literal("declined")),
+    ),
+    managerRespondedAt: v.optional(v.number()),
   }).index("by_extra", ["extraId"])
     .index("by_restaurant", ["restaurantId"])
     .index("by_token", ["responseToken"]),

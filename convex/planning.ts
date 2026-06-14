@@ -18,7 +18,7 @@ type PlanningRow = {
   shiftDate: string
   shiftStart: string
   shiftEnd: string
-  response: "pending" | "accepted" | "declined" | null
+  response: "pending" | "accepted" | "declined" | "counter_proposed" | null
   respondedAt: number | null
   sentAt: number
   subject: string

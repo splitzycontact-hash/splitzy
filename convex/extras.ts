@@ -495,3 +495,299 @@ export const notifyConvocationResponse = internalAction({
     }
   },
 })
+
+// ─── Contre-proposition d'horaire par l'extra ───────────────────────────────────
+// L'extra, plutôt que d'accepter/décliner, propose un autre créneau via la page de
+// réponse publique. recordCounterProposal fige la contre-proposition et notifie le
+// gérant par email avec deux liens de décision (accept/decline) portés par un second
+// token (managerResponseToken). Le gérant peut aussi décider depuis le dashboard
+// (acceptCounter / declineCounter, authentifiées).
+
+// Token de décision du gérant : même schéma que makeResponseToken (UUID + timestamp
+// encodé base64). Le goal le décrit comme btoa(crypto.randomUUID()+Date.now()) ;
+// makeResponseToken applique en plus un encodage url-safe (aucun caractère à échapper).
+
+export const getCounterProposalContext = internalQuery({
+  args: { convoId: v.id("extraConvocations") },
+  handler: async (ctx, { convoId }) => {
+    const convocation = await ctx.db.get(convoId)
+    if (!convocation) return null
+    const extra = await ctx.db.get(convocation.extraId)
+    const restaurant = await ctx.db.get(convocation.restaurantId)
+    let memberEmail: string | undefined
+    if (convocation.sentBy) {
+      const member = await ctx.db.get(convocation.sentBy)
+      memberEmail = member?.email
+    }
+    const managerEmail = memberEmail?.trim() || restaurant?.email?.trim() || ""
+    return { convocation, extra, managerEmail }
+  },
+})
+
+// recordCounterProposal — appelée par l'HTTP action après lecture du responseToken.
+// Atomique : refuse si la convocation a déjà reçu une réponse (response !== "pending").
+export const recordCounterProposal = internalMutation({
+  args: {
+    token: v.string(),
+    start: v.string(),
+    end: v.string(),
+    message: v.optional(v.string()),
+  },
+  handler: async (ctx, { token, start, end, message }): Promise<{ ok: boolean }> => {
+    const convocation = await ctx.db
+      .query("extraConvocations")
+      .withIndex("by_token", q => q.eq("responseToken", token))
+      .unique()
+    if (!convocation) throw new Error("Convocation introuvable")
+    if (convocation.response !== "pending") throw new Error("Déjà répondu")
+    const managerResponseToken = btoa(crypto.randomUUID() + Date.now().toString())
+    await ctx.db.patch(convocation._id, {
+      response: "counter_proposed",
+      counterProposedStart: start,
+      counterProposedEnd: end,
+      counterMessage: message?.trim() || undefined,
+      managerResponseToken,
+      respondedAt: Date.now(),
+    })
+    await ctx.scheduler.runAfter(0, internal.extras.notifyCounterProposal, {
+      convoId: convocation._id,
+    })
+    return { ok: true }
+  },
+})
+
+function renderCounterProposalEmail(opts: {
+  firstName: string
+  lastName: string
+  shiftDate: string
+  shiftStart: string
+  shiftEnd: string
+  counterStart: string
+  counterEnd: string
+  counterMessage?: string
+  acceptUrl: string
+  declineUrl: string
+}): string {
+  const name = escapeHtml(`${opts.firstName} ${opts.lastName}`.trim())
+  const originalTime = opts.shiftStart
+    ? `${opts.shiftStart}${opts.shiftEnd ? " – " + opts.shiftEnd : ""}`
+    : ""
+  const counterTime = `${opts.counterStart} – ${opts.counterEnd}`
+  const messageBlock = opts.counterMessage
+    ? `<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:14px 16px;margin:16px 0">
+    <p style="color:#9CA3AF;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin:0 0 6px">Message de l'extra</p>
+    <p style="color:#18181B;font-size:14px;line-height:1.6;margin:0">${escapeHtml(opts.counterMessage).replace(/\n/g, "<br/>")}</p>
+  </div>`
+    : ""
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:8px;background:#ffffff">
+  <h2 style="color:#F59E0B;margin:0 0 16px">Splitzy</h2>
+  <p style="color:#18181B;font-size:15px;line-height:1.6;margin:0 0 16px">Bonjour, <strong>${name}</strong> propose un autre horaire.</p>
+  <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 6px">📅 <strong>${escapeHtml(frDate(opts.shiftDate))}</strong>${originalTime ? `  ⏰ ${escapeHtml(originalTime)}` : ""}</p>
+  <div style="background:#FEF3C7;border-radius:8px;padding:14px 16px;margin:16px 0">
+    <p style="color:#18181B;font-size:15px;font-weight:700;margin:0">🔄 ${escapeHtml(counterTime)}</p>
+  </div>
+  ${messageBlock}
+  <div style="margin:20px 0">
+    <a href="${opts.acceptUrl}" style="display:inline-block;background:#F59E0B;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin:0 8px 8px 0">✓ Accepter ce créneau</a>
+    <a href="${opts.declineUrl}" style="display:inline-block;background:#F3F4F6;color:#374151;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin:0 0 8px 0">✗ Décliner</a>
+  </div>
+  <p style="color:#9CA3AF;font-size:12px;line-height:1.6;margin:8px 0 0">Notification automatique envoyée par Splitzy.</p>
+</div>`
+}
+
+// notifyCounterProposal — email au gérant avec les deux liens de décision. Les liens
+// pointent vers l'endpoint public /api/manager-counter (base = CONVEX_SITE_URL).
+export const notifyCounterProposal = internalAction({
+  args: { convoId: v.id("extraConvocations") },
+  handler: async (ctx, { convoId }) => {
+    const ctx2 = await ctx.runQuery(internal.extras.getCounterProposalContext, { convoId })
+    if (!ctx2 || !ctx2.convocation || !ctx2.extra) return
+    const { convocation, extra, managerEmail } = ctx2
+    if (!managerEmail) {
+      console.error("[notifyCounterProposal] aucune adresse de notification")
+      return
+    }
+    const apiKey = process.env.RESEND_API_KEY
+    if (!apiKey) {
+      console.error("[notifyCounterProposal] RESEND_API_KEY absente côté Convex")
+      return
+    }
+    const siteUrl = process.env.CONVEX_SITE_URL ?? ""
+    const token = convocation.managerResponseToken ?? ""
+    const acceptUrl = `${siteUrl}/api/manager-counter?token=${encodeURIComponent(token)}&action=accept`
+    const declineUrl = `${siteUrl}/api/manager-counter?token=${encodeURIComponent(token)}&action=decline`
+    const html = renderCounterProposalEmail({
+      firstName: extra.firstName,
+      lastName: extra.lastName,
+      shiftDate: convocation.shiftDate ?? "",
+      shiftStart: convocation.shiftStart ?? "",
+      shiftEnd: convocation.shiftEnd ?? "",
+      counterStart: convocation.counterProposedStart ?? "",
+      counterEnd: convocation.counterProposedEnd ?? "",
+      counterMessage: convocation.counterMessage,
+      acceptUrl,
+      declineUrl,
+    })
+    const subject = `[Splitzy] Contre-proposition de ${`${extra.firstName} ${extra.lastName}`.trim()}`
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "Splitzy <noreply@splitzy.fr>",
+          to: managerEmail,
+          subject,
+          html,
+        }),
+      })
+      if (!res.ok) {
+        console.error("[notifyCounterProposal] Resend error:", res.status, await res.text())
+      }
+    } catch (err) {
+      console.error("[notifyCounterProposal] send threw:", err)
+    }
+  },
+})
+
+// applyManagerDecision — logique partagée entre recordManagerResponse (endpoint public,
+// par token) et acceptCounter/declineCounter (dashboard, authentifié). Idempotente :
+// throw si une décision est déjà figée. Applique l'horaire contre-proposé si accept.
+async function applyManagerDecision(
+  ctx: any,
+  convocation: any,
+  action: "accept" | "decline",
+): Promise<void> {
+  if (convocation.managerResponse) throw new Error("Déjà répondu")
+  const patch: Record<string, unknown> = {
+    managerResponse: action === "accept" ? "accepted" : "declined",
+    managerRespondedAt: Date.now(),
+  }
+  if (action === "accept") {
+    patch.response = "accepted"
+    if (convocation.counterProposedStart) patch.shiftStart = convocation.counterProposedStart
+    if (convocation.counterProposedEnd) patch.shiftEnd = convocation.counterProposedEnd
+  } else {
+    patch.response = "declined"
+  }
+  await ctx.db.patch(convocation._id, patch)
+  await ctx.scheduler.runAfter(0, internal.extras.notifyManagerDecision, {
+    convoId: convocation._id,
+    action,
+  })
+}
+
+// recordManagerResponse — appelée par l'HTTP action /api/manager-counter (par token).
+export const recordManagerResponse = internalMutation({
+  args: {
+    token: v.string(),
+    action: v.union(v.literal("accept"), v.literal("decline")),
+  },
+  handler: async (ctx, { token, action }): Promise<{ ok: boolean }> => {
+    const convocation = await ctx.db
+      .query("extraConvocations")
+      .filter(q => q.eq(q.field("managerResponseToken"), token))
+      .unique()
+    if (!convocation) throw new Error("Convocation introuvable")
+    await applyManagerDecision(ctx, convocation, action)
+    return { ok: true }
+  },
+})
+
+export const getManagerDecisionContext = internalQuery({
+  args: { convoId: v.id("extraConvocations") },
+  handler: async (ctx, { convoId }) => {
+    const convocation = await ctx.db.get(convoId)
+    if (!convocation) return null
+    const extra = await ctx.db.get(convocation.extraId)
+    return {
+      email: extra?.email ?? "",
+      firstName: extra?.firstName ?? "",
+      shiftDate: convocation.shiftDate ?? "",
+      shiftStart: convocation.shiftStart ?? "",
+      shiftEnd: convocation.shiftEnd ?? "",
+    }
+  },
+})
+
+// notifyManagerDecision — email à l'extra avec la décision du gérant sur sa
+// contre-proposition. Best-effort, log seulement.
+export const notifyManagerDecision = internalAction({
+  args: {
+    convoId: v.id("extraConvocations"),
+    action: v.union(v.literal("accept"), v.literal("decline")),
+  },
+  handler: async (ctx, { convoId, action }) => {
+    const c = await ctx.runQuery(internal.extras.getManagerDecisionContext, { convoId })
+    if (!c || !c.email) {
+      console.error("[notifyManagerDecision] aucune adresse extra")
+      return
+    }
+    const apiKey = process.env.RESEND_API_KEY
+    if (!apiKey) {
+      console.error("[notifyManagerDecision] RESEND_API_KEY absente côté Convex")
+      return
+    }
+    const dateLabel = frDate(c.shiftDate)
+    const accepted = action === "accept"
+    const subject = accepted
+      ? "✅ Votre contre-proposition a été acceptée"
+      : "❌ Votre contre-proposition n'a pas été retenue"
+    const body = accepted
+      ? `✅ Votre contre-proposition a été acceptée ! Rendez-vous le ${escapeHtml(dateLabel)} de ${escapeHtml(c.shiftStart)} à ${escapeHtml(c.shiftEnd)}.`
+      : `❌ Votre contre-proposition n'a pas été retenue pour le ${escapeHtml(dateLabel)}.`
+    const color = accepted ? "#10B981" : "#EF4444"
+    const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:8px;background:#ffffff">
+  <h2 style="color:#F59E0B;margin:0 0 16px">Splitzy</h2>
+  <p style="color:#18181B;font-size:15px;line-height:1.6;margin:0 0 6px">Bonjour ${escapeHtml(c.firstName)},</p>
+  <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-left:4px solid ${color};border-radius:8px;padding:14px 16px;margin:16px 0">
+    <p style="color:#18181B;font-size:15px;line-height:1.6;margin:0">${body}</p>
+  </div>
+  <p style="color:#9CA3AF;font-size:12px;line-height:1.6;margin:16px 0 0">Notification automatique envoyée par Splitzy.</p>
+</div>`
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "Splitzy <noreply@splitzy.fr>",
+          to: c.email,
+          subject,
+          html,
+        }),
+      })
+      if (!res.ok) {
+        console.error("[notifyManagerDecision] Resend error:", res.status, await res.text())
+      }
+    } catch (err) {
+      console.error("[notifyManagerDecision] send threw:", err)
+    }
+  },
+})
+
+// acceptCounter / declineCounter — décision du gérant depuis le dashboard (authentifié).
+// owner/manager uniquement. Même logique que recordManagerResponse.
+export const acceptCounter = mutation({
+  args: { convoId: v.id("extraConvocations") },
+  handler: async (ctx, { convoId }) => {
+    const convocation = await ctx.db.get(convoId)
+    if (!convocation) throw new Error("Convocation introuvable")
+    await requireRestaurantAccess(ctx, convocation.restaurantId, ["owner", "manager"])
+    await applyManagerDecision(ctx, convocation, "accept")
+  },
+})
+
+export const declineCounter = mutation({
+  args: { convoId: v.id("extraConvocations") },
+  handler: async (ctx, { convoId }) => {
+    const convocation = await ctx.db.get(convoId)
+    if (!convocation) throw new Error("Convocation introuvable")
+    await requireRestaurantAccess(ctx, convocation.restaurantId, ["owner", "manager"])
+    await applyManagerDecision(ctx, convocation, "decline")
+  },
+})
