@@ -193,7 +193,7 @@ export function Planning() {
 
         {/* Cartes résumé — calculées depuis les données de la période */}
         <section
-          className="grid grid-cols-2 xl:grid-cols-4 border rounded-[12px] overflow-hidden"
+          className="grid grid-cols-2 md:grid-cols-4 border rounded-[12px] overflow-hidden"
           style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
         >
           {[
@@ -333,34 +333,89 @@ function WeekGrid({
         </div>
       </div>
 
-      {/* En-tête de grille : coin vide + 7 jours */}
-      <div className="grid border-b" style={{ gridTemplateColumns: GRID, borderColor: 'var(--ds-border)' }}>
-        <div />
-        {days.map((d, i) => {
-          const isToday = ymd(d) === todayIso
-          return (
-            <div
-              key={i}
-              className="flex flex-col items-center gap-0.5 py-2.5 border-l"
-              style={{ borderColor: 'var(--ds-border)', background: isToday ? todayColBg : undefined }}
-            >
-              <span className="text-[11px] uppercase tracking-wide ds-text-tertiary">{DAY_SHORT[i]}</span>
-              {isToday ? (
-                <span
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[13px] font-medium text-white"
-                  style={{ background: '#F59E0B' }}
+      {/* Zone scrollable horizontalement sur mobile (min-width garantit la lisibilité) */}
+      <div className="overflow-x-auto">
+        <div style={{ minWidth: 720 }}>
+          {/* En-tête de grille : coin vide + 7 jours */}
+          <div className="grid border-b" style={{ gridTemplateColumns: GRID, borderColor: 'var(--ds-border)' }}>
+            <div />
+            {days.map((d, i) => {
+              const isToday = ymd(d) === todayIso
+              return (
+                <div
+                  key={i}
+                  className="flex flex-col items-center gap-0.5 py-2.5 border-l"
+                  style={{ borderColor: 'var(--ds-border)', background: isToday ? todayColBg : undefined }}
                 >
-                  {d.getDate()}
-                </span>
-              ) : (
-                <span className="text-[16px] font-medium ds-text-primary leading-6">{d.getDate()}</span>
-              )}
+                  <span className="text-[11px] uppercase tracking-wide ds-text-tertiary">{DAY_SHORT[i]}</span>
+                  {isToday ? (
+                    <span
+                      className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[13px] font-medium text-white"
+                      style={{ background: '#F59E0B' }}
+                    >
+                      {d.getDate()}
+                    </span>
+                  ) : (
+                    <span className="text-[16px] font-medium ds-text-primary leading-6">{d.getDate()}</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Lignes extra (seulement si chargé et non vide — sinon états plein-largeur dessous) */}
+          {!loading && extras.length > 0 && (
+            <div>
+              {extras.map((ex, idx) => {
+                const initials = `${ex.firstName[0] ?? ''}${ex.lastName[0] ?? ''}`.toUpperCase() || '?'
+                const av = AVATAR_COLORS[idx % AVATAR_COLORS.length]
+                return (
+                  <div
+                    key={ex.extraId}
+                    className="grid border-b"
+                    style={{ gridTemplateColumns: GRID, borderColor: 'var(--ds-border)' }}
+                  >
+                    {/* Colonne extra fixe */}
+                    <div className="flex items-center gap-2 px-3 py-2.5 min-w-0">
+                      <div
+                        className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+                        style={{ background: av.bg, color: av.color }}
+                      >
+                        {initials}
+                      </div>
+                      <div className="min-w-0" style={{ maxWidth: 112 }}>
+                        <div className="text-[12px] font-medium ds-text-primary truncate">
+                          {ex.firstName} {ex.lastName}
+                        </div>
+                        {ex.skills.length > 0 && (
+                          <div className="text-[10px] ds-text-tertiary truncate">
+                            {ex.skills.map(s => SKILL_LABEL[s] ?? s).join(' · ')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* 7 cellules statut */}
+                    {days.map((d, i) => {
+                      const isToday = ymd(d) === todayIso
+                      return (
+                        <div
+                          key={i}
+                          className="border-l p-1.5 flex items-stretch min-h-[52px]"
+                          style={{ borderColor: 'var(--ds-border)', background: isToday ? todayColBg : undefined }}
+                        >
+                          <StatusCell conv={ex.byDate.get(ymd(d))} onResend={onResend} resendingId={resendingId} />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
+          )}
+        </div>
       </div>
 
-      {/* Corps */}
+      {/* États plein-largeur : chargement / vide */}
       {loading ? (
         <div className="flex flex-col items-center justify-center gap-2 py-16">
           <Clock size={20} style={{ color: 'var(--ds-text-tertiary)' }} className="animate-pulse" />
@@ -371,61 +426,12 @@ function WeekGrid({
           <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--ds-bg-subtle)' }}>
             <CalendarClock size={22} style={{ color: 'var(--ds-text-tertiary)' }} />
           </div>
-          <div>
-            <p className="text-[14px] font-semibold ds-text-primary">Aucune convocation cette semaine</p>
-            <p className="text-[12.5px] ds-text-tertiary max-w-[320px] mt-1">
-              Naviguez entre les semaines ou convoquez un extra pour un service à venir.
-            </p>
-          </div>
+          <p className="text-[14px] font-semibold ds-text-primary">Aucune convocation cette semaine</p>
+          <p className="text-[12.5px] ds-text-tertiary max-w-[340px]">
+            Cliquez sur <span className="font-semibold ds-text-secondary">+ Nouvelle convocation</span> pour solliciter un extra sur cette période.
+          </p>
         </div>
-      ) : (
-        <div>
-          {extras.map((ex, idx) => {
-            const initials = `${ex.firstName[0] ?? ''}${ex.lastName[0] ?? ''}`.toUpperCase() || '?'
-            const av = AVATAR_COLORS[idx % AVATAR_COLORS.length]
-            return (
-              <div
-                key={ex.extraId}
-                className="grid border-b"
-                style={{ gridTemplateColumns: GRID, borderColor: 'var(--ds-border)' }}
-              >
-                {/* Colonne extra fixe */}
-                <div className="flex items-center gap-2 px-3 py-2.5 min-w-0">
-                  <div
-                    className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
-                    style={{ background: av.bg, color: av.color }}
-                  >
-                    {initials}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[12px] font-medium ds-text-primary truncate">
-                      {ex.firstName} {ex.lastName}
-                    </div>
-                    {ex.skills.length > 0 && (
-                      <div className="text-[10px] ds-text-tertiary truncate">
-                        {ex.skills.map(s => SKILL_LABEL[s] ?? s).join(' · ')}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {/* 7 cellules statut */}
-                {days.map((d, i) => {
-                  const isToday = ymd(d) === todayIso
-                  return (
-                    <div
-                      key={i}
-                      className="border-l p-1.5 flex items-stretch"
-                      style={{ borderColor: 'var(--ds-border)', background: isToday ? todayColBg : undefined }}
-                    >
-                      <StatusCell conv={ex.byDate.get(ymd(d))} onResend={onResend} resendingId={resendingId} />
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })}
-        </div>
-      )}
+      ) : null}
 
       {/* Légende */}
       <div
