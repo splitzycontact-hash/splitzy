@@ -4,6 +4,10 @@
       "source": "/api/extra-response",
       "destination": "https://mellow-chinchilla-481.eu-west-1.convex.site/api/extra-response"
     },
+    {
+      "source": "/api/extra-response-confirm",
+      "destination": "https://mellow-chinchilla-481.eu-west-1.convex.site/api/extra-response-confirm"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

@@ -1,4 +1,4 @@
-import { query, mutation, action, internalQuery, internalMutation } from "./_generated/server"
+import { query, mutation, action, internalQuery, internalMutation, internalAction } from "./_generated/server"
 import { internal } from "./_generated/api"
 import { v } from "convex/values"
 import { requireRestaurantAccess } from "./authz"
@@ -366,11 +366,132 @@ export const recordResponse = internalMutation({
   },
 })
 
-// notifyConvocationResponse — notifie le gérant qu'un extra a répondu à sa convocation.
-// Stub partie 1 : le corps (email/notification dashboard) est implémenté en partie 2.
-export const notifyConvocationResponse = internalMutation({
+// getConvocationByToken — lecture publique (via HTTP action) des infos minimales
+// pour la page de confirmation : prénom de l'extra, date/horaire du service, et si
+// la convocation a déjà reçu une réponse. Aucune donnée sensible exposée.
+export const getConvocationByToken = internalQuery({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const convocation = await ctx.db
+      .query("extraConvocations")
+      .withIndex("by_token", q => q.eq("responseToken", token))
+      .unique()
+    if (!convocation) return null
+    const extra = await ctx.db.get(convocation.extraId)
+    return {
+      firstName: extra?.firstName ?? "",
+      dateLabel: frDate(convocation.shiftDate),
+      shiftStart: convocation.shiftStart ?? "",
+      shiftEnd: convocation.shiftEnd ?? "",
+      alreadyResponded:
+        convocation.response === "accepted" || convocation.response === "declined",
+    }
+  },
+})
+
+// getResponseNotifyContext — données de l'email de notification au gérant. Cible =
+// email du membre qui a convoqué (sentBy), sinon email du restaurant.
+export const getResponseNotifyContext = internalQuery({
   args: { convocationId: v.id("extraConvocations") },
-  handler: async () => {
-    // TODO(partie 2) : notifier le restaurant de la réponse de l'extra.
+  handler: async (ctx, { convocationId }) => {
+    const convocation = await ctx.db.get(convocationId)
+    if (!convocation) return null
+    const extra = await ctx.db.get(convocation.extraId)
+    const restaurant = await ctx.db.get(convocation.restaurantId)
+    let memberEmail: string | undefined
+    if (convocation.sentBy) {
+      const member = await ctx.db.get(convocation.sentBy)
+      memberEmail = member?.email
+    }
+    return {
+      notifyEmail: memberEmail?.trim() || restaurant?.email?.trim() || "",
+      restaurantName: restaurant?.name ?? "",
+      extraFirstName: extra?.firstName ?? "",
+      extraLastName: extra?.lastName ?? "",
+      response: convocation.response ?? null,
+      subject: convocation.subject,
+      dateLabel: frDate(convocation.shiftDate),
+      shiftStart: convocation.shiftStart ?? "",
+      shiftEnd: convocation.shiftEnd ?? "",
+    }
+  },
+})
+
+function renderResponseNotificationEmail(opts: {
+  extraName: string
+  accepted: boolean
+  restaurantName: string
+  dateLabel: string
+  timeLabel: string
+}): string {
+  const extraName = escapeHtml(opts.extraName || "Un extra")
+  const restaurantName = escapeHtml(opts.restaurantName)
+  const verdict = opts.accepted ? "est disponible ✓" : "n'est pas disponible ✗"
+  const color = opts.accepted ? "#10B981" : "#EF4444"
+  const detail = (emoji: string, label: string, value: string) =>
+    value
+      ? `<p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 6px">${emoji} <strong>${escapeHtml(label)} :</strong> ${escapeHtml(value)}</p>`
+      : ""
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:8px">
+  <h2 style="color:#E8920A;margin:0 0 16px">Splitzy</h2>
+  <p style="color:#18181B;font-size:15px;line-height:1.6;margin:0 0 6px">Réponse à votre convocation${restaurantName ? " — " + restaurantName : ""}</p>
+  <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-left:4px solid ${color};border-radius:8px;padding:14px 16px;margin:16px 0">
+    <p style="color:#18181B;font-size:16px;font-weight:700;margin:0">${extraName} ${verdict}</p>
+  </div>
+  ${detail("📅", "Date", opts.dateLabel)}
+  ${detail("⏰", "Horaire", opts.timeLabel)}
+  <p style="color:#9CA3AF;font-size:12px;line-height:1.6;margin:16px 0 0">Notification automatique envoyée par Splitzy suite à la réponse de votre extra.</p>
+</div>`
+}
+
+// notifyConvocationResponse — email au gérant dès qu'un extra répond. internalAction
+// (et non mutation) car l'envoi Resend nécessite un fetch réseau, interdit dans une
+// mutation. Best-effort : ne fait jamais planter le flux de réponse, log seulement.
+export const notifyConvocationResponse = internalAction({
+  args: { convocationId: v.id("extraConvocations") },
+  handler: async (ctx, { convocationId }) => {
+    const c = await ctx.runQuery(internal.extras.getResponseNotifyContext, { convocationId })
+    if (!c) return
+    if (c.response !== "accepted" && c.response !== "declined") return
+    if (!c.notifyEmail) {
+      console.error("[notifyConvocationResponse] aucune adresse de notification")
+      return
+    }
+    const apiKey = process.env.RESEND_API_KEY
+    if (!apiKey) {
+      console.error("[notifyConvocationResponse] RESEND_API_KEY absente côté Convex")
+      return
+    }
+    const accepted = c.response === "accepted"
+    const extraName = `${c.extraFirstName} ${c.extraLastName}`.trim()
+    const timeLabel = c.shiftStart ? `${c.shiftStart}${c.shiftEnd ? " – " + c.shiftEnd : ""}` : ""
+    const subject = `${extraName || "Un extra"} ${accepted ? "est disponible" : "n'est pas disponible"} — ${c.subject}`
+    const html = renderResponseNotificationEmail({
+      extraName,
+      accepted,
+      restaurantName: c.restaurantName,
+      dateLabel: c.dateLabel,
+      timeLabel,
+    })
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "Splitzy <noreply@splitzy.fr>",
+          to: c.notifyEmail,
+          subject,
+          html,
+        }),
+      })
+      if (!res.ok) {
+        console.error("[notifyConvocationResponse] Resend error:", res.status, await res.text())
+      }
+    } catch (err) {
+      console.error("[notifyConvocationResponse] send threw:", err)
+    }
   },
 })

@@ -3234,6 +3234,33 @@ function ExtraHistoryDrawer({
                     <div className="text-[11.5px] ds-text-tertiary mt-1.5">
                       Envoyé le {new Date(c.sentAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
+                    {(c.response === 'accepted' || c.response === 'declined') ? (
+                      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className="inline-flex items-center px-2 py-[2px] rounded-full text-[10.5px] font-semibold"
+                          style={{
+                            background: c.response === 'accepted' ? 'var(--ds-success-soft)' : 'var(--ds-error-soft)',
+                            color: c.response === 'accepted' ? 'var(--ds-success-strong)' : 'var(--ds-error)',
+                          }}
+                        >
+                          {c.response === 'accepted' ? '✓ Disponible' : '✕ Indisponible'}
+                        </span>
+                        {c.respondedAt && (
+                          <span className="text-[11px] ds-text-tertiary">
+                            répondu le {new Date(c.respondedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                    ) : ok ? (
+                      <div className="mt-2">
+                        <span
+                          className="inline-flex items-center px-2 py-[2px] rounded-full text-[10.5px] font-semibold ds-text-tertiary"
+                          style={{ background: 'var(--ds-bg-base)', border: '1px solid var(--ds-border)' }}
+                        >
+                          ⏳ En attente de réponse
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                 )
               })}

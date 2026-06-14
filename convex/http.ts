@@ -153,11 +153,60 @@ http.route({
   }),
 })
 
-// ── Réponse extra à une convocation (lien public dans l'email de convocation) ───
-// GET /api/extra-response?token=…&answer=yes|no — 100% public (pas de Clerk).
-// Le token (secret d'URL) identifie la convocation ; réponse à usage unique (la 1ʳᵉ
-// est définitive, cf. extras.recordResponse). Redirige toujours vers la page de
-// confirmation publique — jamais d'erreur Convex brute exposée à l'extra.
+// ── Réponse extra à une convocation (liens publics dans l'email) ────────────────
+// Confirmation en 2 temps — anti-SafeLinks/antivirus : un scanner qui PRÉFETCHE le
+// lien GET ne doit pas pouvoir brûler le token à usage unique.
+//   GET  /api/extra-response          → page HTML avec un bouton (n'enregistre RIEN).
+//   POST /api/extra-response-confirm  → enregistre définitivement (1ʳᵉ réponse) + redirige.
+// 100% public (pas de Clerk). Réponse à usage unique, cf. extras.recordResponse.
+
+function htmlEscape(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+}
+
+const confirmationPage = "https://www.splitzy.fr/extra-response-confirmation"
+const redirectTo = (location: string) =>
+  new Response(null, { status: 302, headers: { Location: location } })
+
+// Page intermédiaire : aucun effet de bord, juste un formulaire POST. Un prefetch
+// (SafeLinks, antivirus) charge cette page sans jamais enregistrer la réponse.
+function renderExtraConfirmPage(opts: {
+  firstName: string
+  dateLabel: string
+  timeLabel: string
+  token: string
+  answer: "yes" | "no"
+}): string {
+  const firstName = htmlEscape(opts.firstName)
+  const token = htmlEscape(opts.token)
+  const accepted = opts.answer === "yes"
+  const when = [opts.dateLabel, opts.timeLabel].filter(Boolean).map(htmlEscape).join(" · ")
+  const question = accepted
+    ? "confirmez-vous votre disponibilité"
+    : "confirmez-vous votre indisponibilité"
+  const buttonLabel = accepted ? "Confirmer ma disponibilité" : "Confirmer mon indisponibilité"
+  const buttonBg = accepted ? "#E8920A" : "#374151"
+  return `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Confirmer votre réponse — Splitzy</title></head>
+<body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#18181B;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:24px">
+  <div style="max-width:380px;width:100%;text-align:center">
+    <h2 style="color:#E8920A;font-size:24px;font-weight:800;letter-spacing:-0.02em;margin:0 0 28px">Splitzy</h2>
+    <h1 style="color:#fff;font-size:20px;font-weight:800;letter-spacing:-0.02em;margin:0 0 10px">Bonjour ${firstName},</h1>
+    <p style="color:#A1A1AA;font-size:14.5px;line-height:1.6;margin:0 0 24px">${question}${when ? " pour le " + when : ""} ?</p>
+    <form method="POST" action="/api/extra-response-confirm">
+      <input type="hidden" name="token" value="${token}">
+      <input type="hidden" name="answer" value="${accepted ? "yes" : "no"}">
+      <button type="submit" style="display:inline-block;width:100%;background:${buttonBg};color:#fff;padding:14px 20px;border:0;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">${buttonLabel}</button>
+    </form>
+    <p style="color:#71717A;font-size:12px;line-height:1.6;margin:20px 0 0">Cliquez sur le bouton pour valider votre réponse auprès du restaurant.</p>
+  </div>
+</body></html>`
+}
+
 http.route({
   path: "/api/extra-response",
   method: "GET",
@@ -165,16 +214,46 @@ http.route({
     const url = new URL(request.url)
     const token = url.searchParams.get("token")
     const answer = url.searchParams.get("answer")
-    const confirmation = "https://www.splitzy.fr/extra-response-confirmation"
-    const redirect = (location: string) =>
-      new Response(null, { status: 302, headers: { Location: location } })
-
     if (!token || (answer !== "yes" && answer !== "no")) {
-      return redirect(`${confirmation}?status=invalid`)
+      return redirectTo(`${confirmationPage}?status=invalid`)
+    }
+    const info = await ctx.runQuery(internal.extras.getConvocationByToken, { token })
+    // Déjà répondue (ou token inconnu) → page « lien invalide ou déjà utilisé ».
+    if (!info || info.alreadyResponded) {
+      return redirectTo(`${confirmationPage}?status=invalid`)
+    }
+    const timeLabel = info.shiftStart
+      ? `${info.shiftStart}${info.shiftEnd ? " – " + info.shiftEnd : ""}`
+      : ""
+    const html = renderExtraConfirmPage({
+      firstName: info.firstName,
+      dateLabel: info.dateLabel,
+      timeLabel,
+      token,
+      answer,
+    })
+    return new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    })
+  }),
+})
+
+// POST — enregistre définitivement la réponse (1ʳᵉ = définitive) puis redirige vers
+// la page de confirmation publique. Corps form-urlencoded (token + answer).
+http.route({
+  path: "/api/extra-response-confirm",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = new URLSearchParams(await request.text())
+    const token = body.get("token")
+    const answer = body.get("answer")
+    if (!token || (answer !== "yes" && answer !== "no")) {
+      return redirectTo(`${confirmationPage}?status=invalid`)
     }
     const result = await ctx.runMutation(internal.extras.recordResponse, { token, answer })
-    if (!result.ok) return redirect(`${confirmation}?status=invalid`)
-    return redirect(`${confirmation}?answer=${answer}`)
+    if (!result.ok) return redirectTo(`${confirmationPage}?status=invalid`)
+    return redirectTo(`${confirmationPage}?answer=${answer}`)
   }),
 })
 
