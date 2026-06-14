@@ -9,20 +9,27 @@ import { Helmet } from 'react-helmet-async'
 export function ExtraResponseConfirmation() {
   const [params] = useSearchParams()
   const answer = params.get('answer')
-  const invalid = params.get('status') === 'invalid' || (answer !== 'yes' && answer !== 'no')
+  const counter = answer === 'counter'
+  const invalid =
+    params.get('status') === 'invalid' ||
+    (answer !== 'yes' && answer !== 'no' && answer !== 'counter')
   const yes = answer === 'yes'
 
   const title = invalid
     ? 'Lien invalide ou déjà utilisé'
-    : yes
-      ? 'Merci ! Votre disponibilité a bien été confirmée.'
-      : 'Merci pour votre réponse.'
+    : counter
+      ? 'Contre-proposition envoyée !'
+      : yes
+        ? 'Merci ! Votre disponibilité a bien été confirmée.'
+        : 'Merci pour votre réponse.'
 
   const subtitle = invalid
     ? "Ce lien n'est plus valable — il a peut-être déjà servi. Si vous pensez qu'il s'agit d'une erreur, contactez directement le restaurant."
-    : yes
-      ? 'Le restaurant a bien reçu votre confirmation et reviendra vers vous pour les détails du service.'
-      : "Vous avez indiqué ne pas être disponible pour ce service. Merci de l'avoir signalé."
+    : counter
+      ? 'Votre demande a été transmise au gérant. Il vous répondra par email rapidement.'
+      : yes
+        ? 'Le restaurant a bien reçu votre confirmation et reviendra vers vous pour les détails du service.'
+        : "Vous avez indiqué ne pas être disponible pour ce service. Merci de l'avoir signalé."
 
   return (
     <div
@@ -53,6 +60,16 @@ export function ExtraResponseConfirmation() {
             <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
               <path d="M13 7v7M13 18.5h.01" stroke="#A1A1AA" strokeWidth="2.2" strokeLinecap="round" />
             </svg>
+          </div>
+        ) : counter ? (
+          <div
+            style={{
+              width: 56, height: 56, margin: '0 auto 20px', borderRadius: '50%',
+              background: '#E8920A', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 26,
+            }}
+          >
+            ✉️
           </div>
         ) : yes ? (
           <div

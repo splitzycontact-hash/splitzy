@@ -150,6 +150,7 @@ export function renderConvocationEmail(opts: {
   message: string
   yesUrl: string
   noUrl: string
+  counterUrl?: string
 }): string {
   const firstName = escapeHtml(opts.firstName)
   const restaurantName = escapeHtml(opts.restaurantName)
@@ -179,6 +180,11 @@ export function renderConvocationEmail(opts: {
     <a href="${opts.yesUrl}" style="display:inline-block;background:#E8920A;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin:0 8px 8px 0">Je suis disponible ✓</a>
     <a href="${opts.noUrl}" style="display:inline-block;background:#F3F4F6;color:#374151;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin:0 0 8px 0">Je ne suis pas disponible ✗</a>
   </div>
+  ${opts.counterUrl ? `<p style="text-align:center;margin-top:16px">
+    <a href="${opts.counterUrl}" style="color:#6B7280;font-size:14px;text-decoration:underline">
+      🔄 Proposer un autre horaire
+    </a>
+  </p>` : ""}
   <p style="color:#9CA3AF;font-size:12px;line-height:1.6;margin:8px 0 0">Cet email vous a été envoyé par Splitzy pour le compte de ${restaurantName}.</p>
 </div>`
 }
@@ -268,6 +274,11 @@ export const convoke = action({
     const responseBase = "https://www.splitzy.fr/api/extra-response"
     const yesUrl = `${responseBase}?token=${encodeURIComponent(responseToken)}&answer=yes`
     const noUrl = `${responseBase}?token=${encodeURIComponent(responseToken)}&answer=no`
+    // Lien de contre-proposition → endpoint public Convex (formulaire HTML).
+    const siteUrl = process.env.CONVEX_SITE_URL ?? ""
+    const counterUrl = siteUrl
+      ? `${siteUrl}/api/extra-counter-form?token=${encodeURIComponent(responseToken)}`
+      : undefined
 
     const html = renderConvocationEmail({
       firstName: context.firstName,
@@ -279,6 +290,7 @@ export const convoke = action({
       message: args.message,
       yesUrl,
       noUrl,
+      counterUrl,
     })
 
     let emailStatus: "sent" | "failed" = "failed"
@@ -708,6 +720,28 @@ export const getManagerDecisionContext = internalQuery({
       shiftDate: convocation.shiftDate ?? "",
       shiftStart: convocation.shiftStart ?? "",
       shiftEnd: convocation.shiftEnd ?? "",
+    }
+  },
+})
+
+// getManagerCounterByToken — lecture publique (via HTTP action) de la contre-proposition
+// pour la page de décision du gérant (lien email anti-SafeLinks). Infos minimales :
+// créneau proposé, prénom de l'extra, date, et si une décision a déjà été figée.
+export const getManagerCounterByToken = internalQuery({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const convocation = await ctx.db
+      .query("extraConvocations")
+      .filter(q => q.eq(q.field("managerResponseToken"), token))
+      .unique()
+    if (!convocation) return null
+    const extra = await ctx.db.get(convocation.extraId)
+    return {
+      firstName: extra?.firstName ?? "",
+      dateLabel: frDate(convocation.shiftDate),
+      counterProposedStart: convocation.counterProposedStart ?? "",
+      counterProposedEnd: convocation.counterProposedEnd ?? "",
+      alreadyDecided: !!convocation.managerResponse,
     }
   },
 })

@@ -257,4 +257,195 @@ http.route({
   }),
 })
 
+// ── Contre-proposition d'horaire (liens publics dans l'email) ───────────────────
+// Côté extra : un lien GET ouvre un formulaire (saisie créneau souhaité), le POST
+// enregistre la contre-proposition. Côté gérant : confirmation 2 temps anti-SafeLinks
+// (GET page bouton → POST décision). 100% public, tokens non devinables.
+
+function renderCounterFormPage(opts: {
+  firstName: string
+  dateLabel: string
+  timeLabel: string
+  token: string
+}): string {
+  const firstName = htmlEscape(opts.firstName)
+  const token = htmlEscape(opts.token)
+  const dateLabel = htmlEscape(opts.dateLabel)
+  const timeLabel = htmlEscape(opts.timeLabel)
+  return `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Proposer un autre horaire — Splitzy</title></head>
+<body style="margin:0;min-height:100vh;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:24px;box-sizing:border-box">
+  <div style="max-width:480px;margin:0 auto">
+    <h2 style="color:#E8920A;font-size:24px;font-weight:800;letter-spacing:-0.02em;margin:0 0 24px;text-align:center">Splitzy</h2>
+    <h1 style="color:#18181B;font-size:20px;font-weight:800;letter-spacing:-0.02em;margin:0 0 8px">Bonjour ${firstName},</h1>
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 6px">Proposer un autre horaire pour le <strong>${dateLabel}</strong></p>
+    <p style="color:#9CA3AF;font-size:14px;line-height:1.6;margin:0 0 24px">Horaire original : ${timeLabel || "—"}</p>
+    <form method="POST" action="/api/extra-counter-confirm">
+      <input type="hidden" name="token" value="${token}">
+      <label style="display:block;color:#374151;font-size:14px;font-weight:600;margin:0 0 6px">De :</label>
+      <input type="time" name="start" required style="width:100%;box-sizing:border-box;padding:12px;font-size:16px;border:1px solid #E5E7EB;border-radius:8px;margin:0 0 16px">
+      <label style="display:block;color:#374151;font-size:14px;font-weight:600;margin:0 0 6px">À :</label>
+      <input type="time" name="end" required style="width:100%;box-sizing:border-box;padding:12px;font-size:16px;border:1px solid #E5E7EB;border-radius:8px;margin:0 0 16px">
+      <label style="display:block;color:#374151;font-size:14px;font-weight:600;margin:0 0 6px">Message (optionnel)</label>
+      <textarea name="message" rows="3" placeholder="Ex : je dois déposer mes enfants avant..." style="width:100%;box-sizing:border-box;padding:12px;font-size:16px;border:1px solid #E5E7EB;border-radius:8px;margin:0 0 20px;font-family:inherit;resize:vertical"></textarea>
+      <button type="submit" style="display:block;width:100%;background:#E8920A;color:#fff;padding:14px 20px;border:0;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">Envoyer ma contre-proposition →</button>
+    </form>
+  </div>
+</body></html>`
+}
+
+// GET — formulaire de contre-proposition. Aucun effet de bord.
+http.route({
+  path: "/api/extra-counter-form",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url)
+    const token = url.searchParams.get("token")
+    if (!token) return redirectTo(`${confirmationPage}?status=invalid`)
+    const info = await ctx.runQuery(internal.extras.getConvocationByToken, { token })
+    // Déjà répondue (ou token inconnu) → page « lien invalide ou déjà utilisé ».
+    if (!info || info.alreadyResponded) {
+      return redirectTo(`${confirmationPage}?status=invalid`)
+    }
+    const timeLabel = info.shiftStart
+      ? `${info.shiftStart}${info.shiftEnd ? " – " + info.shiftEnd : ""}`
+      : ""
+    const html = renderCounterFormPage({
+      firstName: info.firstName,
+      dateLabel: info.dateLabel,
+      timeLabel,
+      token,
+    })
+    return new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    })
+  }),
+})
+
+// POST — enregistre la contre-proposition puis redirige. recordCounterProposal throw
+// si la convocation a déjà reçu une réponse (response !== "pending").
+http.route({
+  path: "/api/extra-counter-confirm",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = new URLSearchParams(await request.text())
+    const token = body.get("token")
+    const start = body.get("start")
+    const end = body.get("end")
+    const message = body.get("message") ?? undefined
+    if (!token || !start || !end) {
+      return redirectTo(`${confirmationPage}?status=invalid`)
+    }
+    try {
+      await ctx.runMutation(internal.extras.recordCounterProposal, {
+        token,
+        start,
+        end,
+        message: message || undefined,
+      })
+    } catch {
+      return redirectTo(`${confirmationPage}?status=invalid`)
+    }
+    return redirectTo(`${confirmationPage}?answer=counter`)
+  }),
+})
+
+function renderManagerCounterPage(opts: {
+  firstName: string
+  dateLabel: string
+  counterStart: string
+  counterEnd: string
+  token: string
+  action: "accept" | "decline"
+}): string {
+  const firstName = htmlEscape(opts.firstName)
+  const token = htmlEscape(opts.token)
+  const dateLabel = htmlEscape(opts.dateLabel)
+  const slot = htmlEscape(`${opts.counterStart}–${opts.counterEnd}`)
+  const accept = opts.action === "accept"
+  const question = accept
+    ? `Confirmer l'acceptation du créneau ${slot} ?`
+    : "Confirmer le refus de la contre-proposition ?"
+  const buttonLabel = accept ? "✓ Confirmer l'acceptation" : "✗ Confirmer le refus"
+  const buttonBg = accept ? "#E8920A" : "#374151"
+  const when = [firstName, dateLabel].filter(Boolean).join(" · ")
+  return `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Confirmer votre réponse — Splitzy</title></head>
+<body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#18181B;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:24px">
+  <div style="max-width:380px;width:100%;text-align:center">
+    <h2 style="color:#E8920A;font-size:24px;font-weight:800;letter-spacing:-0.02em;margin:0 0 28px">Splitzy</h2>
+    <h1 style="color:#fff;font-size:20px;font-weight:800;letter-spacing:-0.02em;margin:0 0 10px">${question}</h1>
+    <p style="color:#A1A1AA;font-size:14.5px;line-height:1.6;margin:0 0 24px">${when}</p>
+    <form method="POST" action="/api/manager-counter-confirm">
+      <input type="hidden" name="token" value="${token}">
+      <input type="hidden" name="action" value="${accept ? "accept" : "decline"}">
+      <button type="submit" style="display:inline-block;width:100%;background:${buttonBg};color:#fff;padding:14px 20px;border:0;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">${buttonLabel}</button>
+    </form>
+    <p style="color:#71717A;font-size:12px;line-height:1.6;margin:20px 0 0">Cliquez sur le bouton pour valider votre réponse.</p>
+  </div>
+</body></html>`
+}
+
+function renderManagerCounterResult(): string {
+  return `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Réponse enregistrée — Splitzy</title></head>
+<body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#18181B;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:24px">
+  <div style="max-width:380px;width:100%;text-align:center">
+    <h2 style="color:#E8920A;font-size:24px;font-weight:800;letter-spacing:-0.02em;margin:0 0 28px">Splitzy</h2>
+    <p style="color:#fff;font-size:16px;line-height:1.6;margin:0">Votre réponse a bien été enregistrée. L'extra a été notifié.</p>
+  </div>
+</body></html>`
+}
+
+const htmlResponse = (html: string) =>
+  new Response(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } })
+
+// GET — page de décision du gérant (confirmation 2 temps). Aucun effet de bord.
+http.route({
+  path: "/api/manager-counter",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url)
+    const token = url.searchParams.get("token")
+    const action = url.searchParams.get("action")
+    if (!token || (action !== "accept" && action !== "decline")) {
+      return redirectTo(`${confirmationPage}?status=invalid`)
+    }
+    const info = await ctx.runQuery(internal.extras.getManagerCounterByToken, { token })
+    if (!info || info.alreadyDecided) {
+      return redirectTo(`${confirmationPage}?status=invalid`)
+    }
+    const html = renderManagerCounterPage({
+      firstName: info.firstName,
+      dateLabel: info.dateLabel,
+      counterStart: info.counterProposedStart,
+      counterEnd: info.counterProposedEnd,
+      token,
+      action,
+    })
+    return htmlResponse(html)
+  }),
+})
+
+// POST — enregistre la décision du gérant. recordManagerResponse throw si déjà décidé.
+http.route({
+  path: "/api/manager-counter-confirm",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const body = new URLSearchParams(await request.text())
+    const token = body.get("token")
+    const action = body.get("action")
+    if (!token || (action !== "accept" && action !== "decline")) {
+      return redirectTo(`${confirmationPage}?status=invalid`)
+    }
+    try {
+      await ctx.runMutation(internal.extras.recordManagerResponse, { token, action })
+    } catch {
+      return redirectTo(`${confirmationPage}?status=invalid`)
+    }
+    return htmlResponse(renderManagerCounterResult())
+  }),
+})
+
 export default http
