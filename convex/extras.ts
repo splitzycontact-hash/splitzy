@@ -120,7 +120,7 @@ export const archive = mutation({
 
 // Token de réponse opaque pour l'endpoint public : UUID aléatoire + timestamp,
 // encodé base64 url-safe (aucun caractère à échapper dans l'URL). Non devinable.
-function makeResponseToken(): string {
+export function makeResponseToken(): string {
   const raw = `${crypto.randomUUID()}:${Date.now()}`
   return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
 }
@@ -140,7 +140,7 @@ function frDate(iso?: string): string {
   return y && m && d ? `${d}/${m}/${y}` : iso
 }
 
-function renderConvocationEmail(opts: {
+export function renderConvocationEmail(opts: {
   firstName: string
   restaurantName: string
   address?: string

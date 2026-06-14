@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useAction } from 'convex/react'
+import type { FunctionReturnType } from 'convex/server'
 import { toast } from 'sonner'
-import { CalendarDays, Plus, Check, X, Clock, Mail, CalendarClock, Hourglass } from 'lucide-react'
+import { CalendarDays, Plus, Check, X, Clock, Mail, CalendarClock, Hourglass, Bell } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
@@ -56,6 +57,45 @@ function frDateLong(iso: string): string {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   })
 }
+// "2026-06-15" → "15/06"
+function frDateShort(iso: string): string {
+  const [, m, d] = iso.split('-')
+  return m && d ? `${d}/${m}` : iso
+}
+// "12:00" → "12h" ; "12:30" → "12h30"
+function frTime(t: string): string {
+  if (!t) return ''
+  const [h, m] = t.split(':')
+  return m && m !== '00' ? `${h}h${m}` : `${h}h`
+}
+// "12h–16h" (ou "" sans heure de début)
+function timeLabel(start: string, end: string): string {
+  if (!start) return ''
+  return end ? `${frTime(start)}–${frTime(end)}` : frTime(start)
+}
+// "à l'instant" / "il y a 2 h" / "il y a 3 j"
+function timeAgo(ms: number): string {
+  const min = Math.floor((Date.now() - ms) / 60000)
+  if (min < 1) return "à l'instant"
+  if (min < 60) return `il y a ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `il y a ${h} h`
+  return `il y a ${Math.floor(h / 24)} j`
+}
+
+const DAY_MS = 86_400_000
+
+type PlanningRow = FunctionReturnType<typeof api.planning.getUpcoming>[number]
+type StatusKey = 'accepted' | 'declined' | 'pending'
+
+const STATUS_CONFIG: Record<StatusKey, { label: string; icon: string; bg: string; color: string }> = {
+  accepted: { label: 'Disponible', icon: '✅', bg: 'var(--ds-success-soft)', color: 'var(--ds-success-strong)' },
+  declined: { label: 'Non disponible', icon: '❌', bg: 'var(--ds-error-soft)', color: 'var(--ds-error-strong)' },
+  pending: { label: 'En attente', icon: '⏳', bg: 'var(--ds-bg-subtle)', color: 'var(--ds-text-secondary)' },
+}
+function statusKey(r: PlanningRow): StatusKey {
+  return r.response === 'accepted' ? 'accepted' : r.response === 'declined' ? 'declined' : 'pending'
+}
 
 export function Planning() {
   const restaurantId = useRestaurantId()
@@ -66,6 +106,22 @@ export function Planning() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [showConvoke, setShowConvoke] = useState(false)
+  const resend = useAction(api.planning.resend)
+  const [resendingId, setResendingId] = useState<string | null>(null)
+
+  async function handleResend(convocationId: Id<'extraConvocations'>, firstName: string) {
+    if (resendingId) return
+    setResendingId(convocationId)
+    try {
+      const res = await resend({ convocationId })
+      if (res.success) toast.success(`Email de relance envoyé à ${firstName}`)
+      else toast.error(res.error || 'Échec de la relance')
+    } catch {
+      toast.error('Échec de la relance')
+    } finally {
+      setResendingId(null)
+    }
+  }
 
   const range = useMemo<{ from: string; to: string } | null>(() => {
     if (period === 'week') return weekRange()
@@ -95,8 +151,12 @@ export function Planning() {
   // Groupes par date — structure du tableau ; le contenu détaillé des lignes est
   // rempli en partie 2 (placeholders pour l'instant).
   const groups = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const r of rows ?? []) map.set(r.shiftDate, (map.get(r.shiftDate) ?? 0) + 1)
+    const map = new Map<string, PlanningRow[]>()
+    for (const r of rows ?? []) {
+      const list = map.get(r.shiftDate) ?? []
+      list.push(r)
+      map.set(r.shiftDate, list)
+    }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [rows])
 
@@ -209,48 +269,112 @@ export function Planning() {
               <p className="text-[13px] ds-text-tertiary">Chargement…</p>
             </div>
           ) : groups.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center px-6">
-              <CalendarClock size={24} style={{ color: 'var(--ds-text-tertiary)' }} />
-              <p className="text-[14px] font-semibold ds-text-primary">Aucune convocation sur cette période</p>
-              <p className="text-[12.5px] ds-text-tertiary max-w-[300px]">
-                {period === 'custom' && !range
-                  ? 'Sélectionnez une plage de dates pour afficher le planning.'
-                  : 'Cliquez sur « Nouvelle convocation » pour solliciter un extra.'}
-              </p>
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--ds-bg-subtle)' }}>
+                <CalendarClock size={22} style={{ color: 'var(--ds-text-tertiary)' }} />
+              </div>
+              <div>
+                <p className="text-[14px] font-semibold ds-text-primary">Aucune convocation sur cette période</p>
+                <p className="text-[12.5px] ds-text-tertiary max-w-[320px] mt-1">
+                  {period === 'custom' && !range
+                    ? 'Sélectionnez une plage de dates pour afficher le planning.'
+                    : 'Sollicitez un extra pour un service à venir.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowConvoke(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white"
+                style={{ background: '#E8920A' }}
+              >
+                <Plus size={14} /> Convoquer un extra
+              </button>
             </div>
           ) : (
             <div>
-              {groups.map(([date, count]) => (
-                <div key={date}>
-                  {/* Séparateur de jour */}
-                  <div
-                    className="px-5 py-2 text-[12px] font-semibold ds-text-secondary border-b first-letter:uppercase"
-                    style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}
-                  >
-                    {frDateLong(date)} · {count} extra{count !== 1 ? 's' : ''}
-                  </div>
-                  {/* Lignes placeholder (contenu détaillé = partie 2) */}
-                  {Array.from({ length: count }).map((_, j) => (
+              {groups.map(([date, list]) => {
+                const confirmed = list.filter(r => r.response === 'accepted').length
+                const pending = list.filter(r => r.response !== 'accepted' && r.response !== 'declined').length
+                return (
+                  <div key={date}>
+                    {/* Séparateur de jour */}
                     <div
-                      key={j}
-                      className="grid items-center gap-3 px-5 py-3 border-b"
-                      style={{ gridTemplateColumns: GRID_COLS, borderColor: 'var(--ds-border)' }}
+                      className="flex flex-wrap items-baseline gap-x-2 px-5 py-2 border-b"
+                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full shrink-0" style={{ background: 'var(--ds-bg-subtle)' }} />
-                        <div className="h-3 w-24 rounded" style={{ background: 'var(--ds-bg-subtle)' }} />
-                      </div>
-                      <div className="h-3 w-20 rounded" style={{ background: 'var(--ds-bg-subtle)' }} />
-                      <div className="h-3 w-28 rounded" style={{ background: 'var(--ds-bg-subtle)' }} />
-                      <div className="h-3 w-16 rounded" style={{ background: 'var(--ds-bg-subtle)' }} />
-                      <div className="h-3 w-10 rounded justify-self-end" style={{ background: 'var(--ds-bg-subtle)' }} />
+                      <span className="text-[12px] font-semibold ds-text-primary first-letter:uppercase">{frDateLong(date)}</span>
+                      <span className="text-[11.5px] ds-text-tertiary">
+                        · {list.length} convocation{list.length !== 1 ? 's' : ''}
+                        {confirmed > 0 ? ` · ${confirmed} confirmée${confirmed !== 1 ? 's' : ''}` : ''}
+                        {pending > 0 ? ` · ${pending} en attente` : ''}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              ))}
-              <div className="px-5 py-2.5 text-[11.5px] ds-text-tertiary text-center">
-                Détail des lignes disponible prochainement.
-              </div>
+                    {/* Lignes de convocation */}
+                    {list.map(r => {
+                      const sk = statusKey(r)
+                      const cfg = STATUS_CONFIG[sk]
+                      const initials = `${r.firstName[0] ?? ''}${r.lastName[0] ?? ''}`.toUpperCase() || '?'
+                      const when = timeLabel(r.shiftStart, r.shiftEnd)
+                      const stale = sk === 'pending' && Date.now() - r.sentAt > DAY_MS
+                      const isResending = resendingId === r.convocationId
+                      return (
+                        <div
+                          key={r.convocationId}
+                          className="grid items-center gap-3 px-5 py-3 border-b"
+                          style={{ gridTemplateColumns: GRID_COLS, borderColor: 'var(--ds-border)' }}
+                        >
+                          {/* Extra */}
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-[11.5px] font-bold shrink-0"
+                              style={{ background: 'var(--ds-accent-soft)', color: 'var(--ds-accent-strong)' }}
+                            >
+                              {initials}
+                            </div>
+                            <span className="text-[13px] font-semibold ds-text-primary truncate">
+                              {r.firstName} {r.lastName}
+                            </span>
+                          </div>
+                          {/* Skills */}
+                          <div className="text-[12.5px] ds-text-secondary truncate">
+                            {r.skills.length ? r.skills.map(s => SKILL_LABEL[s] ?? s).join(' · ') : '—'}
+                          </div>
+                          {/* Date & horaire */}
+                          <div className="text-[12.5px] ds-text-secondary">
+                            {frDateShort(r.shiftDate)}{when ? ` · ${when}` : ''}
+                          </div>
+                          {/* Statut */}
+                          <div className="flex flex-col gap-0.5 items-start">
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full text-[11px] font-semibold whitespace-nowrap"
+                              style={{ background: cfg.bg, color: cfg.color }}
+                            >
+                              {cfg.icon} {cfg.label}
+                            </span>
+                            {(sk === 'accepted' || sk === 'declined') && r.respondedAt && (
+                              <span className="text-[10.5px] ds-text-tertiary">Répondu {timeAgo(r.respondedAt)}</span>
+                            )}
+                          </div>
+                          {/* Action */}
+                          <div className="flex justify-end">
+                            {sk === 'pending' && (stale ? (
+                              <button
+                                onClick={() => handleResend(r.convocationId, r.firstName)}
+                                disabled={isResending}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11.5px] font-semibold border transition-colors disabled:opacity-50"
+                                style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
+                              >
+                                <Bell size={12} /> {isResending ? 'Envoi…' : 'Relancer'}
+                              </button>
+                            ) : (
+                              <span className="text-[11px] ds-text-tertiary whitespace-nowrap">Envoyé {timeAgo(r.sentAt)}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
             </div>
           )}
         </section>
