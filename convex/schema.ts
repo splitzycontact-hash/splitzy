@@ -44,6 +44,11 @@ export default defineSchema({
     restaurantId: v.id("restaurants"),
     email: v.string(),
     name: v.string(),
+    // Prénom / nom réels (recopiés depuis Clerk à l'acceptation d'invitation ou via
+    // members.syncMyProfile). Optionnels : les lignes anciennes n'en ont pas et
+    // retombent sur `name` (dérivé de l'email) côté UI.
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
     role: v.union(v.literal("owner"), v.literal("manager"), v.literal("staff")),
     status: v.union(v.literal("active"), v.literal("pending")),
     invitedAt: v.number(),

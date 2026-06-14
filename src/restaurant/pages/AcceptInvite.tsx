@@ -93,7 +93,7 @@ function AcceptInviteInner() {
     autoAcceptDone.current = true
     setAccepting(true)
     setError(null)
-    accept({ token })
+    accept({ token, firstName: user.firstName ?? undefined, lastName: user.lastName ?? undefined })
       .then(() => navigate('/restaurant', { replace: true }))
       .catch((err) => {
         // On NE remet PAS autoAcceptDone à false : sinon l'effet se re-déclenche
@@ -179,7 +179,7 @@ function AcceptInviteInner() {
     setAccepting(true)
     setError(null)
     try {
-      await accept({ token })
+      await accept({ token, firstName: user.firstName ?? undefined, lastName: user.lastName ?? undefined })
       navigate('/restaurant', { replace: true })
     } catch (err) {
       setError(errMessage(err))

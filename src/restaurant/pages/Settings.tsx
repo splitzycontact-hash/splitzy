@@ -1922,11 +1922,30 @@ const INVITE_STATUS_STYLE: Record<'pending' | 'accepted' | 'expired', { bg: stri
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+// Nom affiché d'un membre : prénom + nom (Clerk) si renseignés, sinon le libellé
+// `name` (dérivé de l'email à l'invitation), sinon l'email brut en dernier recours.
+function memberDisplayName(m: { firstName?: string; lastName?: string; name?: string; email: string }): string {
+  const full = [m.firstName, m.lastName].filter(Boolean).join(' ').trim()
+  return full || m.name?.trim() || m.email
+}
+
 function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null }) {
   const { user } = useUser()
   const restaurant = useRestaurant()
   const restaurantName = restaurant?.name ?? 'votre restaurant'
   const members = useQuery(api.members.getTeamMembers, restaurantId ? { restaurantId } : 'skip') ?? []
+  const syncMemberProfile = useMutation(api.members.syncMyProfile)
+
+  // Backfill : recopie le nom Clerk de l'utilisateur courant sur sa propre ligne
+  // `members` à l'ouverture de la page, pour les membres créés avant l'ajout des
+  // champs firstName/lastName (sans-effet pour le propriétaire, qui n'a pas de ligne).
+  useEffect(() => {
+    if (!user) return
+    syncMemberProfile({
+      firstName: user.firstName ?? undefined,
+      lastName: user.lastName ?? undefined,
+    }).catch(() => {})
+  }, [user, syncMemberProfile])
   const invitations = useQuery(api.invitations.listByRestaurant, restaurantId ? { restaurantId } : 'skip') ?? []
   const createInvitation = useAction(api.invitations.create)
   const updateMemberRole = useMutation(api.members.updateMemberRole)
@@ -2127,7 +2146,8 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
           )}
           {members.map(member => {
               const roleStyle = ROLE_STYLE[member.role as MemberRole] ?? ROLE_STYLE.staff
-              const initials = member.name.split(' ').map(w => w[0]?.toUpperCase() ?? '').slice(0, 2).join('')
+              const displayName = memberDisplayName(member)
+              const initials = displayName.split(' ').map(w => w[0]?.toUpperCase() ?? '').slice(0, 2).join('')
               return (
                 <div
                   key={member._id}
@@ -2146,7 +2166,7 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                   </div>
                   {/* Name */}
                   <div>
-                    <div className="text-[13px] font-semibold ds-text-primary">{member.name}</div>
+                    <div className="text-[13px] font-semibold ds-text-primary">{displayName}</div>
                   </div>
                   {/* Email */}
                   <div className="text-[11.5px] ds-text-tertiary truncate">{member.email}</div>
@@ -2208,7 +2228,7 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                         <div className="my-1" style={{ borderTop: '1px solid var(--ds-border)' }} />
                         <button
                           onClick={() => {
-                            setConfirmRemove({ id: member._id, name: member.name })
+                            setConfirmRemove({ id: member._id, name: displayName })
                             setOpenMenu(null)
                           }}
                           className="w-full text-left flex items-center gap-2 px-3 py-2 text-[13px] hover:ds-bg-error-soft transition-colors"
@@ -2567,10 +2587,49 @@ function AccountSection({
   const { openUserProfile, signOut } = useClerk()
   const navigate = useNavigate()
   const deleteAll    = useMutation(api.restaurants.deleteAll)
+  const syncMemberProfile = useMutation(api.members.syncMyProfile)
 
   const [deleteModal,    setDeleteModal]   = useState(false)
   const [deleteConfirm,  setDeleteConfirm] = useState('')
   const [dangerLoading,  setDangerLoading] = useState(false)
+
+  // Champs Prénom / Nom éditables (source : Clerk). Pré-remplis dès que Clerk a
+  // chargé l'utilisateur, sauvegardés via user.update().
+  const [firstName,      setFirstName]     = useState('')
+  const [lastName,       setLastName]      = useState('')
+  const [savingProfile,  setSavingProfile] = useState(false)
+  const [profileSaved,   setProfileSaved]  = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    setFirstName(user.firstName ?? '')
+    setLastName(user.lastName ?? '')
+  }, [user])
+
+  const profileDirty =
+    !!user &&
+    (firstName.trim() !== (user.firstName ?? '') || lastName.trim() !== (user.lastName ?? ''))
+
+  async function handleSaveProfile() {
+    if (!user || !profileDirty || savingProfile) return
+    setSavingProfile(true)
+    try {
+      await user.update({ firstName: firstName.trim(), lastName: lastName.trim() })
+      // Répercute le nom sur la ligne `members` du gérant (si elle existe) pour que
+      // la page Équipe affiche le vrai nom plutôt qu'un libellé dérivé de l'email.
+      await syncMemberProfile({
+        firstName: firstName.trim() || undefined,
+        lastName: lastName.trim() || undefined,
+      }).catch(() => {})
+      setProfileSaved(true)
+      toast.success('Profil mis à jour')
+      setTimeout(() => setProfileSaved(false), 2000)
+    } catch {
+      toast.error("Impossible d'enregistrer le profil")
+    } finally {
+      setSavingProfile(false)
+    }
+  }
 
   async function handleDelete() {
     if (!restaurantId || deleteConfirm.trim().toLowerCase() !== (restaurant?.name ?? '').toLowerCase()) return
@@ -2608,24 +2667,36 @@ function AccountSection({
             <div className="font-bold text-[13.5px] ds-text-primary">Profil</div>
             <div className="text-[12px] ds-text-tertiary mt-0.5">Vos informations personnelles</div>
           </div>
+          <button
+            onClick={handleSaveProfile}
+            disabled={!profileDirty || savingProfile}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: profileSaved ? 'var(--ds-success)' : '#E8920A' }}
+          >
+            {profileSaved
+              ? <><Check size={13} />Enregistré</>
+              : savingProfile ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
         </div>
         <div className="px-5 py-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Prénom</label>
               <input
-                readOnly
-                value={user?.firstName ?? ''}
-                className="w-full rounded-lg border px-3 py-2 text-[13.5px] cursor-default"
+                value={firstName}
+                onChange={e => setFirstName(e.target.value)}
+                placeholder="Votre prénom"
+                className="w-full rounded-lg border px-3 py-2 text-[13.5px] outline-none focus:border-[#E8920A]"
                 style={inputStyle}
               />
             </div>
             <div>
               <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Nom</label>
               <input
-                readOnly
-                value={user?.lastName ?? ''}
-                className="w-full rounded-lg border px-3 py-2 text-[13.5px] cursor-default"
+                value={lastName}
+                onChange={e => setLastName(e.target.value)}
+                placeholder="Votre nom"
+                className="w-full rounded-lg border px-3 py-2 text-[13.5px] outline-none focus:border-[#E8920A]"
                 style={inputStyle}
               />
             </div>

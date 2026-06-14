@@ -222,8 +222,14 @@ export const listByRestaurant = query({
 // accept — appelée après login Clerk. Valide le token + l'expiration, crée ou
 // réactive la ligne `members` correspondante, passe l'invitation à 'accepted'.
 export const accept = mutation({
-  args: { token: v.string() },
-  handler: async (ctx, { token }) => {
+  args: {
+    token: v.string(),
+    // Prénom / nom Clerk de l'invité (passés par le front à l'acceptation) pour
+    // afficher son vrai nom dans l'équipe plutôt qu'un libellé dérivé de l'email.
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+  },
+  handler: async (ctx, { token, firstName, lastName }) => {
     const identity = await ctx.auth.getUserIdentity()
     // Diagnostic prod : on logge l'identité complète pour voir ce que le JWT
     // Clerk transmet réellement (en particulier si le claim `email` est émis).
@@ -269,6 +275,7 @@ export const accept = mutation({
 
     const memberRole = inviteRoleToMemberRole(inv.role)
     const now = Date.now()
+    const fullName = [firstName, lastName].filter(Boolean).join(" ").trim()
 
     // Réutilise une éventuelle ligne `members` déjà créée pour cet email
     // (même restaurant) plutôt que de créer un doublon.
@@ -285,12 +292,17 @@ export const accept = mutation({
         status: "active",
         joinedAt: now,
         clerkUserId,
+        ...(firstName !== undefined ? { firstName } : {}),
+        ...(lastName !== undefined ? { lastName } : {}),
+        ...(fullName ? { name: fullName } : {}),
       })
     } else {
       await ctx.db.insert("members", {
         restaurantId: inv.restaurantId,
         email: inv.email,
-        name: nameFromEmail(inv.email),
+        name: fullName || nameFromEmail(inv.email),
+        firstName,
+        lastName,
         role: memberRole,
         status: "active",
         invitedAt: inv.createdAt,

@@ -33,6 +33,34 @@ export const inviteMember = mutation({
   },
 })
 
+// Recopie le prénom/nom Clerk de l'utilisateur courant sur SA propre ligne
+// `members` (identifiée par clerkUserId). Permet à la page Équipe d'afficher le
+// vrai nom, y compris pour les membres créés avant l'ajout de ces champs (la
+// ligne était nommée d'après l'email). N'agit que sur les lignes de l'appelant —
+// pas de garde restaurant nécessaire (self-scoped via identity.subject).
+export const syncMyProfile = mutation({
+  args: {
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+  },
+  handler: async (ctx, { firstName, lastName }) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return
+    const rows = await ctx.db
+      .query("members")
+      .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
+      .collect()
+    const full = [firstName, lastName].filter(Boolean).join(" ").trim()
+    for (const row of rows) {
+      await ctx.db.patch(row._id, {
+        firstName,
+        lastName,
+        ...(full ? { name: full } : {}),
+      })
+    }
+  },
+})
+
 export const updateMemberRole = mutation({
   args: {
     memberId: v.id("members"),
