@@ -68,9 +68,10 @@ export function ReportPeriodSelector({ open, onClose, onChoose }: Props) {
       }}
     >
       <div
+        className="w-[420px] min-w-[min(380px,100%)] max-w-[calc(100vw-2rem)]"
         style={{
           background: 'var(--ds-bg-surface)', color: 'var(--ds-text-primary)',
-          borderRadius: 16, width: 420, maxWidth: '100%',
+          borderRadius: 16,
           boxShadow: '0 12px 48px rgba(0,0,0,0.3)', overflow: 'hidden',
         }}
       >
@@ -92,42 +93,32 @@ export function ReportPeriodSelector({ open, onClose, onChoose }: Props) {
         </div>
 
         <div style={{ padding: 20 }}>
-          {/* Raccourcis */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {/* Raccourcis — boutons pleine largeur, 1 col mobile / 2 cols desktop */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {SHORTCUTS.map(({ kind, label, hint }) => (
               <button
                 key={kind}
                 onClick={() => handleShortcut(kind)}
-                style={{
-                  textAlign: 'left', padding: '11px 14px', borderRadius: 10,
-                  border: '1px solid var(--ds-border)', background: 'var(--ds-bg-base)',
-                  color: 'var(--ds-text-primary)', cursor: 'pointer',
-                  fontSize: 13.5, fontWeight: 600, transition: 'border-color .15s',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#E8920A')}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--ds-border)')}
+                className="flex items-center justify-between gap-2 w-full text-left rounded-xl px-4 py-4 sm:py-3 border cursor-pointer text-[13.5px] font-semibold transition-colors border-[color:var(--ds-border)] bg-[color:var(--ds-bg-base)] text-[color:var(--ds-text-primary)] hover:border-[#E8920A] hover:bg-[color:var(--ds-bg-subtle)]"
               >
-                {label}
+                <span>{label}</span>
                 {hint && (
-                  <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 700, color: '#E8920A', textTransform: 'uppercase' }}>{hint}</span>
+                  <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-[#FEF3C7] text-[#92400e]">
+                    {hint}
+                  </span>
                 )}
               </button>
             ))}
           </div>
 
-          {/* Période personnalisée (option avancée) */}
+          {/* Période personnalisée (option avancée) — bouton pleine largeur dessous */}
           <div style={{ marginTop: 14, borderTop: '1px dashed var(--ds-border)', paddingTop: 14 }}>
             {!customMode ? (
               <button
                 onClick={() => { setCustomMode(true); setError(null) }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                  padding: '11px 14px', borderRadius: 10, cursor: 'pointer',
-                  border: '1px solid var(--ds-border)', background: 'transparent',
-                  color: 'var(--ds-text-secondary)', fontSize: 13.5, fontWeight: 600,
-                }}
+                className="flex items-center justify-center gap-2 w-full rounded-xl px-4 py-4 sm:py-3 border cursor-pointer text-[13.5px] font-semibold transition-colors border-[color:var(--ds-border)] text-[color:var(--ds-text-secondary)] hover:border-[#E8920A] hover:bg-[color:var(--ds-bg-subtle)]"
               >
-                <CalendarRange size={15} />
+                <CalendarRange size={16} />
                 Période personnalisée…
               </button>
             ) : (
