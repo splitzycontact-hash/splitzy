@@ -7,6 +7,8 @@ import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId } from '../context/RestaurantContext'
+import { suggestEmoji } from '../lib/foodEmoji'
+import { EmojiPicker } from '../components/EmojiPicker'
 import {
   Search, Plus, Download, ChevronDown, MoreHorizontal,
   Clock, BarChart3, AlertCircle,
@@ -346,7 +348,7 @@ function LiveCategorySection({ categoryName, items, filter, onAdd, onEdit, onDup
               >
                 {/* Thumb */}
                 <div className="w-10 h-10 rounded-[8px] flex items-center justify-center text-[18px] flex-shrink-0" style={{ background: 'var(--ds-bg-subtle)' }}>
-                  {item.emoji}
+                  {item.emoji || suggestEmoji(item.name, normalizeCategory(item.category ?? 'plats'))}
                 </div>
 
                 {/* Name + tags + desc */}
@@ -508,6 +510,11 @@ export function MenuPage() {
   const [formAvail, setFormAvail]       = useState(true)
   const [formTags, setFormTags]         = useState<Set<string>>(new Set())
   const [formLoading, setFormLoading]   = useState(false)
+  // Emoji : auto-suggéré tant que le gérant n'a pas choisi manuellement (emojiTouched).
+  const [formEmoji, setFormEmoji]       = useState('🍽️')
+  const [emojiTouched, setEmojiTouched] = useState(false)
+  const [emojiOpen, setEmojiOpen]       = useState(false)
+  const emojiBtnRef                     = useRef<HTMLButtonElement>(null)
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget]   = useState<ConvexItem | null>(null)
@@ -558,19 +565,37 @@ export function MenuPage() {
   /* ── Modal helpers ── */
 
   function openAddModal(category?: string) {
+    const cat = normalizeCategory(category ?? 'entrees')
     setModalMode('add'); setEditTarget(null)
-    setFormName(''); setFormCategory(normalizeCategory(category ?? 'entrees'))
+    setFormName(''); setFormCategory(cat)
     setFormPrice(''); setFormDesc(''); setFormAvail(true); setFormTags(new Set())
+    setFormEmoji(suggestEmoji('', cat)); setEmojiTouched(false); setEmojiOpen(false)
   }
 
   function openEditModal(item: ConvexItem) {
+    const cat = normalizeCategory(item.category ?? 'plats')
     setModalMode('edit'); setEditTarget(item)
     setFormName(item.name)
-    setFormCategory(normalizeCategory(item.category ?? 'plats'))
+    setFormCategory(cat)
     setFormPrice(item.priceCents > 0 ? (item.priceCents / 100).toFixed(2).replace('.', ',') : '')
     setFormDesc(item.description ?? '')
     setFormAvail(item.isAvailable !== false)
     setFormTags(new Set(item.tags ?? []))
+    // Édition : on part de l'emoji existant et on ne l'écrase pas au fil de la frappe.
+    setFormEmoji(item.emoji || suggestEmoji(item.name, cat)); setEmojiTouched(true); setEmojiOpen(false)
+  }
+
+  // En création, recalcule la suggestion tant que le gérant n'a pas choisi à la main.
+  function onNameChange(value: string) {
+    setFormName(value)
+    if (modalMode === 'add' && !emojiTouched) setFormEmoji(suggestEmoji(value, formCategory))
+  }
+  function onCategoryChange(value: string) {
+    setFormCategory(value)
+    if (modalMode === 'add' && !emojiTouched) setFormEmoji(suggestEmoji(formName, value))
+  }
+  function pickEmoji(e: string) {
+    setFormEmoji(e); setEmojiTouched(true); setEmojiOpen(false)
   }
 
   function toggleTag(id: string) {
@@ -587,13 +612,13 @@ export function MenuPage() {
     const desc       = formDesc.trim() || undefined
     setFormLoading(true)
     try {
+      const emoji = formEmoji || CATEGORY_EMOJI[normCat] || '🍽'
       if (modalMode === 'edit' && editTarget) {
         await updateItem({
           id: editTarget._id, name: formName.trim(), category: normCat,
-          priceCents, description: desc, isAvailable: formAvail, tags,
+          priceCents, emoji, description: desc, isAvailable: formAvail, tags,
         })
       } else {
-        const emoji = CATEGORY_EMOJI[normCat] ?? '🍽'
         await addItemMut({
           restaurantId, name: formName.trim(), category: normCat,
           priceCents, emoji, description: desc, isAvailable: formAvail, tags,
@@ -897,23 +922,50 @@ export function MenuPage() {
 
               {/* Body */}
               <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-                {/* Nom */}
+                {/* Emoji + Nom */}
                 <div>
                   <label className="block text-[11.5px] font-semibold ds-text-secondary mb-1.5 uppercase tracking-[0.06em]">Nom du plat *</label>
-                  <input
-                    value={formName} onChange={e => setFormName(e.target.value)}
-                    placeholder="ex: Pad thaï crevettes"
-                    className="w-full rounded-lg border px-3 py-2 outline-none"
-                    style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
-                    autoFocus
-                  />
+                  <div className="flex gap-2">
+                    <button
+                      ref={emojiBtnRef}
+                      type="button"
+                      onClick={() => setEmojiOpen(o => !o)}
+                      title="Choisir un emoji"
+                      className="shrink-0 rounded-lg border flex items-center justify-center transition-colors"
+                      style={{
+                        width: 44, height: 38, fontSize: 22, lineHeight: 1,
+                        background: 'var(--ds-bg-base)',
+                        borderColor: emojiOpen ? '#E8920A' : 'var(--ds-border)',
+                      }}
+                    >
+                      {formEmoji}
+                    </button>
+                    <input
+                      value={formName} onChange={e => onNameChange(e.target.value)}
+                      placeholder="ex: Pad thaï crevettes"
+                      className="flex-1 rounded-lg border px-3 py-2 outline-none"
+                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="text-[11px] ds-text-tertiary mt-1">
+                    Emoji {emojiTouched ? 'choisi manuellement' : 'suggéré automatiquement'} — cliquez dessus pour changer.
+                  </div>
+                  {emojiOpen && (
+                    <EmojiPicker
+                      anchorRef={emojiBtnRef}
+                      value={formEmoji}
+                      onSelect={pickEmoji}
+                      onClose={() => setEmojiOpen(false)}
+                    />
+                  )}
                 </div>
 
                 {/* Catégorie */}
                 <div>
                   <label className="block text-[11.5px] font-semibold ds-text-secondary mb-1.5 uppercase tracking-[0.06em]">Catégorie</label>
                   <select
-                    value={formCategory} onChange={e => setFormCategory(e.target.value)}
+                    value={formCategory} onChange={e => onCategoryChange(e.target.value)}
                     className="w-full rounded-lg border px-3 py-2 outline-none"
                     style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
                   >
