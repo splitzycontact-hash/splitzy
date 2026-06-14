@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, CalendarRange } from 'lucide-react'
+import { useTheme } from '../context/ThemeContext'
 import {
   buildRange,
   buildCustomRange,
@@ -25,6 +26,12 @@ const SHORTCUTS: { kind: Exclude<PeriodKind, 'custom'>; label: string; hint?: st
 ]
 
 export function ReportPeriodSelector({ open, onClose, onChoose }: Props) {
+  // Le modal est porté dans document.body (hors du scope .restaurant-root où sont
+  // définies les variables --ds-*). Les couleurs sont donc explicites et choisies
+  // selon le thème courant, sinon le texte sombre tombe sur un fond sombre.
+  const { theme } = useTheme()
+  const dark = theme === 'dark'
+
   const todayMs = Date.now()
   const [customMode, setCustomMode] = useState(false)
   const [fromYmd, setFromYmd] = useState(() => toDateInputValue(todayMs - 6 * 86400000))
@@ -58,35 +65,50 @@ export function ReportPeriodSelector({ open, onClose, onChoose }: Props) {
     onChoose(range)
   }
 
+  const C = dark
+    ? { modalBg: '#18181B', text: '#FAFAFA', textSub: '#A1A1AA', border: '#3F3F46', inputBg: '#27272A' }
+    : { modalBg: '#FFFFFF', text: '#0A0A0A', textSub: '#71717A', border: '#E4E4E7', inputBg: '#FFFFFF' }
+
+  const baseBtn = 'w-full rounded-xl px-4 py-4 sm:py-3 border cursor-pointer text-[13.5px] font-semibold transition-colors'
+  // Couleurs base + hover en classes Tailwind (le hover doit l'emporter → pas d'inline pour ces props).
+  const shortcutBtn = `${baseBtn} flex items-center justify-between gap-2 text-left ${
+    dark
+      ? 'border-[#3F3F46] bg-[#27272A] text-[#FAFAFA] hover:border-[#E8920A] hover:bg-[#E8920A]/10'
+      : 'border-[#E4E4E7] bg-[#FAFAFA] text-[#0A0A0A] hover:border-[#E8920A] hover:bg-[#FFF7ED]'
+  }`
+  // « Période personnalisée » : fond légèrement distinct des raccourcis.
+  const customBtn = `${baseBtn} flex items-center justify-center gap-2 ${
+    dark
+      ? 'border-[#3F3F46] bg-[#18181B] text-[#D4D4D8] hover:border-[#E8920A] hover:bg-[#E8920A]/10'
+      : 'border-[#E4E4E7] bg-white text-[#52525B] hover:border-[#E8920A] hover:bg-[#FFF7ED]'
+  }`
+
   return createPortal(
     <div
       onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9998,
-        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-      }}
+      className="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
     >
       <div
         className="w-[420px] min-w-[min(380px,100%)] max-w-[calc(100vw-2rem)]"
         style={{
-          background: 'var(--ds-bg-surface)', color: 'var(--ds-text-primary)',
+          background: C.modalBg, color: C.text,
           borderRadius: 16,
-          boxShadow: '0 12px 48px rgba(0,0,0,0.3)', overflow: 'hidden',
+          boxShadow: '0 12px 48px rgba(0,0,0,0.4)', overflow: 'hidden',
+          border: `1px solid ${C.border}`,
         }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--ds-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${C.border}` }}>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 16 }}>Période du rapport</div>
-            <div style={{ fontSize: 12.5, color: 'var(--ds-text-tertiary)', marginTop: 2 }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: C.text }}>Période du rapport</div>
+            <div style={{ fontSize: 12.5, color: C.textSub, marginTop: 2 }}>
               Choisissez la plage à imprimer.
             </div>
           </div>
           <button
             onClick={handleClose}
             aria-label="Fermer"
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--ds-text-tertiary)', padding: 4 }}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: C.textSub, padding: 4 }}
           >
             <X size={18} />
           </button>
@@ -96,14 +118,10 @@ export function ReportPeriodSelector({ open, onClose, onChoose }: Props) {
           {/* Raccourcis — boutons pleine largeur, 1 col mobile / 2 cols desktop */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {SHORTCUTS.map(({ kind, label, hint }) => (
-              <button
-                key={kind}
-                onClick={() => handleShortcut(kind)}
-                className="flex items-center justify-between gap-2 w-full text-left rounded-xl px-4 py-4 sm:py-3 border cursor-pointer text-[13.5px] font-semibold transition-colors border-[color:var(--ds-border)] bg-[color:var(--ds-bg-base)] text-[color:var(--ds-text-primary)] hover:border-[#E8920A] hover:bg-[color:var(--ds-bg-subtle)]"
-              >
+              <button key={kind} onClick={() => handleShortcut(kind)} className={shortcutBtn}>
                 <span>{label}</span>
                 {hint && (
-                  <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-[#FEF3C7] text-[#92400e]">
+                  <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-[#E8920A] text-white">
                     {hint}
                   </span>
                 )}
@@ -112,19 +130,16 @@ export function ReportPeriodSelector({ open, onClose, onChoose }: Props) {
           </div>
 
           {/* Période personnalisée (option avancée) — bouton pleine largeur dessous */}
-          <div style={{ marginTop: 14, borderTop: '1px dashed var(--ds-border)', paddingTop: 14 }}>
+          <div style={{ marginTop: 14, borderTop: `1px dashed ${C.border}`, paddingTop: 14 }}>
             {!customMode ? (
-              <button
-                onClick={() => { setCustomMode(true); setError(null) }}
-                className="flex items-center justify-center gap-2 w-full rounded-xl px-4 py-4 sm:py-3 border cursor-pointer text-[13.5px] font-semibold transition-colors border-[color:var(--ds-border)] text-[color:var(--ds-text-secondary)] hover:border-[#E8920A] hover:bg-[color:var(--ds-bg-subtle)]"
-              >
+              <button onClick={() => { setCustomMode(true); setError(null) }} className={customBtn}>
                 <CalendarRange size={16} />
                 Période personnalisée…
               </button>
             ) : (
               <div>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <label style={{ flex: 1, fontSize: 11.5, fontWeight: 700, color: 'var(--ds-text-tertiary)' }}>
+                  <label style={{ flex: 1, fontSize: 11.5, fontWeight: 700, color: C.textSub }}>
                     Du
                     <input
                       type="date"
@@ -133,13 +148,12 @@ export function ReportPeriodSelector({ open, onClose, onChoose }: Props) {
                       onChange={(e) => { setFromYmd(e.target.value); setError(null) }}
                       style={{
                         display: 'block', width: '100%', marginTop: 4, padding: '8px 10px',
-                        borderRadius: 8, border: '1px solid var(--ds-border)',
-                        background: 'var(--ds-bg-surface)', color: 'var(--ds-text-primary)',
-                        fontSize: 14,
+                        borderRadius: 8, border: `1px solid ${C.border}`,
+                        background: C.inputBg, color: C.text, fontSize: 14,
                       }}
                     />
                   </label>
-                  <label style={{ flex: 1, fontSize: 11.5, fontWeight: 700, color: 'var(--ds-text-tertiary)' }}>
+                  <label style={{ flex: 1, fontSize: 11.5, fontWeight: 700, color: C.textSub }}>
                     Au
                     <input
                       type="date"
@@ -148,23 +162,22 @@ export function ReportPeriodSelector({ open, onClose, onChoose }: Props) {
                       onChange={(e) => { setToYmd(e.target.value); setError(null) }}
                       style={{
                         display: 'block', width: '100%', marginTop: 4, padding: '8px 10px',
-                        borderRadius: 8, border: '1px solid var(--ds-border)',
-                        background: 'var(--ds-bg-surface)', color: 'var(--ds-text-primary)',
-                        fontSize: 14,
+                        borderRadius: 8, border: `1px solid ${C.border}`,
+                        background: C.inputBg, color: C.text, fontSize: 14,
                       }}
                     />
                   </label>
                 </div>
                 {error && (
-                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ds-error, #dc2626)' }}>{error}</div>
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#dc2626' }}>{error}</div>
                 )}
                 <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
                   <button
                     onClick={() => { setCustomMode(false); setError(null) }}
                     style={{
-                      flex: 1, padding: '9px 14px', borderRadius: 9, cursor: 'pointer',
-                      border: '1px solid var(--ds-border)', background: 'transparent',
-                      color: 'var(--ds-text-secondary)', fontSize: 13, fontWeight: 600,
+                      flex: 1, padding: '10px 14px', borderRadius: 9, cursor: 'pointer',
+                      border: `1px solid ${C.border}`, background: 'transparent',
+                      color: C.textSub, fontSize: 13, fontWeight: 600,
                     }}
                   >
                     Retour
@@ -172,7 +185,7 @@ export function ReportPeriodSelector({ open, onClose, onChoose }: Props) {
                   <button
                     onClick={handleCustomConfirm}
                     style={{
-                      flex: 1, padding: '9px 14px', borderRadius: 9, cursor: 'pointer',
+                      flex: 1, padding: '10px 14px', borderRadius: 9, cursor: 'pointer',
                       border: 'none', background: '#E8920A', color: 'white',
                       fontSize: 13, fontWeight: 700,
                     }}
