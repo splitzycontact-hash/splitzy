@@ -1,3 +1,9 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/api/extra-response",
+      "destination": "https://mellow-chinchilla-481.eu-west-1.convex.site/api/extra-response"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

@@ -118,6 +118,13 @@ export const archive = mutation({
 // n'a pas ctx.db) + internalMutation pour écrire l'historique. L'envoi ne fait
 // jamais planter : succès comme échec, on enregistre un doc extraConvocations.
 
+// Token de réponse opaque pour l'endpoint public : UUID aléatoire + timestamp,
+// encodé base64 url-safe (aucun caractère à échapper dans l'URL). Non devinable.
+function makeResponseToken(): string {
+  const raw = `${crypto.randomUUID()}:${Date.now()}`
+  return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -141,8 +148,8 @@ function renderConvocationEmail(opts: {
   shiftStart?: string
   shiftEnd?: string
   message: string
-  managerEmail: string
-  subject: string
+  yesUrl: string
+  noUrl: string
 }): string {
   const firstName = escapeHtml(opts.firstName)
   const restaurantName = escapeHtml(opts.restaurantName)
@@ -157,14 +164,6 @@ function renderConvocationEmail(opts: {
       ? `<p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 6px">${emoji} <strong>${escapeHtml(label)} :</strong> ${escapeHtml(value)}</p>`
       : ""
 
-  const mailto = (available: boolean) => {
-    const verb = available ? "Je suis disponible" : "Je ne suis pas disponible"
-    const body = available
-      ? "Bonjour, je suis disponible pour ce service."
-      : "Bonjour, je ne suis pas disponible pour ce service."
-    return `mailto:${encodeURIComponent(opts.managerEmail)}?subject=${encodeURIComponent(verb + " — " + opts.subject)}&body=${encodeURIComponent(body)}`
-  }
-
   return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:8px">
   <h2 style="color:#E8920A;margin:0 0 16px">Splitzy</h2>
   <p style="color:#18181B;font-size:15px;line-height:1.6;margin:0 0 6px">Bonjour ${firstName},</p>
@@ -177,8 +176,8 @@ function renderConvocationEmail(opts: {
     <p style="color:#18181B;font-size:14px;line-height:1.6;margin:0">${message}</p>
   </div>
   <div style="margin:20px 0">
-    <a href="${mailto(true)}" style="display:inline-block;background:#E8920A;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin:0 8px 8px 0">Je suis disponible ✓</a>
-    <a href="${mailto(false)}" style="display:inline-block;background:#F3F4F6;color:#374151;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin:0 0 8px 0">Je ne suis pas disponible ✗</a>
+    <a href="${opts.yesUrl}" style="display:inline-block;background:#E8920A;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin:0 8px 8px 0">Je suis disponible ✓</a>
+    <a href="${opts.noUrl}" style="display:inline-block;background:#F3F4F6;color:#374151;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin:0 0 8px 0">Je ne suis pas disponible ✗</a>
   </div>
   <p style="color:#9CA3AF;font-size:12px;line-height:1.6;margin:8px 0 0">Cet email vous a été envoyé par Splitzy pour le compte de ${restaurantName}.</p>
 </div>`
@@ -224,6 +223,10 @@ export const recordConvocation = internalMutation({
     shiftEnd: v.optional(v.string()),
     sentAt: v.number(),
     emailStatus: v.union(v.literal("sent"), v.literal("failed")),
+    responseToken: v.optional(v.string()),
+    response: v.optional(
+      v.union(v.literal("pending"), v.literal("accepted"), v.literal("declined")),
+    ),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("extraConvocations", args)
@@ -259,6 +262,13 @@ export const convoke = action({
       context.restaurantEmail?.trim() ||
       ""
 
+    // Token de réponse : secret d'URL non devinable. L'extra répond via l'endpoint
+    // public /api/extra-response (cf. http.ts) sans aucune authentification.
+    const responseToken = makeResponseToken()
+    const responseBase = "https://www.splitzy.fr/api/extra-response"
+    const yesUrl = `${responseBase}?token=${encodeURIComponent(responseToken)}&answer=yes`
+    const noUrl = `${responseBase}?token=${encodeURIComponent(responseToken)}&answer=no`
+
     const html = renderConvocationEmail({
       firstName: context.firstName,
       restaurantName: context.restaurantName,
@@ -267,8 +277,8 @@ export const convoke = action({
       shiftStart: args.shiftStart,
       shiftEnd: args.shiftEnd,
       message: args.message,
-      managerEmail,
-      subject: args.subject,
+      yesUrl,
+      noUrl,
     })
 
     let emailStatus: "sent" | "failed" = "failed"
@@ -317,8 +327,50 @@ export const convoke = action({
       shiftEnd: args.shiftEnd,
       sentAt: Date.now(),
       emailStatus,
+      responseToken,
+      response: "pending",
     })
 
     return emailStatus === "sent" ? { success: true } : { success: false, error }
+  },
+})
+
+// ─── Réponse de l'extra (endpoint public /api/extra-response) ───────────────────
+// recordResponse : appelée par l'HTTP action après lecture du token. Atomique —
+// trouve la convocation par token, refuse si déjà répondue (1ʳᵉ réponse = définitive),
+// sinon fige response + respondedAt puis déclenche la notification (corps = partie 2).
+export const recordResponse = internalMutation({
+  args: {
+    token: v.string(),
+    answer: v.union(v.literal("yes"), v.literal("no")),
+  },
+  handler: async (ctx, { token, answer }): Promise<{ ok: boolean }> => {
+    const convocation = await ctx.db
+      .query("extraConvocations")
+      .withIndex("by_token", q => q.eq("responseToken", token))
+      .unique()
+    if (!convocation) return { ok: false }
+    // Token à usage unique : une réponse déjà figée est définitive.
+    if (convocation.response === "accepted" || convocation.response === "declined") {
+      return { ok: false }
+    }
+    await ctx.db.patch(convocation._id, {
+      response: answer === "yes" ? "accepted" : "declined",
+      respondedAt: Date.now(),
+    })
+    // Notifie le restaurant de la réponse — corps implémenté en partie 2.
+    await ctx.scheduler.runAfter(0, internal.extras.notifyConvocationResponse, {
+      convocationId: convocation._id,
+    })
+    return { ok: true }
+  },
+})
+
+// notifyConvocationResponse — notifie le gérant qu'un extra a répondu à sa convocation.
+// Stub partie 1 : le corps (email/notification dashboard) est implémenté en partie 2.
+export const notifyConvocationResponse = internalMutation({
+  args: { convocationId: v.id("extraConvocations") },
+  handler: async () => {
+    // TODO(partie 2) : notifier le restaurant de la réponse de l'extra.
   },
 })

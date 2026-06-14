@@ -153,4 +153,29 @@ http.route({
   }),
 })
 
+// ── Réponse extra à une convocation (lien public dans l'email de convocation) ───
+// GET /api/extra-response?token=…&answer=yes|no — 100% public (pas de Clerk).
+// Le token (secret d'URL) identifie la convocation ; réponse à usage unique (la 1ʳᵉ
+// est définitive, cf. extras.recordResponse). Redirige toujours vers la page de
+// confirmation publique — jamais d'erreur Convex brute exposée à l'extra.
+http.route({
+  path: "/api/extra-response",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const url = new URL(request.url)
+    const token = url.searchParams.get("token")
+    const answer = url.searchParams.get("answer")
+    const confirmation = "https://www.splitzy.fr/extra-response-confirmation"
+    const redirect = (location: string) =>
+      new Response(null, { status: 302, headers: { Location: location } })
+
+    if (!token || (answer !== "yes" && answer !== "no")) {
+      return redirect(`${confirmation}?status=invalid`)
+    }
+    const result = await ctx.runMutation(internal.extras.recordResponse, { token, answer })
+    if (!result.ok) return redirect(`${confirmation}?status=invalid`)
+    return redirect(`${confirmation}?answer=${answer}`)
+  }),
+})
+
 export default http

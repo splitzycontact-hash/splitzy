@@ -227,6 +227,15 @@ export default defineSchema({
     shiftEnd: v.optional(v.string()),     // "16:00"
     sentAt: v.number(),
     emailStatus: v.union(v.literal("sent"), v.literal("failed")),
+    // Réponse de l'extra via les liens publics de l'email (endpoint /api/extra-response).
+    // responseToken : secret d'URL non devinable, identifie la convocation sans auth.
+    // response : "pending" à l'envoi, figé à "accepted"/"declined" à la 1ʳᵉ réponse (définitive).
+    responseToken: v.optional(v.string()),
+    response: v.optional(
+      v.union(v.literal("pending"), v.literal("accepted"), v.literal("declined")),
+    ),
+    respondedAt: v.optional(v.number()),
   }).index("by_extra", ["extraId"])
-    .index("by_restaurant", ["restaurantId"]),
+    .index("by_restaurant", ["restaurantId"])
+    .index("by_token", ["responseToken"]),
 })
