@@ -2624,6 +2624,13 @@ function ExtrasSection({ restaurantId }: { restaurantId: Id<'restaurants'> | nul
   const addExtra     = useMutation(api.extras.add)
   const updateExtra  = useMutation(api.extras.update)
   const archiveExtra = useMutation(api.extras.archive)
+  const convoke      = useAction(api.extras.convoke)
+  const { user } = useUser()
+  const restaurant = useRestaurant()
+  const restaurantName = restaurant?.name ?? 'votre restaurant'
+  // Email de l'expéditeur (réponses des extras via mailto / reply_to).
+  const managerEmail =
+    user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses?.[0]?.emailAddress ?? ''
 
   const [form, setForm] = useState<ExtraForm>(EMPTY_EXTRA_FORM)
   const [editingId, setEditingId] = useState<Id<'extras'> | null>(null)
@@ -2633,6 +2640,11 @@ function ExtrasSection({ restaurantId }: { restaurantId: Id<'restaurants'> | nul
   const [confirmArchive, setConfirmArchive] = useState<{ id: Id<'extras'>; name: string } | null>(null)
   const [archiving, setArchiving] = useState(false)
   const [historyExtra, setHistoryExtra] = useState<{ id: Id<'extras'>; name: string } | null>(null)
+  const [convokeExtra, setConvokeExtra] = useState<{ id: Id<'extras'>; firstName: string; name: string } | null>(null)
+  const [convokeForm, setConvokeForm] = useState<{ shiftDate: string; shiftStart: string; shiftEnd: string; subject: string; message: string }>({
+    shiftDate: '', shiftStart: '', shiftEnd: '', subject: '', message: '',
+  })
+  const [sendingConvoke, setSendingConvoke] = useState(false)
 
   // Viewer / équipier : section masquée (owner + manager uniquement).
   if (role === 'viewer') return null
@@ -2726,10 +2738,45 @@ function ExtrasSection({ restaurantId }: { restaurantId: Id<'restaurants'> | nul
     }
   }
 
-  // Convocation par email = partie 2. Bouton présent dès la partie 1 pour la mise
-  // en page, mais l'envoi n'est pas encore branché.
-  function handleConvoke() {
-    toast('Convocation par email', { description: 'Disponible très prochainement.' })
+  function openConvoke(extra: NonNullable<typeof extras>[number]) {
+    setConvokeExtra({ id: extra._id, firstName: extra.firstName, name: `${extra.firstName} ${extra.lastName}` })
+    setConvokeForm({
+      shiftDate: '',
+      shiftStart: '',
+      shiftEnd: '',
+      subject: `[${restaurantName}] Demande de disponibilité`,
+      message: '',
+    })
+  }
+
+  async function handleSendConvoke() {
+    if (!convokeExtra || sendingConvoke) return
+    if (!convokeForm.message.trim()) {
+      toast.error("Ajoutez un message avant d'envoyer")
+      return
+    }
+    setSendingConvoke(true)
+    try {
+      const res = await convoke({
+        extraId: convokeExtra.id,
+        subject: convokeForm.subject.trim() || `[${restaurantName}] Demande de disponibilité`,
+        message: convokeForm.message,
+        shiftDate: convokeForm.shiftDate || undefined,
+        shiftStart: convokeForm.shiftStart || undefined,
+        shiftEnd: convokeForm.shiftEnd || undefined,
+        managerEmail: managerEmail || undefined,
+      })
+      if (res.success) {
+        toast.success(`Email envoyé à ${convokeExtra.firstName}`)
+        setConvokeExtra(null)
+      } else {
+        toast.error(res.error || "Échec de l'envoi de la convocation")
+      }
+    } catch {
+      toast.error("Échec de l'envoi de la convocation")
+    } finally {
+      setSendingConvoke(false)
+    }
   }
 
   const list = extras ?? []
@@ -2799,7 +2846,7 @@ function ExtrasSection({ restaurantId }: { restaurantId: Id<'restaurants'> | nul
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
-                      onClick={handleConvoke}
+                      onClick={() => openConvoke(extra)}
                       className="inline-flex items-center gap-1.5 px-2.5 py-[6px] rounded-lg text-[12px] font-semibold"
                       style={{ background: 'var(--ds-accent-soft)', color: 'var(--ds-accent-strong)' }}
                     >
@@ -3022,6 +3069,100 @@ function ExtrasSection({ restaurantId }: { restaurantId: Id<'restaurants'> | nul
       {/* History drawer */}
       {historyExtra && (
         <ExtraHistoryDrawer extra={historyExtra} onClose={() => setHistoryExtra(null)} />
+      )}
+
+      {/* Convoke modal */}
+      {convokeExtra && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={e => { if (e.target === e.currentTarget && !sendingConvoke) setConvokeExtra(null) }}
+        >
+          <div
+            className="rounded-2xl overflow-hidden w-[500px] max-w-full max-h-[90vh] flex flex-col"
+            style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
+              <div className="font-bold text-[15px] ds-text-primary">Convoquer {convokeExtra.firstName}</div>
+              <button onClick={() => setConvokeExtra(null)} className="ds-text-tertiary hover:ds-text-primary"><X size={16} /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4 overflow-y-auto">
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Date du service</label>
+                <input
+                  type="date"
+                  value={convokeForm.shiftDate}
+                  onChange={e => setConvokeForm(f => ({ ...f, shiftDate: e.target.value }))}
+                  className="w-full rounded-lg border px-3 py-2 outline-none"
+                  style={inputStyle}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Heure de début</label>
+                  <input
+                    type="time"
+                    value={convokeForm.shiftStart}
+                    onChange={e => setConvokeForm(f => ({ ...f, shiftStart: e.target.value }))}
+                    className="w-full rounded-lg border px-3 py-2 outline-none"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Heure de fin</label>
+                  <input
+                    type="time"
+                    value={convokeForm.shiftEnd}
+                    onChange={e => setConvokeForm(f => ({ ...f, shiftEnd: e.target.value }))}
+                    className="w-full rounded-lg border px-3 py-2 outline-none"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Objet de l'email</label>
+                <input
+                  type="text"
+                  value={convokeForm.subject}
+                  onChange={e => setConvokeForm(f => ({ ...f, subject: e.target.value }))}
+                  className="w-full rounded-lg border px-3 py-2 outline-none"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Message</label>
+                <textarea
+                  value={convokeForm.message}
+                  onChange={e => setConvokeForm(f => ({ ...f, message: e.target.value }))}
+                  rows={4}
+                  placeholder={`Bonjour ${convokeExtra.firstName}, nous avons besoin de toi…`}
+                  className="w-full rounded-lg border px-3 py-2 outline-none resize-none"
+                  style={inputStyle}
+                />
+                <p className="text-[11.5px] ds-text-tertiary mt-1.5">
+                  L'email part de noreply@splitzy.fr ; les réponses arrivent sur {managerEmail || 'votre adresse'}.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-6 py-4 border-t shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
+              <button
+                onClick={() => setConvokeExtra(null)}
+                disabled={sendingConvoke}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-colors disabled:opacity-50"
+                style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleSendConvoke}
+                disabled={sendingConvoke || !convokeForm.message.trim()}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
+                style={{ background: '#E8920A' }}
+              >
+                {sendingConvoke ? 'Envoi…' : (<><Mail size={14} /> Envoyer la convocation</>)}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
