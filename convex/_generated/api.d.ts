@@ -13,6 +13,8 @@ import type * as authz from "../authz.js";
 import type * as campaigns from "../campaigns.js";
 import type * as customers from "../customers.js";
 import type * as dependencyStatus from "../dependencyStatus.js";
+import type * as extraConvocations from "../extraConvocations.js";
+import type * as extras from "../extras.js";
 import type * as feedbacks from "../feedbacks.js";
 import type * as http from "../http.js";
 import type * as insights from "../insights.js";
@@ -37,6 +39,8 @@ declare const fullApi: ApiFromModules<{
   campaigns: typeof campaigns;
   customers: typeof customers;
   dependencyStatus: typeof dependencyStatus;
+  extraConvocations: typeof extraConvocations;
+  extras: typeof extras;
   feedbacks: typeof feedbacks;
   http: typeof http;
   insights: typeof insights;

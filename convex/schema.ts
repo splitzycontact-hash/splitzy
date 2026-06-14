@@ -193,4 +193,40 @@ export default defineSchema({
   }).index("by_restaurant", ["restaurantId"])
     .index("by_restaurant_phone", ["restaurantId", "phone"])
     .index("by_restaurant_email", ["restaurantId", "email"]),
+
+  // Extras — personnel d'appoint (remplacements / renforts) du carnet de contacts
+  // du restaurant. PAS de compte Splitzy ni d'accès dashboard : ce sont de simples
+  // contacts que le gérant/manager peut convoquer par email (cf extraConvocations).
+  // `createdBy` optionnel : le propriétaire (restaurants.clerkUserId) n'a pas de
+  // ligne `members`, donc pas d'id membre à référencer.
+  extras: defineTable({
+    restaurantId: v.id("restaurants"),
+    firstName: v.string(),
+    lastName: v.string(),
+    email: v.string(),
+    phone: v.optional(v.string()),
+    skills: v.array(v.string()),        // ids: serveur|barman|cuisine|caisse|livraison|autre
+    notes: v.optional(v.string()),      // notes internes du manager
+    isActive: v.boolean(),              // archivage doux (jamais de delete)
+    createdAt: v.number(),
+    createdBy: v.optional(v.id("members")),
+  }).index("by_restaurant", ["restaurantId"])
+    .index("by_restaurant_active", ["restaurantId", "isActive"]),
+
+  // Historique des convocations envoyées à un extra (envoi email = partie 2).
+  // Lecture seule côté UI. `sentBy` optionnel pour la même raison que
+  // extras.createdBy (le propriétaire n'a pas de ligne `members`).
+  extraConvocations: defineTable({
+    restaurantId: v.id("restaurants"),
+    extraId: v.id("extras"),
+    sentBy: v.optional(v.id("members")),
+    subject: v.string(),
+    message: v.string(),
+    shiftDate: v.optional(v.string()),    // "2026-06-21"
+    shiftStart: v.optional(v.string()),   // "12:00"
+    shiftEnd: v.optional(v.string()),     // "16:00"
+    sentAt: v.number(),
+    emailStatus: v.union(v.literal("sent"), v.literal("failed")),
+  }).index("by_extra", ["extraId"])
+    .index("by_restaurant", ["restaurantId"]),
 })

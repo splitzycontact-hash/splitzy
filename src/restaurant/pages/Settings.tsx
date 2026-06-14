@@ -9,6 +9,7 @@ import {
   Download, Store, QrCode, UserCog, Bell, UserRound,
   CreditCard, Sparkles, Plus, MoreHorizontal, Trash2,
   Check, Shield, KeyRound, ChevronRight, Utensils, Beer, Coffee, Upload, X,
+  Mail, Phone, Archive, History, Pencil,
 } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
@@ -1920,6 +1921,34 @@ const INVITE_STATUS_STYLE: Record<'pending' | 'accepted' | 'expired', { bg: stri
   expired:  { bg: 'var(--ds-bg-subtle)',    color: 'var(--ds-text-tertiary)',  label: 'Expirée' },
 }
 
+// Compétences possibles d'un extra. `id` stocké en base (extras.skills), `label`
+// affiché dans les badges des cartes et les checkboxes du formulaire.
+const EXTRA_SKILLS: { id: string; label: string }[] = [
+  { id: 'serveur',   label: 'Serveur' },
+  { id: 'barman',    label: 'Barman' },
+  { id: 'cuisine',   label: 'Cuisine' },
+  { id: 'caisse',    label: 'Caisse' },
+  { id: 'livraison', label: 'Livraison' },
+  { id: 'autre',     label: 'Autre' },
+]
+
+const EXTRA_SKILL_LABEL: Record<string, string> = Object.fromEntries(
+  EXTRA_SKILLS.map(s => [s.id, s.label]),
+)
+
+// Libellé « Dernière convocation » d'une carte extra (relatif, puis date courte).
+function formatLastConvocation(ts: number | null): string {
+  if (!ts) return 'Jamais convoqué'
+  const min = Math.floor((Date.now() - ts) / 60000)
+  let rel: string
+  if (min < 1) rel = "à l'instant"
+  else if (min < 60) rel = `il y a ${min} min`
+  else if (min < 1440) rel = `il y a ${Math.floor(min / 60)} h`
+  else if (min < 10080) rel = `il y a ${Math.floor(min / 1440)} j`
+  else rel = "le " + new Date(ts).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return `Dernière convocation : ${rel}`
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // Nom affiché d'un membre : prénom + nom (Clerk) si renseignés, sinon le libellé
@@ -2568,6 +2597,509 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+// EXTRAS SECTION (personnel d'appoint — envoi des convocations = partie 2)
+// ══════════════════════════════════════════════════════════════
+
+type ExtraForm = {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  skills: string[]
+  notes: string
+}
+
+const EMPTY_EXTRA_FORM: ExtraForm = {
+  firstName: '', lastName: '', email: '', phone: '', skills: [], notes: '',
+}
+
+function ExtrasSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null }) {
+  const role = useRestaurantRole()
+  const extras = useQuery(api.extras.list, restaurantId ? { restaurantId } : 'skip')
+  const addExtra     = useMutation(api.extras.add)
+  const updateExtra  = useMutation(api.extras.update)
+  const archiveExtra = useMutation(api.extras.archive)
+
+  const [form, setForm] = useState<ExtraForm>(EMPTY_EXTRA_FORM)
+  const [editingId, setEditingId] = useState<Id<'extras'> | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [confirmArchive, setConfirmArchive] = useState<{ id: Id<'extras'>; name: string } | null>(null)
+  const [archiving, setArchiving] = useState(false)
+  const [historyExtra, setHistoryExtra] = useState<{ id: Id<'extras'>; name: string } | null>(null)
+
+  // Viewer / équipier : section masquée (owner + manager uniquement).
+  if (role === 'viewer') return null
+
+  const inputStyle = {
+    background: 'var(--ds-bg-surface)',
+    borderColor: 'var(--ds-border)',
+    color: 'var(--ds-text-primary)',
+    fontSize: '16px',
+  } as const
+
+  function openAdd() {
+    setEditingId(null)
+    setForm(EMPTY_EXTRA_FORM)
+    setShowForm(true)
+  }
+
+  function openEdit(extra: NonNullable<typeof extras>[number]) {
+    setEditingId(extra._id)
+    setForm({
+      firstName: extra.firstName,
+      lastName: extra.lastName,
+      email: extra.email,
+      phone: extra.phone ?? '',
+      skills: extra.skills,
+      notes: extra.notes ?? '',
+    })
+    setOpenMenu(null)
+    setShowForm(true)
+  }
+
+  function toggleSkill(id: string) {
+    setForm(f => ({
+      ...f,
+      skills: f.skills.includes(id) ? f.skills.filter(s => s !== id) : [...f.skills, id],
+    }))
+  }
+
+  const formValid =
+    form.firstName.trim() !== '' &&
+    form.lastName.trim() !== '' &&
+    EMAIL_RE.test(form.email.trim())
+
+  async function handleSave() {
+    if (!formValid || saving) return
+    setSaving(true)
+    try {
+      if (editingId) {
+        await updateExtra({
+          extraId: editingId,
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email,
+          phone: form.phone,
+          skills: form.skills,
+          notes: form.notes,
+        })
+        toast.success('Extra mis à jour')
+      } else {
+        if (!restaurantId) return
+        await addExtra({
+          restaurantId,
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email,
+          phone: form.phone || undefined,
+          skills: form.skills,
+          notes: form.notes || undefined,
+        })
+        toast.success(`${form.firstName.trim()} ajouté(e) aux extras`)
+      }
+      setShowForm(false)
+    } catch {
+      toast.error("Échec de l'enregistrement")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleArchive() {
+    if (!confirmArchive) return
+    setArchiving(true)
+    try {
+      await archiveExtra({ extraId: confirmArchive.id })
+      toast.success(`${confirmArchive.name} archivé(e)`)
+      setConfirmArchive(null)
+    } catch {
+      toast.error("Échec de l'archivage")
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  // Convocation par email = partie 2. Bouton présent dès la partie 1 pour la mise
+  // en page, mais l'envoi n'est pas encore branché.
+  function handleConvoke() {
+    toast('Convocation par email', { description: 'Disponible très prochainement.' })
+  }
+
+  const list = extras ?? []
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="font-extrabold tracking-[-0.03em]" style={{ fontSize: '24px', color: 'var(--ds-text-primary)' }}>
+            Extras
+          </h2>
+          <p className="text-[13.5px] mt-1.5 max-w-lg" style={{ color: 'var(--ds-text-secondary)' }}>
+            Votre carnet de personnel d'appoint pour les remplacements et les renforts.
+          </p>
+        </div>
+        <button
+          onClick={openAdd}
+          className="inline-flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[13px] font-semibold text-white shrink-0"
+          style={{ background: '#E8920A' }}
+        >
+          <Plus size={14} />
+          Ajouter un extra
+        </button>
+      </div>
+
+      {/* List */}
+      {extras === undefined ? (
+        <div className="ds-panel p-12 flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#E8920A', borderTopColor: 'transparent' }} />
+        </div>
+      ) : list.length === 0 ? (
+        <div className="ds-panel p-10 text-center">
+          <div className="w-11 h-11 rounded-full flex items-center justify-center mx-auto" style={{ background: 'var(--ds-accent-soft)' }}>
+            <UserRound size={20} style={{ color: 'var(--ds-accent)' }} />
+          </div>
+          <div className="text-[14px] font-semibold ds-text-primary mt-3">Aucun extra pour l'instant</div>
+          <div className="text-[12.5px] ds-text-tertiary mt-1 max-w-sm mx-auto">
+            Ajoutez vos extras pour les contacter rapidement lors d'un coup de feu.
+          </div>
+          <button onClick={openAdd} className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white" style={{ background: '#E8920A' }}>
+            <Plus size={14} /> Ajouter un extra
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
+          {list.map(extra => {
+            const initials = `${extra.firstName[0] ?? ''}${extra.lastName[0] ?? ''}`.toUpperCase()
+            return (
+              <div key={extra._id} className="ds-panel p-4" style={{ overflow: 'visible' }}>
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-[12.5px] font-bold text-white shrink-0" style={{ background: 'linear-gradient(135deg, #FFB453, #E8920A)' }}>
+                    {initials || '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[14px] font-bold ds-text-primary truncate">{extra.firstName} {extra.lastName}</div>
+                    <div className="flex items-center gap-1.5 mt-1 text-[12px] ds-text-tertiary">
+                      <Mail size={12} className="shrink-0" />
+                      <span className="truncate">{extra.email}</span>
+                    </div>
+                    {extra.phone && (
+                      <div className="flex items-center gap-1.5 mt-0.5 text-[12px] ds-text-tertiary">
+                        <Phone size={12} className="shrink-0" />
+                        <span>{extra.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={handleConvoke}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-[6px] rounded-lg text-[12px] font-semibold"
+                      style={{ background: 'var(--ds-accent-soft)', color: 'var(--ds-accent-strong)' }}
+                    >
+                      <Mail size={13} />
+                      Convoquer
+                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => setOpenMenu(openMenu === extra._id ? null : extra._id)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                        style={{ color: 'var(--ds-text-tertiary)' }}
+                      >
+                        <MoreHorizontal size={16} />
+                      </button>
+                      {openMenu === extra._id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setOpenMenu(null)} />
+                          <div className="absolute right-0 top-8 z-20 w-44 rounded-xl border py-1 shadow-lg" style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)' }}>
+                            <button onClick={() => openEdit(extra)} className="w-full text-left px-3 py-2 text-[12.5px] font-medium flex items-center gap-2 hover:bg-[var(--ds-bg-subtle)]" style={{ color: 'var(--ds-text-primary)' }}>
+                              <Pencil size={13} /> Modifier
+                            </button>
+                            <button onClick={() => { setHistoryExtra({ id: extra._id, name: `${extra.firstName} ${extra.lastName}` }); setOpenMenu(null) }} className="w-full text-left px-3 py-2 text-[12.5px] font-medium flex items-center gap-2 hover:bg-[var(--ds-bg-subtle)]" style={{ color: 'var(--ds-text-primary)' }}>
+                              <History size={13} /> Voir l'historique
+                            </button>
+                            <button onClick={() => { setConfirmArchive({ id: extra._id, name: `${extra.firstName} ${extra.lastName}` }); setOpenMenu(null) }} className="w-full text-left px-3 py-2 text-[12.5px] font-medium flex items-center gap-2 hover:bg-[var(--ds-bg-subtle)]" style={{ color: 'var(--ds-error)' }}>
+                              <Archive size={13} /> Archiver
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {extra.skills.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {extra.skills.map(s => (
+                      <span key={s} className="inline-flex items-center px-2 py-[3px] rounded-full text-[11px] font-semibold" style={{ background: 'var(--ds-accent-soft)', color: 'var(--ds-accent-strong)' }}>
+                        {EXTRA_SKILL_LABEL[s] ?? s}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="text-[11.5px] ds-text-tertiary mt-3 pt-3 border-t" style={{ borderColor: 'var(--ds-border)' }}>
+                  {formatLastConvocation(extra.lastConvokedAt)}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Add / Edit modal */}
+      {showForm && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={e => { if (e.target === e.currentTarget && !saving) setShowForm(false) }}
+        >
+          <div
+            className="rounded-2xl overflow-hidden w-[480px] max-w-full max-h-[90vh] flex flex-col"
+            style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
+              <div className="font-bold text-[15px] ds-text-primary">{editingId ? "Modifier l'extra" : 'Ajouter un extra'}</div>
+              <button onClick={() => setShowForm(false)} className="ds-text-tertiary hover:ds-text-primary"><X size={16} /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4 overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Prénom *</label>
+                  <input
+                    value={form.firstName}
+                    onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))}
+                    autoFocus
+                    placeholder="Marie"
+                    className="w-full rounded-lg border px-3 py-2 outline-none"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Nom *</label>
+                  <input
+                    value={form.lastName}
+                    onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))}
+                    placeholder="Durand"
+                    className="w-full rounded-lg border px-3 py-2 outline-none"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Email *</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="marie@email.fr"
+                  className="w-full rounded-lg border px-3 py-2 outline-none"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Téléphone</label>
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="06 12 34 56 78"
+                  className="w-full rounded-lg border px-3 py-2 outline-none"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-2">Compétences</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {EXTRA_SKILLS.map(s => {
+                    const active = form.skills.includes(s.id)
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => toggleSkill(s.id)}
+                        className="flex items-center gap-2 px-2.5 py-2 rounded-lg border text-[12.5px] font-medium transition-colors"
+                        style={{
+                          borderColor: active ? '#E8920A' : 'var(--ds-border)',
+                          background: active ? 'var(--ds-accent-soft)' : 'var(--ds-bg-base)',
+                          color: active ? 'var(--ds-accent-strong)' : 'var(--ds-text-secondary)',
+                        }}
+                      >
+                        <span
+                          className="w-4 h-4 rounded border flex items-center justify-center shrink-0"
+                          style={{ borderColor: active ? '#E8920A' : 'var(--ds-border-strong)', background: active ? '#E8920A' : 'transparent' }}
+                        >
+                          {active && <Check size={11} className="text-white" />}
+                        </span>
+                        {s.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Notes internes</label>
+                <textarea
+                  value={form.notes}
+                  onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                  rows={3}
+                  placeholder="Disponible le week-end, parle anglais…"
+                  className="w-full rounded-lg border px-3 py-2 outline-none resize-none"
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-6 py-4 border-t shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
+              <button
+                onClick={() => setShowForm(false)}
+                disabled={saving}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-colors disabled:opacity-50"
+                style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !formValid}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
+                style={{ background: '#E8920A' }}
+              >
+                {saving ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive confirmation modal */}
+      {confirmArchive && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={e => { if (e.target === e.currentTarget && !archiving) setConfirmArchive(null) }}
+        >
+          <div
+            className="rounded-2xl overflow-hidden w-[400px] max-w-full"
+            style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
+          >
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: 'var(--ds-warning-soft)' }}>
+                  <Archive size={16} style={{ color: 'var(--ds-warning)' }} />
+                </div>
+                <div className="font-bold text-[15px] ds-text-primary">Archiver {confirmArchive.name} ?</div>
+              </div>
+              <p className="text-[13px] ds-text-secondary leading-[1.5]">
+                {confirmArchive.name} n'apparaîtra plus dans votre liste d'extras. Son historique de convocations est conservé.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 px-6 pb-5">
+              <button
+                onClick={() => setConfirmArchive(null)}
+                disabled={archiving}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-colors disabled:opacity-50"
+                style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleArchive}
+                disabled={archiving}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
+                style={{ background: 'var(--ds-warning)' }}
+              >
+                {archiving ? 'Archivage…' : 'Archiver'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History drawer */}
+      {historyExtra && (
+        <ExtraHistoryDrawer extra={historyExtra} onClose={() => setHistoryExtra(null)} />
+      )}
+    </div>
+  )
+}
+
+// Drawer latéral lecture seule — historique des convocations d'un extra. Monté
+// uniquement quand un extra est sélectionné, pour que la query parte avec un id
+// concret (et non 'skip').
+function ExtraHistoryDrawer({
+  extra,
+  onClose,
+}: {
+  extra: { id: Id<'extras'>; name: string }
+  onClose: () => void
+}) {
+  const convocations = useQuery(api.extraConvocations.list, { extraId: extra.id })
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div
+        className="relative w-[440px] max-w-full h-full flex flex-col"
+        style={{ background: 'var(--ds-bg-surface)', boxShadow: '-8px 0 32px rgba(0,0,0,0.18)' }}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
+          <div>
+            <div className="font-bold text-[15px] ds-text-primary">Historique des convocations</div>
+            <div className="text-[12px] ds-text-tertiary mt-0.5">{extra.name}</div>
+          </div>
+          <button onClick={onClose} className="ds-text-tertiary hover:ds-text-primary"><X size={18} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {convocations === undefined ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#E8920A', borderTopColor: 'transparent' }} />
+            </div>
+          ) : convocations.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-11 h-11 rounded-full flex items-center justify-center mx-auto" style={{ background: 'var(--ds-bg-subtle)' }}>
+                <History size={20} style={{ color: 'var(--ds-text-tertiary)' }} />
+              </div>
+              <div className="text-[13.5px] font-semibold ds-text-primary mt-3">Aucune convocation</div>
+              <div className="text-[12px] ds-text-tertiary mt-1 max-w-[240px] mx-auto">
+                L'historique apparaîtra ici après le premier envoi.
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {convocations.map(c => {
+                const ok = c.emailStatus === 'sent'
+                return (
+                  <div key={c._id} className="rounded-xl border p-3.5" style={{ borderColor: 'var(--ds-border)', background: 'var(--ds-bg-base)' }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-[13px] font-semibold ds-text-primary">{c.subject}</div>
+                      <span
+                        className="inline-flex items-center px-2 py-[2px] rounded-full text-[10.5px] font-semibold whitespace-nowrap shrink-0"
+                        style={{
+                          background: ok ? 'var(--ds-success-soft)' : 'var(--ds-error-soft)',
+                          color: ok ? 'var(--ds-success-strong)' : 'var(--ds-error)',
+                        }}
+                      >
+                        {ok ? '✓ Envoyé' : '✕ Échec'}
+                      </span>
+                    </div>
+                    {(c.shiftDate || c.shiftStart) && (
+                      <div className="text-[12px] ds-text-secondary mt-1.5">
+                        {c.shiftDate}{c.shiftStart ? ` · ${c.shiftStart}${c.shiftEnd ? `–${c.shiftEnd}` : ''}` : ''}
+                      </div>
+                    )}
+                    <div className="text-[11.5px] ds-text-tertiary mt-1.5">
+                      Envoyé le {new Date(c.sentAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -3339,7 +3871,10 @@ export function Settings() {
             )}
 
             {section === 'team' && (
-              <TeamSection restaurantId={restaurantId} />
+              <div className="space-y-10">
+                <TeamSection restaurantId={restaurantId} />
+                <ExtrasSection restaurantId={restaurantId} />
+              </div>
             )}
 
             {section === 'account' && (
