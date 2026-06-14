@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useAction } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { toast } from 'sonner'
-import { CalendarDays, Plus, Check, X, Clock, Mail, CalendarClock, Hourglass, Bell } from 'lucide-react'
+import { CalendarDays, Plus, Check, X, Clock, Mail, CalendarClock, Hourglass, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
@@ -24,8 +24,6 @@ const PERIOD_TABS: { key: PeriodKind; label: string }[] = [
   { key: 'month', label: 'Ce mois' },
   { key: 'custom', label: 'Personnalisé' },
 ]
-
-const GRID_COLS = '1.6fr 1.4fr 1.4fr 1fr 0.7fr'
 
 const inputStyle = {
   background: 'var(--ds-bg-surface)',
@@ -49,18 +47,9 @@ function monthRange(now = new Date()): { from: string; to: string } {
     to: ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
   }
 }
-// "YYYY-MM-DD" → "lundi 16 juin 2026" (parsé en date locale, pas UTC).
-function frDateLong(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  if (!y || !m || !d) return iso
-  return new Date(y, m - 1, d).toLocaleDateString('fr-FR', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  })
-}
-// "2026-06-15" → "15/06"
-function frDateShort(iso: string): string {
-  const [, m, d] = iso.split('-')
-  return m && d ? `${d}/${m}` : iso
+// Date → "15/06"
+function dmLabel(d: Date): string {
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 // "12:00" → "12h" ; "12:30" → "12h30"
 function frTime(t: string): string {
@@ -73,28 +62,25 @@ function timeLabel(start: string, end: string): string {
   if (!start) return ''
   return end ? `${frTime(start)}–${frTime(end)}` : frTime(start)
 }
-// "à l'instant" / "il y a 2 h" / "il y a 3 j"
-function timeAgo(ms: number): string {
-  const min = Math.floor((Date.now() - ms) / 60000)
-  if (min < 1) return "à l'instant"
-  if (min < 60) return `il y a ${min} min`
-  const h = Math.floor(min / 60)
-  if (h < 24) return `il y a ${h} h`
-  return `il y a ${Math.floor(h / 24)} j`
-}
-
-const DAY_MS = 86_400_000
-
 type PlanningRow = FunctionReturnType<typeof api.planning.getUpcoming>[number]
-type StatusKey = 'accepted' | 'declined' | 'pending'
 
-const STATUS_CONFIG: Record<StatusKey, { label: string; icon: string; bg: string; color: string }> = {
-  accepted: { label: 'Disponible', icon: '✅', bg: 'var(--ds-success-soft)', color: 'var(--ds-success-strong)' },
-  declined: { label: 'Non disponible', icon: '❌', bg: 'var(--ds-error-soft)', color: 'var(--ds-error-strong)' },
-  pending: { label: 'En attente', icon: '⏳', bg: 'var(--ds-bg-subtle)', color: 'var(--ds-text-secondary)' },
-}
-function statusKey(r: PlanningRow): StatusKey {
-  return r.response === 'accepted' ? 'accepted' : r.response === 'declined' ? 'declined' : 'pending'
+// Grille hebdo — noms courts (lundi=0) + couleurs d'avatar cycliques (amber/blue/green/purple).
+const DAY_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+const AVATAR_COLORS = [
+  { bg: '#FEF3C7', color: '#B45309' }, // amber
+  { bg: '#DBEAFE', color: '#1E40AF' }, // blue
+  { bg: '#DCFCE7', color: '#166534' }, // green
+  { bg: '#EDE9FE', color: '#6D28D9' }, // purple
+]
+
+// Les 7 jours (lundi → dimanche) de la semaine décalée de `offsetWeeks` semaines.
+function weekDaysFrom(offsetWeeks: number): Date[] {
+  const now = new Date()
+  const dow = (now.getDay() + 6) % 7 // lundi = 0
+  const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow + offsetWeeks * 7)
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i),
+  )
 }
 
 export function Planning() {
@@ -146,18 +132,6 @@ export function Planning() {
     const confirmed = list.filter(r => r.response === 'accepted').length
     const declined = list.filter(r => r.response === 'declined').length
     return { total: list.length, confirmed, declined, pending: list.length - confirmed - declined }
-  }, [rows])
-
-  // Groupes par date — structure du tableau ; le contenu détaillé des lignes est
-  // rempli en partie 2 (placeholders pour l'instant).
-  const groups = useMemo(() => {
-    const map = new Map<string, PlanningRow[]>()
-    for (const r of rows ?? []) {
-      const list = map.get(r.shiftDate) ?? []
-      list.push(r)
-      map.set(r.shiftDate, list)
-    }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [rows])
 
   return (
@@ -247,137 +221,8 @@ export function Planning() {
           ))}
         </section>
 
-        {/* Tableau principal — structure ; lignes détaillées remplies en partie 2 */}
-        <section
-          className="rounded-[12px] border overflow-hidden"
-          style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
-        >
-          <div
-            className="grid items-center gap-3 px-5 py-2.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] ds-text-tertiary border-b"
-            style={{ gridTemplateColumns: GRID_COLS, borderColor: 'var(--ds-border)', background: 'var(--ds-bg-base)' }}
-          >
-            <span>Extra</span>
-            <span>Skills</span>
-            <span>Date &amp; horaire</span>
-            <span>Statut</span>
-            <span className="text-right">Action</span>
-          </div>
-
-          {loading ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-16">
-              <Clock size={20} style={{ color: 'var(--ds-text-tertiary)' }} className="animate-pulse" />
-              <p className="text-[13px] ds-text-tertiary">Chargement…</p>
-            </div>
-          ) : groups.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--ds-bg-subtle)' }}>
-                <CalendarClock size={22} style={{ color: 'var(--ds-text-tertiary)' }} />
-              </div>
-              <div>
-                <p className="text-[14px] font-semibold ds-text-primary">Aucune convocation sur cette période</p>
-                <p className="text-[12.5px] ds-text-tertiary max-w-[320px] mt-1">
-                  {period === 'custom' && !range
-                    ? 'Sélectionnez une plage de dates pour afficher le planning.'
-                    : 'Sollicitez un extra pour un service à venir.'}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowConvoke(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white"
-                style={{ background: '#E8920A' }}
-              >
-                <Plus size={14} /> Convoquer un extra
-              </button>
-            </div>
-          ) : (
-            <div>
-              {groups.map(([date, list]) => {
-                const confirmed = list.filter(r => r.response === 'accepted').length
-                const pending = list.filter(r => r.response !== 'accepted' && r.response !== 'declined').length
-                return (
-                  <div key={date}>
-                    {/* Séparateur de jour */}
-                    <div
-                      className="flex flex-wrap items-baseline gap-x-2 px-5 py-2 border-b"
-                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}
-                    >
-                      <span className="text-[12px] font-semibold ds-text-primary first-letter:uppercase">{frDateLong(date)}</span>
-                      <span className="text-[11.5px] ds-text-tertiary">
-                        · {list.length} convocation{list.length !== 1 ? 's' : ''}
-                        {confirmed > 0 ? ` · ${confirmed} confirmée${confirmed !== 1 ? 's' : ''}` : ''}
-                        {pending > 0 ? ` · ${pending} en attente` : ''}
-                      </span>
-                    </div>
-                    {/* Lignes de convocation */}
-                    {list.map(r => {
-                      const sk = statusKey(r)
-                      const cfg = STATUS_CONFIG[sk]
-                      const initials = `${r.firstName[0] ?? ''}${r.lastName[0] ?? ''}`.toUpperCase() || '?'
-                      const when = timeLabel(r.shiftStart, r.shiftEnd)
-                      const stale = sk === 'pending' && Date.now() - r.sentAt > DAY_MS
-                      const isResending = resendingId === r.convocationId
-                      return (
-                        <div
-                          key={r.convocationId}
-                          className="grid items-center gap-3 px-5 py-3 border-b"
-                          style={{ gridTemplateColumns: GRID_COLS, borderColor: 'var(--ds-border)' }}
-                        >
-                          {/* Extra */}
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-[11.5px] font-bold shrink-0"
-                              style={{ background: 'var(--ds-accent-soft)', color: 'var(--ds-accent-strong)' }}
-                            >
-                              {initials}
-                            </div>
-                            <span className="text-[13px] font-semibold ds-text-primary truncate">
-                              {r.firstName} {r.lastName}
-                            </span>
-                          </div>
-                          {/* Skills */}
-                          <div className="text-[12.5px] ds-text-secondary truncate">
-                            {r.skills.length ? r.skills.map(s => SKILL_LABEL[s] ?? s).join(' · ') : '—'}
-                          </div>
-                          {/* Date & horaire */}
-                          <div className="text-[12.5px] ds-text-secondary">
-                            {frDateShort(r.shiftDate)}{when ? ` · ${when}` : ''}
-                          </div>
-                          {/* Statut */}
-                          <div className="flex flex-col gap-0.5 items-start">
-                            <span
-                              className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full text-[11px] font-semibold whitespace-nowrap"
-                              style={{ background: cfg.bg, color: cfg.color }}
-                            >
-                              {cfg.icon} {cfg.label}
-                            </span>
-                            {(sk === 'accepted' || sk === 'declined') && r.respondedAt && (
-                              <span className="text-[10.5px] ds-text-tertiary">Répondu {timeAgo(r.respondedAt)}</span>
-                            )}
-                          </div>
-                          {/* Action */}
-                          <div className="flex justify-end">
-                            {sk === 'pending' && (stale ? (
-                              <button
-                                onClick={() => handleResend(r.convocationId, r.firstName)}
-                                disabled={isResending}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11.5px] font-semibold border transition-colors disabled:opacity-50"
-                                style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
-                              >
-                                <Bell size={12} /> {isResending ? 'Envoi…' : 'Relancer'}
-                              </button>
-                            ) : (
-                              <span className="text-[11px] ds-text-tertiary whitespace-nowrap">Envoyé {timeAgo(r.sentAt)}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
+        {/* Grille visuelle hebdomadaire — une ligne par extra, une colonne par jour */}
+        <WeekGrid restaurantId={restaurantId} onResend={handleResend} resendingId={resendingId} />
       </div>
 
       {showConvoke && (
@@ -388,6 +233,282 @@ export function Planning() {
         />
       )}
     </RestaurantLayout>
+  )
+}
+
+// Ligne agrégée d'un extra dans la grille hebdo : ses convocations indexées par jour.
+type ExtraRow = {
+  extraId: Id<'extras'>
+  firstName: string
+  lastName: string
+  skills: string[]
+  byDate: Map<string, PlanningRow>
+}
+
+// Grille visuelle de la semaine : colonne gauche fixe (extra) + 7 colonnes jour.
+// Données via planning.getByPeriod sur [lundi, dimanche] de la semaine affichée ;
+// navigation ‹ › décale le dateFrom/dateTo de ±7 jours (relance la query).
+function WeekGrid({
+  restaurantId,
+  onResend,
+  resendingId,
+}: {
+  restaurantId: Id<'restaurants'> | null
+  onResend: (id: Id<'extraConvocations'>, firstName: string) => void
+  resendingId: string | null
+}) {
+  const [weekOffset, setWeekOffset] = useState(0)
+  const days = useMemo(() => weekDaysFrom(weekOffset), [weekOffset])
+  const dateFrom = ymd(days[0])
+  const dateTo = ymd(days[6])
+  const todayIso = ymd(new Date())
+
+  const rows = useQuery(
+    api.planning.getByPeriod,
+    restaurantId ? { restaurantId, dateFrom, dateTo } : 'skip',
+  )
+  const loading = rows === undefined && restaurantId !== null
+
+  // Agrège les convocations par extra puis par jour. Plusieurs convocations le même
+  // jour : la plus récente l'emporte (rows triées sentAt ASC → le dernier set gagne).
+  const extras = useMemo(() => {
+    const map = new Map<string, ExtraRow>()
+    for (const r of rows ?? []) {
+      let e = map.get(r.extraId)
+      if (!e) {
+        e = { extraId: r.extraId, firstName: r.firstName, lastName: r.lastName, skills: r.skills, byDate: new Map() }
+        map.set(r.extraId, e)
+      }
+      e.byDate.set(r.shiftDate, r)
+    }
+    return [...map.values()].sort((a, b) =>
+      `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, 'fr'),
+    )
+  }, [rows])
+
+  const monthLabel = days[0].toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+  const GRID = '150px repeat(7, 1fr)'
+  const todayColBg = 'rgba(245,158,11,0.04)'
+
+  return (
+    <section
+      className="rounded-[12px] border overflow-hidden"
+      style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
+    >
+      {/* Navigation semaine */}
+      <div
+        className="flex items-center justify-between px-5 py-3 border-b"
+        style={{ borderColor: 'var(--ds-border)', background: 'var(--ds-bg-base)' }}
+      >
+        <div className="text-[13px] font-semibold ds-text-primary first-letter:uppercase">
+          {monthLabel}
+          <span className="ds-text-tertiary font-normal"> · {dmLabel(days[0])} – {dmLabel(days[6])}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setWeekOffset(o => o - 1)}
+            aria-label="Semaine précédente"
+            className="w-7 h-7 inline-flex items-center justify-center rounded-lg border transition-colors"
+            style={{ borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+          >
+            <ChevronLeft size={15} />
+          </button>
+          {weekOffset !== 0 && (
+            <button
+              onClick={() => setWeekOffset(0)}
+              className="px-2 h-7 inline-flex items-center rounded-lg border text-[11.5px] font-medium transition-colors"
+              style={{ borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+            >
+              Aujourd'hui
+            </button>
+          )}
+          <button
+            onClick={() => setWeekOffset(o => o + 1)}
+            aria-label="Semaine suivante"
+            className="w-7 h-7 inline-flex items-center justify-center rounded-lg border transition-colors"
+            style={{ borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+          >
+            <ChevronRight size={15} />
+          </button>
+        </div>
+      </div>
+
+      {/* En-tête de grille : coin vide + 7 jours */}
+      <div className="grid border-b" style={{ gridTemplateColumns: GRID, borderColor: 'var(--ds-border)' }}>
+        <div />
+        {days.map((d, i) => {
+          const isToday = ymd(d) === todayIso
+          return (
+            <div
+              key={i}
+              className="flex flex-col items-center gap-0.5 py-2.5 border-l"
+              style={{ borderColor: 'var(--ds-border)', background: isToday ? todayColBg : undefined }}
+            >
+              <span className="text-[11px] uppercase tracking-wide ds-text-tertiary">{DAY_SHORT[i]}</span>
+              {isToday ? (
+                <span
+                  className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[13px] font-medium text-white"
+                  style={{ background: '#F59E0B' }}
+                >
+                  {d.getDate()}
+                </span>
+              ) : (
+                <span className="text-[16px] font-medium ds-text-primary leading-6">{d.getDate()}</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Corps */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-16">
+          <Clock size={20} style={{ color: 'var(--ds-text-tertiary)' }} className="animate-pulse" />
+          <p className="text-[13px] ds-text-tertiary">Chargement…</p>
+        </div>
+      ) : extras.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--ds-bg-subtle)' }}>
+            <CalendarClock size={22} style={{ color: 'var(--ds-text-tertiary)' }} />
+          </div>
+          <div>
+            <p className="text-[14px] font-semibold ds-text-primary">Aucune convocation cette semaine</p>
+            <p className="text-[12.5px] ds-text-tertiary max-w-[320px] mt-1">
+              Naviguez entre les semaines ou convoquez un extra pour un service à venir.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div>
+          {extras.map((ex, idx) => {
+            const initials = `${ex.firstName[0] ?? ''}${ex.lastName[0] ?? ''}`.toUpperCase() || '?'
+            const av = AVATAR_COLORS[idx % AVATAR_COLORS.length]
+            return (
+              <div
+                key={ex.extraId}
+                className="grid border-b"
+                style={{ gridTemplateColumns: GRID, borderColor: 'var(--ds-border)' }}
+              >
+                {/* Colonne extra fixe */}
+                <div className="flex items-center gap-2 px-3 py-2.5 min-w-0">
+                  <div
+                    className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+                    style={{ background: av.bg, color: av.color }}
+                  >
+                    {initials}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-medium ds-text-primary truncate">
+                      {ex.firstName} {ex.lastName}
+                    </div>
+                    {ex.skills.length > 0 && (
+                      <div className="text-[10px] ds-text-tertiary truncate">
+                        {ex.skills.map(s => SKILL_LABEL[s] ?? s).join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {/* 7 cellules statut */}
+                {days.map((d, i) => {
+                  const isToday = ymd(d) === todayIso
+                  return (
+                    <div
+                      key={i}
+                      className="border-l p-1.5 flex items-stretch"
+                      style={{ borderColor: 'var(--ds-border)', background: isToday ? todayColBg : undefined }}
+                    >
+                      <StatusCell conv={ex.byDate.get(ymd(d))} onResend={onResend} resendingId={resendingId} />
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Légende */}
+      <div
+        className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3 border-t"
+        style={{ borderColor: 'var(--ds-border)', background: 'var(--ds-bg-base)' }}
+      >
+        <LegendItem label="Disponible" swatch={<span className="w-3 h-3 rounded-[3px]" style={{ background: '#D1FAE5' }} />} />
+        <LegendItem label="Non disponible" swatch={<span className="w-3 h-3 rounded-[3px]" style={{ background: '#FEE2E2' }} />} />
+        <LegendItem
+          label="En attente"
+          swatch={<span className="w-3 h-3 rounded-[3px] border border-dashed" style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)' }} />}
+        />
+        <LegendItem label="Pas convoqué" swatch={<span className="ds-text-tertiary text-[13px] leading-none">—</span>} />
+      </div>
+    </section>
+  )
+}
+
+// Une cellule jour × extra : disponible / non dispo / en attente / pas convoqué.
+function StatusCell({
+  conv,
+  onResend,
+  resendingId,
+}: {
+  conv: PlanningRow | undefined
+  onResend: (id: Id<'extraConvocations'>, firstName: string) => void
+  resendingId: string | null
+}) {
+  if (!conv) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <span className="ds-text-tertiary text-[13px] leading-none">—</span>
+      </div>
+    )
+  }
+  if (conv.response === 'accepted') {
+    const when = timeLabel(conv.shiftStart, conv.shiftEnd)
+    return (
+      <div
+        className="flex-1 flex flex-col items-center justify-center rounded-[6px] py-1"
+        style={{ background: '#D1FAE5', color: '#065F46' }}
+      >
+        <span className="text-[11px] font-medium">✓ Dispo</span>
+        {when && <span className="text-[10px]">{when}</span>}
+      </div>
+    )
+  }
+  if (conv.response === 'declined') {
+    return (
+      <div
+        className="flex-1 flex items-center justify-center rounded-[6px] py-1"
+        style={{ background: '#FEE2E2', color: '#991B1B' }}
+      >
+        <span className="text-[11px] font-medium">✗ Non dispo</span>
+      </div>
+    )
+  }
+  // En attente (response 'pending' ou null)
+  const isResending = resendingId === conv.convocationId
+  return (
+    <div
+      className="flex-1 flex flex-col items-center justify-center rounded-[6px] py-1"
+      style={{ background: 'var(--ds-bg-subtle)', border: '0.5px dashed var(--ds-border)' }}
+    >
+      <span className="text-[11px] ds-text-tertiary">⏳ En attente</span>
+      <button
+        onClick={() => onResend(conv.convocationId, conv.firstName)}
+        disabled={isResending}
+        className="text-[10px] underline disabled:opacity-50"
+        style={{ color: '#F59E0B' }}
+      >
+        {isResending ? 'Envoi…' : 'Relancer'}
+      </button>
+    </div>
+  )
+}
+
+function LegendItem({ swatch, label }: { swatch: ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11.5px] ds-text-secondary">
+      {swatch}
+      {label}
+    </span>
   )
 }
 
