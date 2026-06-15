@@ -1,6 +1,6 @@
-import { Printer, Sun, Moon } from 'lucide-react'
+import { Printer } from 'lucide-react'
 import { usePrint } from '../context/PrintContext'
-import { useTheme } from '../context/ThemeContext'
+import { StandaloneThemeToggle } from './StandaloneThemeToggle'
 import type { ReactNode } from 'react'
 
 interface PageHeaderProps {
@@ -12,7 +12,6 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, live = false, actions }: PageHeaderProps) {
   const { openPrint } = usePrint()
-  const { theme, toggleTheme } = useTheme()
 
   return (
     <header
@@ -81,37 +80,7 @@ export function PageHeader({ title, subtitle, live = false, actions }: PageHeade
         </button>
 
         {/* Theme toggle */}
-        <div
-          className="inline-flex rounded-lg p-[3px] border"
-          style={{
-            background: 'var(--ds-bg-surface)',
-            borderColor: 'var(--ds-border)',
-            boxShadow: 'var(--ds-shadow-sm)',
-          }}
-        >
-          <button
-            onClick={() => theme === 'dark' && toggleTheme()}
-            className="flex items-center justify-center w-[26px] h-6 rounded-[5px] transition-colors"
-            style={{
-              background: theme === 'light' ? 'var(--ds-bg-subtle)' : 'none',
-              color: theme === 'light' ? 'var(--ds-text-primary)' : 'var(--ds-text-tertiary)',
-            }}
-            aria-label="Clair"
-          >
-            <Sun size={13} />
-          </button>
-          <button
-            onClick={() => theme === 'light' && toggleTheme()}
-            className="flex items-center justify-center w-[26px] h-6 rounded-[5px] transition-colors"
-            style={{
-              background: theme === 'dark' ? 'var(--ds-bg-subtle)' : 'none',
-              color: theme === 'dark' ? 'var(--ds-text-primary)' : 'var(--ds-text-tertiary)',
-            }}
-            aria-label="Sombre"
-          >
-            <Moon size={13} />
-          </button>
-        </div>
+        <StandaloneThemeToggle />
       </div>
     </header>
   )

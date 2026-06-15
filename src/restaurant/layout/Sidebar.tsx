@@ -2,13 +2,13 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Grid3x3, Star, TrendingUp,
   Utensils, Users, Receipt, Plug, Settings, CalendarDays,
-  ArrowUpRight, ChevronsUpDown, Sun, Moon,
+  ArrowUpRight, ChevronsUpDown,
 } from 'lucide-react'
 import { useUser, useClerk } from '@clerk/clerk-react'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useRestaurant, useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
-import { useTheme } from '../context/ThemeContext'
+import { StandaloneThemeToggle } from '../components/StandaloneThemeToggle'
 import { ROLE_LABEL, type RestaurantRole } from '../lib/roles'
 
 const clerkReady = (() => {
@@ -161,7 +161,6 @@ export function Sidebar() {
   const restaurantId = useRestaurantId()
   const role = useRestaurantRole() ?? 'owner'
   const restaurantItems = RESTAURANT_ITEMS.filter(item => !item.roles || item.roles.includes(role))
-  const { theme, toggleTheme } = useTheme()
   const newFeedbackCount = useQuery(
     api.feedbacks.getNewCount,
     restaurantId ? { restaurantId } : 'skip',
@@ -267,37 +266,7 @@ export function Sidebar() {
 
         {/* Theme toggle + User */}
         <div className="flex items-center justify-between gap-2">
-          <div
-            className="inline-flex rounded-lg p-[3px] border"
-            style={{
-              background: 'var(--ds-bg-surface)',
-              borderColor: 'var(--ds-border)',
-              boxShadow: 'var(--ds-shadow-sm)',
-            }}
-          >
-            <button
-              onClick={() => theme === 'dark' && toggleTheme()}
-              className="flex items-center justify-center w-[26px] h-6 rounded-[5px] transition-colors"
-              style={{
-                background: theme === 'light' ? 'var(--ds-bg-subtle)' : 'none',
-                color: theme === 'light' ? 'var(--ds-text-primary)' : 'var(--ds-text-tertiary)',
-              }}
-              aria-label="Thème clair"
-            >
-              <Sun size={13} />
-            </button>
-            <button
-              onClick={() => theme === 'light' && toggleTheme()}
-              className="flex items-center justify-center w-[26px] h-6 rounded-[5px] transition-colors"
-              style={{
-                background: theme === 'dark' ? 'var(--ds-bg-subtle)' : 'none',
-                color: theme === 'dark' ? 'var(--ds-text-primary)' : 'var(--ds-text-tertiary)',
-              }}
-              aria-label="Thème sombre"
-            >
-              <Moon size={13} />
-            </button>
-          </div>
+          <StandaloneThemeToggle />
           {clerkReady ? (
             <div className="flex-1 min-w-0">
               <UserSection />
