@@ -27,7 +27,31 @@ export const send = mutation({
     content: v.string(),
   },
   handler: async (ctx, { restaurantId, recipientId, content }) => {
-    const me = await getMe(ctx, restaurantId)
+    const { identity, restaurant } = await requireRestaurantAccess(ctx, restaurantId)
+
+    let me = await ctx.db
+      .query("members")
+      .withIndex("by_restaurant", (q) => q.eq("restaurantId", restaurantId))
+      .filter((q) => q.eq(q.field("clerkUserId"), identity.subject))
+      .first()
+
+    // Owner pur (identifié par restaurants.clerkUserId, sans ligne members) :
+    // on lui crée une ligne `members` à la volée pour qu'il puisse envoyer.
+    if (!me) {
+      const isOwner = restaurant.clerkUserId === identity.subject
+      if (!isOwner) throw new Error("Membre introuvable")
+      const memberId = await ctx.db.insert("members", {
+        restaurantId,
+        clerkUserId: identity.subject,
+        name: identity.name ?? identity.email ?? "Owner",
+        email: identity.email ?? "",
+        role: "owner" as const,
+        status: "active" as const,
+        invitedAt: Date.now(),
+      })
+      me = await ctx.db.get(memberId)
+    }
+
     if (!me) throw new Error("Membre introuvable")
 
     const threadId = recipientId
