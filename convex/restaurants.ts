@@ -39,6 +39,14 @@ export const update = mutation({
   },
 })
 
+export const updateSpecialMessage = mutation({
+  args: { restaurantId: v.id("restaurants"), message: v.string() },
+  handler: async (ctx, { restaurantId, message }) => {
+    await requireRestaurantAccess(ctx, restaurantId, ["owner", "manager"])
+    await ctx.db.patch(restaurantId, { specialMessage: message.trim() || undefined })
+  },
+})
+
 export const getBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, { slug }) => {

@@ -6,7 +6,7 @@ import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
-import { useRestaurantId } from '../context/RestaurantContext'
+import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import { suggestEmoji } from '../lib/foodEmoji'
 import { EmojiPicker } from '../components/EmojiPicker'
 import {
@@ -27,6 +27,7 @@ type ConvexItem = {
   emoji: string
   description?: string
   isAvailable?: boolean
+  isDailySpecial?: boolean
   tags?: string[]
 }
 
@@ -288,9 +289,10 @@ type CatSectionProps = {
   onDuplicate: (item: ConvexItem) => void
   onDeleteRequest: (item: ConvexItem) => void
   onToggle: (item: ConvexItem) => void
+  onToggleSpecial: (item: ConvexItem) => void
 }
 
-function LiveCategorySection({ categoryName, items, filter, onAdd, onEdit, onDuplicate, onDeleteRequest, onToggle }: CatSectionProps) {
+function LiveCategorySection({ categoryName, items, filter, onAdd, onEdit, onDuplicate, onDeleteRequest, onToggle, onToggleSpecial }: CatSectionProps) {
   const [open, setOpen]     = useState(true)
   const [menuId, setMenuId] = useState<string | null>(null)
   const menuRef             = useRef<HTMLDivElement>(null)
@@ -363,9 +365,14 @@ function LiveCategorySection({ categoryName, items, filter, onAdd, onEdit, onDup
                         </span>
                       ) : null
                     })}
+                    {item.isDailySpecial && (
+                      <span className="text-[10.5px] font-semibold px-1.5 py-[2px] rounded-[4px] border" style={{ background: '#FEF3C7', color: '#B8730A', borderColor: '#FDE68A' }}>
+                        ⭐ SPÉCIAL
+                      </span>
+                    )}
                     {!avail && (
-                      <span className="text-[10.5px] font-semibold px-1.5 py-[2px] rounded-[4px] border" style={{ background: 'var(--ds-warning-soft)', color: '#92400E', borderColor: '#FDE68A' }}>
-                        Rupture
+                      <span className="text-[10.5px] font-semibold px-1.5 py-[2px] rounded-[4px] border" style={{ background: '#FEE2E2', color: '#B91C1C', borderColor: '#FCA5A5' }}>
+                        RUPTURE
                       </span>
                     )}
                   </div>
@@ -377,7 +384,13 @@ function LiveCategorySection({ categoryName, items, filter, onAdd, onEdit, onDup
                   <div className="font-bold text-[14px] ds-text-primary tabular-nums">{priceFmt(item.priceCents)}</div>
                 </div>
 
-                {/* Toggle */}
+                {/* Toggle plat du jour */}
+                <div className="flex items-center gap-1.5 flex-shrink-0" title="Mettre en avant comme plat du jour">
+                  <Toggle on={!!item.isDailySpecial} onChange={() => onToggleSpecial(item)} />
+                  <span className="text-[11.5px] w-12" style={{ color: item.isDailySpecial ? '#B8730A' : 'var(--ds-text-tertiary)' }}>⭐ Spécial</span>
+                </div>
+
+                {/* Toggle disponibilité */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Toggle on={avail} onChange={() => onToggle(item)} />
                   <span className="text-[11.5px] ds-text-tertiary w-10">{avail ? 'Dispo.' : 'Rupture'}</span>
@@ -525,6 +538,7 @@ export function MenuPage() {
   const fileRef                         = useRef<HTMLInputElement>(null)
 
   const restaurantId = useRestaurantId()
+  const restaurant   = useRestaurant()
   const rawItems   = useQuery(api.menuItems.listByRestaurant, restaurantId ? { restaurantId } : 'skip')
   const rawPayments = useQuery(api.payments.list, restaurantId ? { restaurantId } : 'skip')
   const ca28 = useMemo(() => {
@@ -536,6 +550,14 @@ export function MenuPage() {
   const addItemMut = useMutation(api.menuItems.addItem)
   const updateItem = useMutation(api.menuItems.updateItem)
   const deleteItem = useMutation(api.menuItems.deleteItem)
+  const toggleSpecialMut = useMutation(api.menuItems.toggleDailySpecial)
+  const updateSpecialMessageMut = useMutation(api.restaurants.updateSpecialMessage)
+
+  function saveSpecialMessage(message: string) {
+    if (!restaurantId) return
+    updateSpecialMessageMut({ restaurantId, message })
+      .catch(err => console.error('[MenuPage] updateSpecialMessage failed:', err))
+  }
 
   const convexItems = (rawItems ?? []) as ConvexItem[]
   const hasLive     = convexItems.length > 0
@@ -642,6 +664,11 @@ export function MenuPage() {
   async function handleToggle(item: ConvexItem) {
     await updateItem({ id: item._id, isAvailable: !(item.isAvailable !== false) })
       .catch(err => console.error('[MenuPage] toggle failed:', err))
+  }
+
+  async function handleToggleSpecial(item: ConvexItem) {
+    await toggleSpecialMut({ itemId: item._id, value: !item.isDailySpecial })
+      .catch(err => console.error('[MenuPage] toggleDailySpecial failed:', err))
   }
 
   async function handleDelete() {
@@ -786,6 +813,28 @@ export function MenuPage() {
 
       <div className="px-9 py-6 space-y-5">
 
+        {/* Message affiché aux clients (écran de paiement QR) */}
+        <div
+          className="rounded-[12px] border px-5 py-4"
+          style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
+        >
+          <label className="block text-[12px] font-semibold ds-text-secondary mb-1.5">
+            Message affiché aux clients
+          </label>
+          <input
+            key={restaurant?._id ?? 'no-resto'}
+            defaultValue={restaurant?.specialMessage ?? ''}
+            onBlur={e => saveSpecialMessage(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+            placeholder="Ex: Bonne soirée ! Profitez de -20% sur les desserts ce soir 🎉"
+            maxLength={120}
+            disabled={!restaurantId}
+            className="w-full rounded-lg border px-3 py-2 outline-none disabled:opacity-50"
+            style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+          />
+          <p className="text-[11px] ds-text-tertiary mt-1">Affiché sur l'écran de paiement QR client</p>
+        </div>
+
         {/* Toolbar */}
         <div className="flex items-center gap-3 flex-wrap">
           <div
@@ -881,6 +930,7 @@ export function MenuPage() {
                 onDuplicate={handleDuplicate}
                 onDeleteRequest={setDeleteTarget}
                 onToggle={handleToggle}
+                onToggleSpecial={handleToggleSpecial}
               />
             )
           })

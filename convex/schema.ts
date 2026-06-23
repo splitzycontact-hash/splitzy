@@ -12,6 +12,9 @@ export default defineSchema({
     clerkUserId: v.optional(v.string()),
     suspended: v.optional(v.boolean()),
     qrColor: v.optional(v.string()),
+    // Message libre affiché aux clients sur l'écran de paiement QR (plat du jour,
+    // promo du soir…). Édité depuis MenuPage, persisté via restaurants.updateSpecialMessage.
+    specialMessage: v.optional(v.string()),
     // Champs legacy présents sur d'anciens documents (plus écrits par create/update).
     // Déclarés en optionnel pour que le schéma valide les docs existants en prod.
     plan: v.optional(v.string()),
@@ -219,6 +222,7 @@ export default defineSchema({
     emoji: v.string(),
     description: v.optional(v.string()),
     isAvailable: v.optional(v.boolean()),
+    isDailySpecial: v.optional(v.boolean()),
     tags: v.optional(v.array(v.string())),
     allergenes: v.optional(v.string()),
   }).index("by_restaurant", ["restaurantId"]),

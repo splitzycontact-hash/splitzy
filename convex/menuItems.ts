@@ -33,6 +33,16 @@ export const updateItem = mutation({
   },
 })
 
+export const toggleDailySpecial = mutation({
+  args: { itemId: v.id("menuItems"), value: v.boolean() },
+  handler: async (ctx, { itemId, value }) => {
+    const item = await ctx.db.get(itemId)
+    if (!item) throw new Error("Article introuvable")
+    await requireRestaurantAccess(ctx, item.restaurantId, ["owner", "manager"])
+    await ctx.db.patch(itemId, { isDailySpecial: value })
+  },
+})
+
 export const deleteItem = mutation({
   args: { id: v.id("menuItems") },
   handler: async (ctx, { id }) => {
