@@ -307,4 +307,19 @@ export default defineSchema({
   }).index("by_extra", ["extraId"])
     .index("by_restaurant", ["restaurantId"])
     .index("by_token", ["responseToken"]),
+
+  // M6 Chat interne (gérant ↔ staff). threadId canonique :
+  //   broadcast → "broadcast" ; 1:1 → [memberA, memberB].sort().join('|').
+  // readBy porte les memberIds ayant lu (badges unread). Voir convex/messages.ts.
+  messages: defineTable({
+    restaurantId: v.id("restaurants"),
+    senderId: v.id("members"),
+    recipientId: v.optional(v.id("members")),
+    threadId: v.string(),
+    content: v.string(),
+    createdAt: v.number(),
+    readBy: v.array(v.id("members")),
+  })
+    .index("by_restaurant_thread", ["restaurantId", "threadId"])
+    .index("by_restaurant_date", ["restaurantId", "createdAt"]),
 })

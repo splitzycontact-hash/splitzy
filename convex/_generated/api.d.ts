@@ -22,6 +22,7 @@ import type * as insights from "../insights.js";
 import type * as invitations from "../invitations.js";
 import type * as members from "../members.js";
 import type * as menuItems from "../menuItems.js";
+import type * as messages from "../messages.js";
 import type * as payments from "../payments.js";
 import type * as planning from "../planning.js";
 import type * as posIntegrations from "../posIntegrations.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   invitations: typeof invitations;
   members: typeof members;
   menuItems: typeof menuItems;
+  messages: typeof messages;
   payments: typeof payments;
   planning: typeof planning;
   posIntegrations: typeof posIntegrations;
