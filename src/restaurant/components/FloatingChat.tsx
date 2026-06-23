@@ -41,23 +41,32 @@ export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'>
   const sendMsg = useMutation(api.messages.send)
   const markRead = useMutation(api.messages.markRead)
 
+  const { user } = useUser()
+  const me = members?.find(m => m.clerkUserId === user?.id) ?? null
+
   const totalUnread = convos?.reduce((s, c) => s + (c.unread ?? 0), 0) ?? 0
-  const prevUnread = useRef(totalUnread)
+  // null tant que Convex n'a pas répondu → pas d'auto-open au 1er load (Bug A).
+  const prevUnread = useRef<number | null>(null)
 
   // Auto-ouvrir sur nouvelle notif si pas déjà sur /chat
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    if (prevUnread.current === null) {
+      prevUnread.current = totalUnread // premier load : snapshot sans ouvrir
+      return
+    }
     if (totalUnread > prevUnread.current && !location.pathname.includes('/chat')) {
       const newest = convos?.find(c => (c.unread ?? 0) > 0)
       if (newest) {
         setIsOpen(true)
         const ids = newest.threadId === 'broadcast' ? [] : newest.threadId.split('|')
-        // trouver l'autre participant dans ids (pas me)
-        setActiveId(newest.threadId === 'broadcast' ? null : ids[0] as Id<'members'>)
+        // Bug B fix : ids[0] peut être mon propre ID — prendre l'autre
+        const otherId = ids.find(id => id !== me?._id?.toString())
+        setActiveId(newest.threadId === 'broadcast' ? null : otherId as Id<'members'>)
       }
     }
     prevUnread.current = totalUnread
-  }, [totalUnread, convos, location.pathname])
+  }, [totalUnread, convos, location.pathname, me?._id])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
@@ -78,8 +87,6 @@ export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'>
   }
 
   // --- Dérivations pour le rendu (annuaire, titres, "mes" messages) ---
-  const { user } = useUser()
-  const me = members?.find(m => m.clerkUserId === user?.id) ?? null
   const otherMembers = (members ?? []).filter(m => m._id !== me?._id)
   const memberById = new Map((members ?? []).map(m => [m._id, m]))
   const threadIdFor = (memberId: string) =>

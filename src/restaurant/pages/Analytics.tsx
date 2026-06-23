@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
@@ -214,6 +215,7 @@ function AnalyticsInsightsBlock({
   isPro: boolean
   totalTickets: number
 }) {
+  const navigate = useNavigate()
   return (
     <div className="rounded-[12px] overflow-hidden border" style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}>
       <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
@@ -232,7 +234,7 @@ function AnalyticsInsightsBlock({
           <Sparkles size={28} style={{ color: '#E8920A' }} />
           <p className="font-semibold text-[13.5px] ds-text-primary">Insights IA</p>
           <p className="text-[12px] ds-text-secondary max-w-xs leading-[1.5]">Recommandations personnalisées générées chaque nuit. Disponible avec le Plan Pro.</p>
-          <button className="text-[12.5px] font-semibold" style={{ color: '#E8920A' }} onClick={() => window.location.href='/restaurant/settings?section=plan'}>Passer au Plan Pro →</button>
+          <button className="text-[12.5px] font-semibold" style={{ color: '#E8920A' }} onClick={() => navigate('/restaurant/settings?section=plan')}>Passer au Plan Pro →</button>
         </div>
       ) : !latestInsights ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from 'convex/react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../../convex/_generated/api'
@@ -16,9 +16,6 @@ import {
 type ConvexTable   = { number: number; status: string; amountCents?: number; paidCents?: number; durationMinutes?: number; alert?: boolean }
 type ConvexPayment = { tableNumber: number; totalCents: number; tipCents: number; subtotalCents: number; createdAt: number; dateLabel: string; status: string; guests: number }
 type ConvexFeedback = { stars: number; isNew?: boolean }
-
-const NOW = new Date()
-const DATE_FR = NOW.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
 function Panel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
@@ -248,6 +245,7 @@ function InsightsEmptyState() {
 }
 
 function InsightsProLock() {
+  const navigate = useNavigate()
   return (
     <div className="flex flex-col items-center gap-3 py-6 text-center px-4">
       <Sparkles size={28} style={{ color: '#E8920A' }} />
@@ -258,7 +256,7 @@ function InsightsProLock() {
       <button
         className="text-[12.5px] font-semibold transition-colors"
         style={{ color: '#E8920A' }}
-        onClick={() => window.location.href = '/restaurant/settings?section=plan'}
+        onClick={() => navigate('/restaurant/settings?section=plan')}
       >
         Passer au Plan Pro →
       </button>
@@ -277,7 +275,12 @@ export function Overview() {
   const rawFeedbacks   = useQuery(api.feedbacks.list,            restaurantId ? { restaurantId } : 'skip')
   const latestInsights = useQuery(api.insights.getLatestInsights, restaurantId ? { restaurantId } : 'skip')
 
-  const isPro = restaurant?.plan === 'pro'
+  const isPro = restaurant?.plan?.toLowerCase() === 'pro'
+
+  const DATE_FR = useMemo(
+    () => new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    [], // calculé 1 fois au mount, ok
+  )
 
   const isLoading = rawTables === undefined
 
@@ -564,8 +567,8 @@ export function Overview() {
                   <span>Aucune table configurée</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-5 gap-2.5">
-                  {tables.slice(0, 10).map(t => (
+                <div className="grid grid-cols-4 xl:grid-cols-5 gap-2.5">
+                  {tables.map(t => (
                     <TableCardSmall key={t.number} table={t} />
                   ))}
                 </div>
