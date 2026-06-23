@@ -4,6 +4,7 @@ import { useUser } from '@clerk/clerk-react'
 import { MessageSquare, Send, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
+import type { Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
@@ -85,17 +86,21 @@ export function ChatPage() {
   // (identifié par restaurants.clerkUserId, sans ligne members) → l'envoi
   // remontera l'erreur backend "Membre introuvable" via toast.
   const me = members?.find(m => m.clerkUserId === user?.id) ?? null
-  const otherMembers = (members ?? []).filter(m => m._id !== me?._id)
+  // Cibles de DM : owner/manager uniquement (jamais le staff — broadcast-only).
+  const otherMembers = (members ?? []).filter(
+    m => m._id !== me?._id && (m.role === 'owner' || m.role === 'manager'),
+  )
   const memberById = new Map((members ?? []).map(m => [m._id, m]))
 
   const threadIdFor = (memberId: string) =>
     me ? [me._id, memberId].sort().join('|') : ''
   const convFor = (threadId: string) =>
     conversations?.find(c => c.threadId === threadId)
-  // Conversation 1:1 d'un membre — `includes` pour rester robuste si `me` n'est
-  // pas encore résolu (le threadId d'un DM contient toujours les deux memberIds).
+  // Conversation 1:1 d'un membre — match exact du threadId (me|memberId trié).
+  // `includes` deviendrait ambigu : owner/manager reçoit aussi les threads tiers
+  // (X|Y) qui contiennent memberId mais ne sont pas la conversation avec `me`.
   const convForMember = (memberId: string) =>
-    conversations?.find(c => c.threadId !== 'broadcast' && c.threadId.includes(memberId))
+    conversations?.find(c => c.threadId === threadIdFor(memberId))
 
   const activeMember =
     activeThread === 'broadcast'
@@ -119,9 +124,15 @@ export function ChatPage() {
     const content = draft.trim()
     if (!content || !restaurantId) return
     // Garde client : le staff ne peut envoyer qu'en broadcast (le backend
-    // refuse aussi côté serveur — défense en profondeur).
-    const recipientId =
-      !canDM || activeThread === 'broadcast' ? undefined : activeMember?._id
+    // refuse aussi côté serveur — défense en profondeur). Pour un DM, on extrait
+    // le destinataire DIRECTEMENT du threadId (me|recipient trié) plutôt que de
+    // dépendre d'`activeMember` — évite le leak où un activeMember non résolu
+    // ferait retomber recipientId à undefined ⇒ message diffusé en broadcast.
+    let recipientId: Id<'members'> | undefined = undefined
+    if (canDM && activeThread !== 'broadcast') {
+      const ids = activeThread.split('|')
+      recipientId = (ids.find(id => id !== me?._id) ?? ids[0]) as Id<'members'>
+    }
     try {
       await sendMsg({ restaurantId, content, recipientId })
       setDraft('')

@@ -27,7 +27,17 @@ export const send = mutation({
     content: v.string(),
   },
   handler: async (ctx, { restaurantId, recipientId, content }) => {
-    const { identity, restaurant } = await requireRestaurantAccess(ctx, restaurantId)
+    const { identity, restaurant, role } = await requireRestaurantAccess(ctx, restaurantId)
+
+    // DM : staff exclu des deux côtés (broadcast-only). Owner/manager ↔ owner/manager.
+    if (recipientId) {
+      if (role === "staff") throw new Error("Le staff ne peut pas envoyer de message privé")
+      const recipient = await ctx.db.get(recipientId)
+      if (!recipient || recipient.restaurantId !== restaurantId)
+        throw new Error("Destinataire introuvable")
+      if (recipient.role === "staff")
+        throw new Error("Impossible d'envoyer un message privé à un membre staff")
+    }
 
     let me = await ctx.db
       .query("members")
@@ -96,18 +106,10 @@ export const markRead = mutation({
 export const listThread = query({
   args: { restaurantId: v.id("restaurants"), threadId: v.string() },
   handler: async (ctx, { restaurantId, threadId }) => {
-    const { identity, role } = await requireRestaurantAccess(ctx, restaurantId)
-    // Staff : accès uniquement au broadcast.
+    const { role } = await requireRestaurantAccess(ctx, restaurantId)
+    // Staff : accès uniquement au broadcast. Owner + manager : visibilité totale
+    // (toutes les conversations, y compris les DMs entre tiers).
     if (role === "staff" && threadId !== "broadcast") return []
-    // Manager (non-owner) : doit être participant du thread 1:1.
-    if (threadId !== "broadcast" && role !== "owner") {
-      const me = await ctx.db
-        .query("members")
-        .withIndex("by_restaurant", (q) => q.eq("restaurantId", restaurantId))
-        .filter((q) => q.eq(q.field("clerkUserId"), identity.subject))
-        .first()
-      if (!me || !threadId.split("|").includes(me._id as string)) return []
-    }
     const msgs = await ctx.db
       .query("messages")
       .withIndex("by_restaurant_thread", (q) =>
@@ -158,12 +160,11 @@ export const listConversations = query({
       threads.push({ threadId, lastMsg, unread })
     }
 
-    // Filtrer selon le rôle : staff → broadcast seul ; owner/manager → broadcast
-    // + uniquement les DMs dont ils sont participants (pas les DMs entre tiers).
+    // Filtrer selon le rôle : staff → broadcast seul ; owner/manager → toutes
+    // les conversations (broadcast + tous les DMs, y compris entre tiers).
     const visible = threads.filter(({ threadId }) => {
       if (threadId === "broadcast") return true
-      if (role === "staff") return false
-      return me ? threadId.split("|").includes(me._id as string) : false
+      return role !== "staff"
     })
 
     return visible.sort((a, b) => b.lastMsg.createdAt - a.lastMsg.createdAt)
