@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useAction, useMutation } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
 import { toast } from 'sonner'
-import { CalendarDays, Plus, Check, X, Clock, Mail, CalendarClock, Hourglass, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { CalendarDays, Plus, Check, X, Clock, Mail, CalendarClock, Hourglass, ChevronLeft, ChevronRight, RefreshCw, Users } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
@@ -63,6 +63,16 @@ function timeLabel(start: string, end: string): string {
   return end ? `${frTime(start)}–${frTime(end)}` : frTime(start)
 }
 type PlanningRow = FunctionReturnType<typeof api.planning.getUpcoming>[number]
+type WeekShift = FunctionReturnType<typeof api.shifts.listByWeek>[number]
+type TeamMember = FunctionReturnType<typeof api.members.getTeamMembers>[number]
+
+// Nom affichable d'un membre (displayName > prénom/nom > name).
+function memberLabel(m: TeamMember): string {
+  return m.displayName ?? (m.firstName ? `${m.firstName} ${m.lastName ?? ''}`.trim() : null) ?? m.name
+}
+const MEMBER_ROLE_LABEL: Record<string, string> = {
+  owner: 'Propriétaire', manager: 'Manager', staff: 'Équipier',
+}
 
 // Grille hebdo — noms courts (lundi=0) + couleurs d'avatar cycliques (amber/blue/green/purple).
 const DAY_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
@@ -88,6 +98,7 @@ export function Planning() {
   const restaurant = useRestaurant()
   const restaurantName = restaurant?.name ?? 'Splitzy'
 
+  const [view, setView] = useState<'extras' | 'equipe'>('extras')
   const [period, setPeriod] = useState<PeriodKind>('upcoming')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -144,23 +155,56 @@ export function Planning() {
   return (
     <RestaurantLayout>
       <PageHeader
-        title="Planning des extras"
+        title={view === 'extras' ? 'Planning des extras' : "Planning de l'équipe"}
         subtitle={
-          <span>
-            {stats.total} convocation{stats.total !== 1 ? 's' : ''} sur la période · {stats.confirmed} confirmée{stats.confirmed !== 1 ? 's' : ''}
-          </span>
+          view === 'extras' ? (
+            <span>
+              {stats.total} convocation{stats.total !== 1 ? 's' : ''} sur la période · {stats.confirmed} confirmée{stats.confirmed !== 1 ? 's' : ''}
+            </span>
+          ) : (
+            <span>Créneaux du personnel interne, semaine par semaine</span>
+          )
         }
         actions={
-          <button
-            onClick={() => setShowConvoke(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-[7px] h-8 rounded-lg text-[13px] font-semibold text-white"
-            style={{ background: '#E8920A' }}
-          >
-            <Plus size={14} /> Nouvelle convocation
-          </button>
+          view === 'extras' ? (
+            <button
+              onClick={() => setShowConvoke(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-[7px] h-8 rounded-lg text-[13px] font-semibold text-white"
+              style={{ background: '#E8920A' }}
+            >
+              <Plus size={14} /> Nouvelle convocation
+            </button>
+          ) : undefined
         }
       />
 
+      {/* Switcher Extras / Équipe */}
+      <div className="px-9 pt-6">
+        <div
+          className="inline-flex rounded-[10px] p-[3px] gap-px border"
+          style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
+        >
+          {([
+            { key: 'extras' as const, label: 'Extras', icon: CalendarDays },
+            { key: 'equipe' as const, label: 'Équipe', icon: Users },
+          ]).map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setView(key)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-[6px] rounded-[7px] text-[12.5px] transition-colors"
+              style={{
+                background: view === key ? 'var(--ds-bg-subtle)' : 'none',
+                color: view === key ? 'var(--ds-text-primary)' : 'var(--ds-text-secondary)',
+                fontWeight: view === key ? 600 : 500,
+              }}
+            >
+              <Icon size={13} /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {view === 'extras' && (
       <div className="px-9 py-6 space-y-5">
         {/* Sélecteur de période */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -232,6 +276,13 @@ export function Planning() {
         {/* Grille visuelle hebdomadaire — une ligne par extra, une colonne par jour */}
         <WeekGrid restaurantId={restaurantId} onResend={handleResend} resendingId={resendingId} />
       </div>
+      )}
+
+      {view === 'equipe' && (
+        <div className="px-9 py-6">
+          <TeamWeek restaurantId={restaurantId} />
+        </div>
+      )}
 
       {showConvoke && (
         <ConvokeModal
@@ -828,5 +879,298 @@ function ConvokeModal({
         </div>
       </div>
     </div>
+  )
+}
+
+// Onglet Équipe — grille hebdo des créneaux du personnel interne (table `shifts`).
+// Lignes = membres (members.getTeamMembers), colonnes = 7 jours de la semaine
+// décalée de `wOff`. Cellule = badges des créneaux (× pour supprimer) + bouton +
+// qui ouvre une mini-modal de création (heure début/fin).
+function TeamWeek({ restaurantId }: { restaurantId: Id<'restaurants'> | null }) {
+  const [wOff, setWOff] = useState(0)
+  const [newShift, setNewShift] = useState<{ dayIdx: number; memberId: Id<'members'> } | null>(null)
+  const [sf, setSf] = useState({ s: '', e: '' })
+  const [saving, setSaving] = useState(false)
+  const createShift = useMutation(api.shifts.create)
+  const removeShift = useMutation(api.shifts.remove)
+  const members = useQuery(api.members.getTeamMembers, restaurantId ? { restaurantId } : 'skip')
+  const wDays = useMemo(() => weekDaysFrom(wOff), [wOff])
+  const weekShifts = useQuery(
+    api.shifts.listByWeek,
+    restaurantId ? { restaurantId, dateFrom: ymd(wDays[0]), dateTo: ymd(wDays[6]) } : 'skip',
+  )
+  const todayIso = ymd(new Date())
+
+  // Index des créneaux par membre + date (plusieurs créneaux possibles / jour).
+  const byMemberDate = useMemo(() => {
+    const map = new Map<string, WeekShift[]>()
+    for (const s of weekShifts ?? []) {
+      const k = `${s.memberId}|${s.date}`
+      const arr = map.get(k)
+      if (arr) arr.push(s)
+      else map.set(k, [s])
+    }
+    return map
+  }, [weekShifts])
+
+  async function submit() {
+    if (!newShift || !restaurantId || saving) return
+    if (!sf.s || !sf.e) {
+      toast.error('Renseignez les heures de début et de fin')
+      return
+    }
+    setSaving(true)
+    try {
+      await createShift({
+        restaurantId,
+        memberId: newShift.memberId,
+        date: ymd(wDays[newShift.dayIdx]),
+        startTime: sf.s,
+        endTime: sf.e,
+      })
+      toast.success('Créneau créé')
+      setNewShift(null)
+    } catch {
+      toast.error('Échec de la création du créneau')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function del(shiftId: Id<'shifts'>) {
+    try {
+      await removeShift({ shiftId })
+      toast.success('Créneau supprimé')
+    } catch {
+      toast.error('Échec de la suppression')
+    }
+  }
+
+  const modalMember = newShift ? members?.find(m => m._id === newShift.memberId) : null
+  const modalDayLabel = newShift
+    ? wDays[newShift.dayIdx].toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' })
+    : ''
+  const GRID = '170px repeat(7, 1fr)'
+  const todayColBg = 'rgba(245,158,11,0.04)'
+
+  return (
+    <>
+      <section
+        className="rounded-[12px] border overflow-hidden"
+        style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
+      >
+        {/* Navigation semaine */}
+        <div
+          className="flex items-center justify-between px-5 py-3 border-b"
+          style={{ borderColor: 'var(--ds-border)', background: 'var(--ds-bg-base)' }}
+        >
+          <div className="text-[13px] font-semibold ds-text-primary first-letter:uppercase">
+            {wDays[0].toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+            <span className="ds-text-tertiary font-normal"> · {dmLabel(wDays[0])} – {dmLabel(wDays[6])}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setWOff(o => o - 1)}
+              aria-label="Semaine précédente"
+              className="w-7 h-7 inline-flex items-center justify-center rounded-lg border transition-colors"
+              style={{ borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+            >
+              <ChevronLeft size={15} />
+            </button>
+            {wOff !== 0 && (
+              <button
+                onClick={() => setWOff(0)}
+                className="px-2 h-7 inline-flex items-center rounded-lg border text-[11.5px] font-medium transition-colors"
+                style={{ borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+              >
+                Aujourd'hui
+              </button>
+            )}
+            <button
+              onClick={() => setWOff(o => o + 1)}
+              aria-label="Semaine suivante"
+              className="w-7 h-7 inline-flex items-center justify-center rounded-lg border transition-colors"
+              style={{ borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
+
+        {members === undefined ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-16">
+            <Clock size={20} style={{ color: 'var(--ds-text-tertiary)' }} className="animate-pulse" />
+            <p className="text-[13px] ds-text-tertiary">Chargement…</p>
+          </div>
+        ) : members.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'var(--ds-bg-subtle)' }}>
+              <Users size={22} style={{ color: 'var(--ds-text-tertiary)' }} />
+            </div>
+            <p className="text-[14px] font-semibold ds-text-primary">Aucun membre d'équipe</p>
+            <p className="text-[12.5px] ds-text-tertiary max-w-[340px]">
+              Ajoutez des membres dans <span className="font-semibold ds-text-secondary">Paramètres → Équipe</span> pour planifier leurs créneaux.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <div style={{ minWidth: 720 }}>
+              {/* En-tête : coin vide + 7 jours */}
+              <div className="grid border-b" style={{ gridTemplateColumns: GRID, borderColor: 'var(--ds-border)' }}>
+                <div />
+                {wDays.map((d, i) => {
+                  const isToday = ymd(d) === todayIso
+                  return (
+                    <div
+                      key={i}
+                      className="flex flex-col items-center gap-0.5 py-2.5 border-l"
+                      style={{ borderColor: 'var(--ds-border)', background: isToday ? todayColBg : undefined }}
+                    >
+                      <span className="text-[11px] uppercase tracking-wide ds-text-tertiary">{DAY_SHORT[i]}</span>
+                      {isToday ? (
+                        <span
+                          className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[13px] font-medium text-white"
+                          style={{ background: '#F59E0B' }}
+                        >
+                          {d.getDate()}
+                        </span>
+                      ) : (
+                        <span className="text-[16px] font-medium ds-text-primary leading-6">{d.getDate()}</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Une ligne par membre */}
+              {members.map((m, idx) => {
+                const label = memberLabel(m)
+                const initials = label.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?'
+                const av = AVATAR_COLORS[idx % AVATAR_COLORS.length]
+                return (
+                  <div
+                    key={m._id}
+                    className="grid border-b"
+                    style={{ gridTemplateColumns: GRID, borderColor: 'var(--ds-border)' }}
+                  >
+                    {/* Colonne membre fixe */}
+                    <div className="flex items-center gap-2 px-3 py-2.5 min-w-0">
+                      <div
+                        className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+                        style={{ background: av.bg, color: av.color }}
+                      >
+                        {initials}
+                      </div>
+                      <div className="min-w-0" style={{ maxWidth: 128 }}>
+                        <div className="text-[12px] font-medium ds-text-primary truncate">{label}</div>
+                        <div className="text-[10px] ds-text-tertiary truncate">
+                          {MEMBER_ROLE_LABEL[m.role] ?? m.role}
+                          {m.status === 'pending' ? ' · invité' : ''}
+                        </div>
+                      </div>
+                    </div>
+                    {/* 7 cellules jour */}
+                    {wDays.map((d, i) => {
+                      const isToday = ymd(d) === todayIso
+                      const shifts = byMemberDate.get(`${m._id}|${ymd(d)}`) ?? []
+                      return (
+                        <div
+                          key={i}
+                          className="border-l p-1.5 flex flex-col gap-1 min-h-[52px]"
+                          style={{ borderColor: 'var(--ds-border)', background: isToday ? todayColBg : undefined }}
+                        >
+                          {shifts.map(s => (
+                            <div
+                              key={s._id}
+                              className="inline-flex items-center justify-between gap-1 rounded-[6px] px-1.5 py-0.5"
+                              style={{ background: '#DBEAFE', color: '#1E40AF' }}
+                            >
+                              <span className="text-[10.5px] font-medium tabular-nums">
+                                {frTime(s.startTime)}–{frTime(s.endTime)}
+                              </span>
+                              <button
+                                onClick={() => del(s._id)}
+                                aria-label="Supprimer le créneau"
+                                className="shrink-0 hover:opacity-70"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            onClick={() => { setNewShift({ dayIdx: i, memberId: m._id }); setSf({ s: '', e: '' }) }}
+                            aria-label="Ajouter un créneau"
+                            className="w-full flex items-center justify-center rounded-[6px] border border-dashed py-1 transition-colors hover:bg-black/[0.02]"
+                            style={{ borderColor: 'var(--ds-border)', color: 'var(--ds-text-tertiary)', minHeight: 24 }}
+                          >
+                            <Plus size={13} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Mini-modal création de créneau */}
+      {newShift && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={e => { if (e.target === e.currentTarget && !saving) setNewShift(null) }}
+        >
+          <div
+            className="relative rounded-2xl w-[340px] max-w-full"
+            style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
+          >
+            <div className="px-5 pt-5 pb-1">
+              <div className="text-[15px] font-bold ds-text-primary">Nouveau créneau</div>
+              <div className="text-[12.5px] ds-text-tertiary mt-0.5 first-letter:uppercase">
+                {modalMember ? memberLabel(modalMember) : ''} · {modalDayLabel}
+              </div>
+            </div>
+            <div className="px-5 py-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Début</label>
+                <input
+                  type="time" value={sf.s}
+                  onChange={e => setSf(f => ({ ...f, s: e.target.value }))}
+                  className="w-full rounded-lg border px-3 py-2 outline-none" style={inputStyle}
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Fin</label>
+                <input
+                  type="time" value={sf.e}
+                  onChange={e => setSf(f => ({ ...f, e: e.target.value }))}
+                  className="w-full rounded-lg border px-3 py-2 outline-none" style={inputStyle}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-5 py-4">
+              <button
+                onClick={() => setNewShift(null)}
+                disabled={saving}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-colors disabled:opacity-50"
+                style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={submit}
+                disabled={saving || !sf.s || !sf.e}
+                className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
+                style={{ background: '#E8920A' }}
+              >
+                {saving ? 'Création…' : 'Créer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

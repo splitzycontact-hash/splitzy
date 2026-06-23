@@ -70,6 +70,37 @@ export const remove = mutation({
   },
 })
 
+// Tous les créneaux d'une fenêtre [dateFrom, dateTo] (semaine d'équipe interne),
+// enrichis du nom du membre. Utilisé par l'onglet Équipe du planning.
+export const listByWeek = query({
+  args: {
+    restaurantId: v.id("restaurants"),
+    dateFrom: v.string(),
+    dateTo: v.string(),
+  },
+  handler: async (ctx, { restaurantId, dateFrom, dateTo }) => {
+    await requireRestaurantAccess(ctx, restaurantId)
+    const list = await ctx.db
+      .query("shifts")
+      .withIndex("by_restaurant_date", q => q.eq("restaurantId", restaurantId))
+      .filter(q =>
+        q.and(q.gte(q.field("date"), dateFrom), q.lte(q.field("date"), dateTo)),
+      )
+      .collect()
+    return Promise.all(
+      list.map(async s => {
+        const m = await ctx.db.get(s.memberId)
+        const memberName = m
+          ? (m.displayName
+              ?? (m.firstName ? `${m.firstName} ${m.lastName ?? ""}`.trim() : null)
+              ?? m.name)
+          : "Inconnu"
+        return { ...s, memberName }
+      }),
+    )
+  },
+})
+
 // Vue agrégée du service du jour : grille du plan, zones, tables complètes et
 // staff présent (couvre le plan de salle + le planning live).
 // Retourne null si non authentifié (jamais de throw côté lecture).
