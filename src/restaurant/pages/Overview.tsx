@@ -1,4 +1,5 @@
 import { useQuery } from 'convex/react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
@@ -13,7 +14,7 @@ import {
 
 type ConvexTable   = { number: number; status: string; amountCents?: number; paidCents?: number; durationMinutes?: number; alert?: boolean }
 type ConvexPayment = { tableNumber: number; totalCents: number; tipCents: number; subtotalCents: number; createdAt: number; dateLabel: string; status: string; guests: number }
-type ConvexFeedback = { stars: number }
+type ConvexFeedback = { stars: number; isNew?: boolean }
 
 const NOW = new Date()
 const DATE_FR = NOW.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -267,6 +268,7 @@ function InsightsProLock() {
 export function Overview() {
   const restaurantId = useRestaurantId()
   const restaurant   = useRestaurant()
+  const navigate     = useNavigate()
 
   const stats          = useQuery(api.payments.getOverviewStats, restaurantId ? { restaurantId } : 'skip')
   const rawTables      = useQuery(api.tables.list,               restaurantId ? { restaurantId } : 'skip')
@@ -287,6 +289,9 @@ export function Overview() {
   const avgRating = feedbacks.length > 0
     ? (feedbacks.reduce((s, f) => s + f.stars, 0) / feedbacks.length).toFixed(1)
     : null
+
+  // Avis négatifs (≤ 2★) non encore consultés → bannière alerte service.
+  const badNew = feedbacks.filter(f => f.stars <= 2 && f.isNew)
 
   // ── Tables live ───────────────────────────────────────────────
   const tables = (rawTables ?? []) as ConvexTable[]
@@ -493,6 +498,15 @@ export function Overview() {
             </div>
           </div>
         </section>
+
+        {/* ── Alerte avis négatifs non traités ── */}
+        {badNew.length > 0 && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700">
+            <AlertTriangle size={16} />
+            <span className="text-sm font-semibold">{badNew.length} avis négatif(s) non traité(s) ce service</span>
+            <button onClick={() => navigate('/restaurant/reputation')} className="ml-auto text-xs underline">Voir →</button>
+          </div>
+        )}
 
         {/* ── Main grid ── */}
         <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-3.5">

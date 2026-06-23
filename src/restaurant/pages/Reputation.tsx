@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useAction } from 'convex/react'
+import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
+import type { Id } from '../../../convex/_generated/dataModel'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId } from '../context/RestaurantContext'
-import { Star, Shield, MessageSquare, Sparkles, RefreshCw } from 'lucide-react'
+import { Star, Shield, MessageSquare, Sparkles, RefreshCw, Pencil } from 'lucide-react'
 
 function timeAgo(ts: number): string {
   const days = Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24))
@@ -16,7 +18,7 @@ function timeAgo(ts: number): string {
 type FilterKey = 'all' | 'neg' | 'pos' | 'neu' | 'week'
 
 type Feedback = {
-  _id: string
+  _id: Id<'feedbacks'>
   tableNumber: number
   stars: number
   tags: string[]
@@ -24,6 +26,7 @@ type Feedback = {
   isNew: boolean
   timeLabel: string
   createdAt: number
+  managerReply?: string
 }
 
 function StarRating({ count, size = 13 }: { count: number; size?: number }) {
@@ -47,6 +50,9 @@ export function Reputation() {
   const restaurantId = useRestaurantId()
   const rawFeedbacks = useQuery(api.feedbacks.list, restaurantId ? { restaurantId } : 'skip')
   const markAllRead = useMutation(api.feedbacks.markAllRead)
+  const addReply = useMutation(api.feedbacks.addReply)
+  const [replyingTo, setReplyingTo] = useState<Id<'feedbacks'> | null>(null)
+  const [replyText, setReplyText] = useState('')
 
   const latestInsightsDoc = useQuery(api.insights.getLatestInsights, restaurantId ? { restaurantId } : 'skip')
   const generateInsights = useAction(api.actions.generateInsights.generateInsightsForRestaurant)
@@ -269,6 +275,65 @@ export function Reputation() {
                       ))}
                     </div>
                   )}
+
+                  {/* Réponse gérant */}
+                  <div className="mt-2.5">
+                    {replyingTo === fb._id ? (
+                      <div className="flex flex-col gap-1.5">
+                        <textarea
+                          autoFocus
+                          maxLength={280}
+                          value={replyText}
+                          onChange={e => setReplyText(e.target.value)}
+                          placeholder="Votre réponse au client…"
+                          className="w-full text-[13px] rounded-[8px] border px-3 py-2 resize-none leading-[1.4] outline-none"
+                          style={{ borderColor: 'var(--ds-border)', background: 'var(--ds-bg-base)', color: 'var(--ds-text-primary)', minHeight: 60 }}
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={async () => {
+                              await addReply({ feedbackId: fb._id, reply: replyText })
+                              toast.success('Réponse enregistrée')
+                              setReplyingTo(null)
+                            }}
+                            className="px-3 py-1.5 rounded-[7px] text-[12px] font-semibold text-white"
+                            style={{ background: 'var(--ds-accent)' }}
+                          >
+                            Envoyer
+                          </button>
+                          <button
+                            onClick={() => setReplyingTo(null)}
+                            className="px-3 py-1.5 rounded-[7px] text-[12px] font-medium ds-text-secondary"
+                          >
+                            Annuler
+                          </button>
+                          <span className="ml-auto text-[11px] ds-text-tertiary tabular-nums">{replyText.length}/280</span>
+                        </div>
+                      </div>
+                    ) : fb.managerReply ? (
+                      <div className="flex items-start gap-2">
+                        <p
+                          className="flex-1 text-[12.5px] italic ds-text-secondary leading-[1.45] px-3 py-2 rounded-[8px]"
+                          style={{ background: 'var(--ds-bg-subtle)' }}
+                        >
+                          ↩ « {fb.managerReply} »
+                        </p>
+                        <button
+                          onClick={() => { setReplyingTo(fb._id); setReplyText(fb.managerReply ?? '') }}
+                          className="inline-flex items-center gap-1 text-[12px] font-medium ds-text-tertiary hover:ds-text-primary transition-colors shrink-0 mt-1"
+                        >
+                          <Pencil size={12} /> Modifier
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setReplyingTo(fb._id); setReplyText('') }}
+                        className="inline-flex items-center gap-1.5 text-[12px] font-medium ds-text-tertiary hover:ds-text-primary transition-colors"
+                      >
+                        <MessageSquare size={13} /> Répondre
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

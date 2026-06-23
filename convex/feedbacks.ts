@@ -49,6 +49,18 @@ export const markRead = mutation({
   },
 })
 
+// Réponse publique du gérant à un feedback. Owner/manager only. reply vide
+// (après trim) efface la réponse existante.
+export const addReply = mutation({
+  args: { feedbackId: v.id("feedbacks"), reply: v.string() },
+  handler: async (ctx, { feedbackId, reply }) => {
+    const fb = await ctx.db.get(feedbackId)
+    if (!fb) throw new Error("Feedback introuvable")
+    await requireRestaurantAccess(ctx, fb.restaurantId, ["owner", "manager"])
+    await ctx.db.patch(feedbackId, { managerReply: reply.trim().slice(0, 280) || undefined })
+  },
+})
+
 export const markAllRead = mutation({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
