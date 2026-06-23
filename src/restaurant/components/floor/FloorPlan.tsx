@@ -9,6 +9,9 @@ import ZoneFilter from "./ZoneFilter"
 export interface RosterEntry {
   memberId: Id<"members">
   name: string
+  // Nom d'affichage libre (displayName) si défini — déjà appliqué dans `name`
+  // côté getServiceOverview ; exposé ici pour les consommateurs qui en ont besoin.
+  displayName?: string
   colorIndex: number
   checkedIn: boolean
   zone: string | null

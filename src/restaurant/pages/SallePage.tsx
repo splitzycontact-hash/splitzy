@@ -183,6 +183,7 @@ export function SallePage() {
   const roster: RosterEntry[] = overview.staffToday.map(s => ({
     memberId: s.memberId,
     name: s.memberName,
+    displayName: s.displayName,
     colorIndex: s.colorIndex,
     checkedIn: s.isPresent,
     zone: s.zone ?? null,
@@ -304,7 +305,7 @@ export function SallePage() {
                       }}
                       className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-dark hover:bg-brand-bg transition-colors"
                     >
-                      {m.firstName || m.name || 'Membre'}
+                      {m.displayName ?? (m.firstName ? `${m.firstName} ${m.lastName ?? ''}`.trim() : null) ?? m.name ?? 'Membre'}
                     </button>
                   ))
                 )}

@@ -52,6 +52,9 @@ export default defineSchema({
     // retombent sur `name` (dérivé de l'email) côté UI.
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
+    // Nom d'affichage libre défini par l'owner/manager (prénom ou surnom).
+    // Prioritaire sur firstName/lastName/name partout dans le dashboard.
+    displayName: v.optional(v.string()),
     role: v.union(v.literal("owner"), v.literal("manager"), v.literal("staff")),
     status: v.union(v.literal("active"), v.literal("pending")),
     invitedAt: v.number(),

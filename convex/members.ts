@@ -83,3 +83,16 @@ export const removeMember = mutation({
     await ctx.db.delete(memberId)
   },
 })
+
+// Nom d'affichage libre d'un membre (prénom ou surnom), prioritaire sur
+// firstName/lastName/name partout. Vidé (undefined) si chaîne blanche → l'UI
+// retombe sur la cascade firstName/name. Guard owner/manager du restaurant.
+export const updateDisplayName = mutation({
+  args: { memberId: v.id("members"), displayName: v.string() },
+  handler: async (ctx, { memberId, displayName }) => {
+    const member = await ctx.db.get(memberId)
+    if (!member) throw new Error("Member not found")
+    await requireRestaurantAccess(ctx, member.restaurantId, ["owner", "manager"])
+    await ctx.db.patch(memberId, { displayName: displayName.trim().slice(0, 30) || undefined })
+  },
+})

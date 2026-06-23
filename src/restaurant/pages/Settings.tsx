@@ -1956,7 +1956,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // Nom affiché d'un membre : prénom + nom (Clerk) si renseignés, sinon le libellé
 // `name` (dérivé de l'email à l'invitation), sinon l'email brut en dernier recours.
-function memberDisplayName(m: { firstName?: string; lastName?: string; name?: string; email: string }): string {
+function memberDisplayName(m: { displayName?: string; firstName?: string; lastName?: string; name?: string; email: string }): string {
+  if (m.displayName?.trim()) return m.displayName.trim()
   const full = [m.firstName, m.lastName].filter(Boolean).join(' ').trim()
   return full || m.name?.trim() || m.email
 }
@@ -1982,6 +1983,8 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
   const createInvitation = useAction(api.invitations.create)
   const updateMemberRole = useMutation(api.members.updateMemberRole)
   const removeMember     = useMutation(api.members.removeMember)
+  const updateDisplayName = useMutation(api.members.updateDisplayName)
+  const [editingName, setEditingName] = useState<{ id: Id<'members'>; value: string } | null>(null)
 
   const [showInvite, setShowInvite] = useState(false)
   const [showRoles, setShowRoles] = useState(false)
@@ -2196,9 +2199,31 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                   >
                     {initials}
                   </div>
-                  {/* Name */}
+                  {/* Name — cliquer pour renommer (displayName libre) */}
                   <div>
-                    <div className="text-[13px] font-semibold ds-text-primary">{displayName}</div>
+                    {editingName?.id === member._id ? (
+                      <input
+                        autoFocus
+                        className="text-[13px] font-semibold bg-transparent border-b border-[var(--ds-accent)] outline-none w-full max-w-[160px] ds-text-primary"
+                        value={editingName.value}
+                        maxLength={30}
+                        onChange={e => setEditingName(s => s ? { ...s, value: e.target.value } : s)}
+                        onBlur={() => {
+                          updateDisplayName({ memberId: member._id, displayName: editingName.value }).catch(() => {})
+                          setEditingName(null)
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                          if (e.key === 'Escape') setEditingName(null)
+                        }}
+                      />
+                    ) : (
+                      <div
+                        className="text-[13px] font-semibold ds-text-primary cursor-pointer hover:underline"
+                        title="Cliquer pour renommer"
+                        onClick={() => setEditingName({ id: member._id, value: member.displayName ?? displayName })}
+                      >{displayName}</div>
+                    )}
                   </div>
                   {/* Email */}
                   <div className="text-[11.5px] ds-text-tertiary truncate">{member.email}</div>

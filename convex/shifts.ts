@@ -102,14 +102,15 @@ export const getServiceOverview = query({
       shifts.map(async (s, idx) => {
         const member = await ctx.db.get(s.memberId)
         const memberName = member
-          ? (member.firstName
-              ? `${member.firstName} ${member.lastName ?? ""}`.trim()
-              : member.name)
+          ? (member.displayName
+              ?? (member.firstName ? `${member.firstName} ${member.lastName ?? ""}`.trim() : null)
+              ?? member.name)
           : "Inconnu"
         return {
           shiftId: s._id,
           memberId: s.memberId,
           memberName,
+          displayName: member?.displayName,
           zone: s.zone,
           startTime: s.startTime,
           endTime: s.endTime,
