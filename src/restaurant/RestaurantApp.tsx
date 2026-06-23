@@ -16,6 +16,7 @@ import { Integrations } from './pages/Integrations'
 import { MenuPage } from './pages/MenuPage'
 import { Clients } from './pages/Clients'
 import { Planning } from './pages/Planning'
+import { SallePage } from './pages/SallePage'
 import { Settings } from './pages/Settings'
 
 const clerkReady = (() => {
@@ -74,6 +75,7 @@ export function RestaurantApp() {
                     <Routes>
                       <Route path="/"             element={<Overview />} />
                       <Route path="/tables"       element={<Tables />} />
+                      <Route path="/salle"        element={<RoleGuard allowed={['owner', 'manager']}><SallePage /></RoleGuard>} />
                       <Route path="/reputation"   element={<Reputation />} />
                       <Route path="/analytics"    element={<Analytics />} />
                       <Route path="/factures"     element={<Factures />} />

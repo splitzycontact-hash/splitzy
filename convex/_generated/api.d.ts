@@ -26,7 +26,9 @@ import type * as planning from "../planning.js";
 import type * as posIntegrations from "../posIntegrations.js";
 import type * as restaurants from "../restaurants.js";
 import type * as seed from "../seed.js";
+import type * as shifts from "../shifts.js";
 import type * as tables from "../tables.js";
+import type * as zones from "../zones.js";
 
 import type {
   ApiFromModules,
@@ -53,7 +55,9 @@ declare const fullApi: ApiFromModules<{
   posIntegrations: typeof posIntegrations;
   restaurants: typeof restaurants;
   seed: typeof seed;
+  shifts: typeof shifts;
   tables: typeof tables;
+  zones: typeof zones;
 }>;
 
 /**

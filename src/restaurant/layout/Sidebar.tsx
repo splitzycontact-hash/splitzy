@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Grid3x3, Star, TrendingUp,
   Utensils, Users, Receipt, Plug, Settings, CalendarDays,
-  ArrowUpRight, ChevronsUpDown,
+  ArrowUpRight, ChevronsUpDown, LayoutGrid,
 } from 'lucide-react'
 import { useUser, useClerk } from '@clerk/clerk-react'
 import { useQuery } from 'convex/react'
@@ -16,9 +16,10 @@ const clerkReady = (() => {
   return typeof k === 'string' && k.startsWith('pk_') && k.length > 20
 })()
 
-const PILOTAGE_ITEMS = [
+const PILOTAGE_ITEMS: { label: string; icon: React.ElementType; to: string; exact?: boolean; badge?: boolean; roles?: RestaurantRole[] }[] = [
   { label: "Vue d'ensemble", icon: LayoutDashboard, to: '/restaurant',            exact: true, badge: false },
   { label: 'Tables live',   icon: Grid3x3,          to: '/restaurant/tables',     exact: false, badge: false },
+  { label: 'Salle',         icon: LayoutGrid,       to: '/restaurant/salle',      exact: false, badge: false, roles: ['owner', 'manager'] },
   { label: 'Réputation',    icon: Star,             to: '/restaurant/reputation', exact: false, badge: true  },
   { label: 'Analytics',     icon: TrendingUp,       to: '/restaurant/analytics',  exact: false, badge: false },
 ]
@@ -160,6 +161,7 @@ export function Sidebar() {
   const restaurant = useRestaurant()
   const restaurantId = useRestaurantId()
   const role = useRestaurantRole() ?? 'owner'
+  const pilotageItems = PILOTAGE_ITEMS.filter(item => !item.roles || item.roles.includes(role))
   const restaurantItems = RESTAURANT_ITEMS.filter(item => !item.roles || item.roles.includes(role))
   const newFeedbackCount = useQuery(
     api.feedbacks.getNewCount,
@@ -195,7 +197,7 @@ export function Sidebar() {
       <nav className="flex-1 overflow-y-auto px-3.5 pb-2">
         <NavSectionLabel label="Pilotage" />
         <div className="flex flex-col gap-px">
-          {PILOTAGE_ITEMS.map(item => (
+          {pilotageItems.map(item => (
             <NavItem
               key={item.to}
               to={item.to}

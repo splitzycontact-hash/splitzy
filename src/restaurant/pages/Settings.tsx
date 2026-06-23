@@ -9,12 +9,14 @@ import {
   Download, Store, QrCode, UserCog, Bell, UserRound,
   CreditCard, Sparkles, Plus, MoreHorizontal, Trash2,
   Check, Shield, KeyRound, ChevronRight, Utensils, Beer, Coffee, Upload, X,
-  Mail, Phone, Archive, History, Pencil,
+  Mail, Phone, Archive, History, Pencil, LayoutGrid,
 } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurant, useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
+import FloorPlan from '../components/floor/FloorPlan'
+import { ZONE_PALETTE } from '../components/floor/floorColors'
 import { assignEmoji, normalizeCategoryId } from '../../utils/menuEmoji'
 import { generateBillingInvoicePDF, downloadAllInvoices, type BillingInvoiceData } from '../../utils/generateBillingInvoice'
 
@@ -24,10 +26,11 @@ import { generateBillingInvoicePDF, downloadAllInvoices, type BillingInvoiceData
 // dashboard.clerk.com (instance clerk.splitzy.fr).
 const FEATURE_MFA_ENABLED = false
 
-type SectionKey = 'restaurant' | 'menu' | 'qr' | 'notifications' | 'pos' | 'billing' | 'team' | 'account' | 'plan'
+type SectionKey = 'restaurant' | 'menu' | 'tables' | 'qr' | 'notifications' | 'pos' | 'billing' | 'team' | 'account' | 'plan'
 
 const SUB_NAV: { key: SectionKey; label: string; icon: React.ElementType; pendingDot?: boolean }[] = [
   { key: 'restaurant',    label: 'Restaurant',       icon: Store       },
+  { key: 'tables',        label: 'Tables & Plan',     icon: LayoutGrid  },
   { key: 'qr',            label: 'QR Codes',          icon: QrCode      },
   { key: 'team',          label: 'Équipe',            icon: UserCog, pendingDot: true },
   { key: 'notifications', label: 'Notifications',    icon: Bell        },
@@ -3703,6 +3706,262 @@ function PlanSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
   )
 }
 
+// Module 3 — Plan de salle (config). Gestion des zones + positionnement des
+// tables sur la grille. Le drag n'est PAS géré ici : placement par sélection
+// (table puis cellule vide). FloorPlan ne fait que rendre.
+function TablesSection() {
+  const restaurantId = useRestaurantId()
+  const zones = useQuery(api.zones.list, restaurantId ? { restaurantId } : 'skip') ?? []
+  const tables = useQuery(api.tables.list, restaurantId ? { restaurantId } : 'skip') ?? []
+  const restaurant = useRestaurant()
+  const gridCols = restaurant?.floorGridCols ?? 12
+  const gridRows = restaurant?.floorGridRows ?? 8
+
+  const createZone = useMutation(api.zones.create)
+  const renameZone = useMutation(api.zones.rename)
+  const removeZone = useMutation(api.zones.remove)
+  const updateGridPosition = useMutation(api.tables.updateGridPosition)
+  const updateZone = useMutation(api.tables.updateZone)
+
+  const [activeZoneId, setActiveZoneId] = useState<Id<'zones'> | null>(null)
+  const [selectedTableId, setSelectedTableId] = useState<Id<'tables'> | null>(null)
+  const [editingZoneId, setEditingZoneId] = useState<Id<'zones'> | null>(null)
+  const [showNewZoneForm, setShowNewZoneForm] = useState(false)
+  const [zonePopoverTableId, setZonePopoverTableId] = useState<Id<'tables'> | null>(null)
+
+  const [editName, setEditName] = useState('')
+  const [newZoneName, setNewZoneName] = useState('')
+  const [newZoneColor, setNewZoneColor] = useState<string>(ZONE_PALETTE[0])
+
+  const selectedTable = tables.find(t => t._id === selectedTableId) ?? null
+  const popoverTable = tables.find(t => t._id === zonePopoverTableId) ?? null
+
+  async function handleCreateZone() {
+    if (!restaurantId || !newZoneName.trim()) return
+    await createZone({ restaurantId, name: newZoneName.trim(), color: newZoneColor })
+    setNewZoneName('')
+    setNewZoneColor(ZONE_PALETTE[0])
+    setShowNewZoneForm(false)
+    toast.success('Zone créée')
+  }
+
+  async function handleRenameZone(zoneId: Id<'zones'>) {
+    if (!editName.trim()) return
+    await renameZone({ zoneId, name: editName.trim() })
+    setEditingZoneId(null)
+    toast.success('Zone renommée')
+  }
+
+  async function handleRemoveZone(zoneId: Id<'zones'>, name: string) {
+    if (!window.confirm(`Supprimer la zone « ${name} » ? Les tables associées seront détachées.`)) return
+    if (activeZoneId === zoneId) setActiveZoneId(null)
+    await removeZone({ zoneId })
+    toast.success('Zone supprimée')
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Zones */}
+      <div className="bg-white rounded-xl border border-border shadow-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-base font-bold text-dark">Zones</h2>
+            <p className="text-xs text-muted mt-0.5">Salle, terrasse, bar… regroupez vos tables.</p>
+          </div>
+          {!showNewZoneForm && (
+            <button
+              onClick={() => setShowNewZoneForm(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand text-white text-xs font-semibold hover:bg-brand-dark transition-colors"
+            >
+              <Plus size={14} /> Nouvelle zone
+            </button>
+          )}
+        </div>
+
+        {zones.length === 0 && !showNewZoneForm && (
+          <div className="text-sm text-muted py-4 text-center">Aucune zone — créez-en une pour organiser votre plan.</div>
+        )}
+
+        <div className="divide-y divide-border">
+          {zones.map(zone => (
+            <div key={zone._id} className="flex items-center gap-3 py-3">
+              <span
+                className="w-3 h-3 rounded-full shrink-0"
+                style={{ background: zone.color, width: 12, height: 12 }}
+              />
+              {editingZoneId === zone._id ? (
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleRenameZone(zone._id) }}
+                  className="flex-1 border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                />
+              ) : (
+                <span className="flex-1 text-sm font-semibold text-dark truncate">{zone.name}</span>
+              )}
+              {editingZoneId === zone._id ? (
+                <>
+                  <button
+                    onClick={() => handleRenameZone(zone._id)}
+                    className="text-xs font-semibold text-brand px-2 py-1 rounded hover:bg-brand-bg transition-colors"
+                  >
+                    Enregistrer
+                  </button>
+                  <button
+                    onClick={() => setEditingZoneId(null)}
+                    className="text-xs text-muted px-2 py-1 rounded hover:bg-bg transition-colors"
+                  >
+                    Annuler
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => { setEditingZoneId(zone._id); setEditName(zone.name) }}
+                    className="flex items-center gap-1 text-xs text-muted hover:text-brand transition-colors px-2 py-1 rounded hover:bg-brand-bg"
+                  >
+                    <Pencil size={12} /> Modifier
+                  </button>
+                  <button
+                    onClick={() => handleRemoveZone(zone._id, zone.name)}
+                    className="flex items-center gap-1 text-xs text-muted hover:text-red-500 transition-colors px-2 py-1 rounded hover:bg-red-50"
+                  >
+                    <Trash2 size={12} /> Supprimer
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {showNewZoneForm && (
+          <div className="mt-4 border border-border rounded-xl p-4 space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Nom de la zone</label>
+              <input
+                autoFocus
+                value={newZoneName}
+                onChange={e => setNewZoneName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleCreateZone() }}
+                placeholder="Terrasse"
+                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Couleur</label>
+              <div className="flex flex-wrap gap-2">
+                {ZONE_PALETTE.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setNewZoneColor(color)}
+                    className="w-8 h-8 rounded-full transition-all"
+                    style={{
+                      background: color,
+                      boxShadow: newZoneColor === color ? '0 0 0 2px #fff, 0 0 0 4px #E8920A' : '0 0 0 1px var(--ds-border)',
+                    }}
+                    aria-label={`Couleur ${color}`}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleCreateZone}
+                disabled={!newZoneName.trim()}
+                className="flex-1 py-2 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brand-dark transition-colors disabled:opacity-40"
+              >
+                Créer la zone
+              </button>
+              <button
+                onClick={() => { setShowNewZoneForm(false); setNewZoneName('') }}
+                className="flex-1 py-2 rounded-lg border border-border text-sm font-semibold text-mid hover:bg-bg transition-colors"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Plan de salle */}
+      <div className="bg-white rounded-xl border border-border shadow-card p-6">
+        <div className="mb-4">
+          <h2 className="text-base font-bold text-dark">Plan de salle</h2>
+          <p className="text-xs text-muted mt-0.5">
+            Sélectionnez une table puis cliquez une cellule vide pour la positionner.
+          </p>
+        </div>
+
+        {selectedTable && (
+          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
+            Table {selectedTable.number} sélectionnée — cliquez une cellule vide
+            <button onClick={() => setSelectedTableId(null)} className="hover:text-amber-950">
+              <X size={13} />
+            </button>
+          </div>
+        )}
+
+        <FloorPlan
+          mode="config"
+          gridCols={gridCols}
+          gridRows={gridRows}
+          tables={tables}
+          zones={zones}
+          activeZoneId={activeZoneId}
+          selectedTableId={selectedTableId}
+          onZoneChange={setActiveZoneId}
+          onTableClick={(tableId) => {
+            const t = tables.find(x => x._id === tableId)
+            if (t && t.gridX != null && t.gridY != null) {
+              // Table déjà placée → ouvre le popover d'assignation de zone.
+              setZonePopoverTableId(prev => prev === tableId ? null : tableId)
+            } else {
+              // Table non placée (bac) → sélection pour positionnement.
+              setSelectedTableId(prev => prev === tableId ? null : tableId)
+            }
+          }}
+          onCellClick={async (x, y) => {
+            if (!selectedTableId || !restaurantId) return
+            await updateGridPosition({ tableId: selectedTableId, gridX: x, gridY: y })
+            setSelectedTableId(null)
+            toast.success('Table positionnée')
+          }}
+        />
+
+        {popoverTable && (
+          <div className="mt-4 border border-border rounded-xl p-4 flex items-center gap-3">
+            <span className="text-sm font-semibold text-dark">Zone de la table {popoverTable.number}</span>
+            <select
+              value={popoverTable.zoneId ?? ''}
+              onChange={async (e) => {
+                const value = e.target.value
+                await updateZone({
+                  tableId: popoverTable._id,
+                  zoneId: value ? (value as Id<'zones'>) : undefined,
+                })
+                toast.success('Zone mise à jour')
+              }}
+              className="flex-1 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+            >
+              <option value="">Aucune zone</option>
+              {zones.map(z => (
+                <option key={z._id} value={z._id}>{z.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setZonePopoverTableId(null)}
+              className="text-muted hover:text-dark transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function Settings() {
   const restaurant = useRestaurant()
   const restaurantId = useRestaurantId()
@@ -4032,6 +4291,10 @@ export function Settings() {
 
             {section === 'menu' && (
               <MenuSection restaurantId={restaurantId} />
+            )}
+
+            {section === 'tables' && (
+              <TablesSection />
             )}
 
             {section === 'billing' && (

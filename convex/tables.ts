@@ -241,6 +241,82 @@ export const importAmounts = mutation({
   },
 })
 
+// Module 3 — Plan de salle : positionne une table sur la grille du plan. No-op
+// silencieux (retourne null) si une AUTRE table occupe déjà la cellule cible —
+// évite les superpositions lors de drags concurrents sans faire échouer le drag.
+export const updateGridPosition = mutation({
+  args: {
+    tableId: v.id("tables"),
+    gridX: v.number(),
+    gridY: v.number(),
+  },
+  handler: async (ctx, { tableId, gridX, gridY }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+    const occupant = await ctx.db
+      .query("tables")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", table.restaurantId))
+      .filter(q => q.and(q.eq(q.field("gridX"), gridX), q.eq(q.field("gridY"), gridY)))
+      .first()
+    if (occupant && occupant._id !== tableId) return null
+    await ctx.db.patch(tableId, { gridX, gridY })
+    return tableId
+  },
+})
+
+// Assigne (ou désassigne) un serveur à une table. Additive : ne touche qu'à
+// cette table. memberId omis = désassignation explicite (patch undefined).
+export const assignServer = mutation({
+  args: {
+    tableId: v.id("tables"),
+    memberId: v.optional(v.id("members")),
+  },
+  handler: async (ctx, { tableId, memberId }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+    await ctx.db.patch(tableId, { assignedMemberId: memberId })
+    return tableId
+  },
+})
+
+// Désassigne tous les serveurs des tables du restaurant. Retourne le nombre de
+// tables effectivement modifiées (celles qui portaient une assignation).
+export const clearAllAssignments = mutation({
+  args: { restaurantId: v.id("restaurants") },
+  handler: async (ctx, { restaurantId }) => {
+    await requireRestaurantAccess(ctx, restaurantId, ["owner", "manager"])
+    const tables = await ctx.db
+      .query("tables")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
+      .collect()
+    let cleared = 0
+    for (const t of tables) {
+      if (t.assignedMemberId !== undefined) {
+        await ctx.db.patch(t._id, { assignedMemberId: undefined })
+        cleared++
+      }
+    }
+    return cleared
+  },
+})
+
+// Rattache (ou détache) une table à une zone logique. zoneId omis = détachement.
+export const updateZone = mutation({
+  args: {
+    tableId: v.id("tables"),
+    zoneId: v.optional(v.id("zones")),
+  },
+  handler: async (ctx, { tableId, zoneId }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+    await ctx.db.patch(tableId, { zoneId })
+    return tableId
+  },
+})
+
 // Auto-création paresseuse d'une table manquante. Utilisé par TableEntry quand
 // un client scanne un QR de table qui n'a pas encore de document Convex
 // (ex: setup partiel, ou ajout d'une table sans re-run createBulk).

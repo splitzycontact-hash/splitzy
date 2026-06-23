@@ -21,6 +21,9 @@ export default defineSchema({
     stripeAccountId: v.optional(v.string()),
     posProvider: v.optional(v.string()),
     logoStorageId: v.optional(v.id("_storage")),
+    // Module 3 — Plan de salle : dimensions de la grille du plan (défaut 12×8).
+    floorGridCols: v.optional(v.number()),
+    floorGridRows: v.optional(v.number()),
   }).index("by_slug", ["slug"])
     .index("by_clerk_user", ["clerkUserId"]),
 
@@ -97,7 +100,45 @@ export default defineSchema({
       paid: v.optional(v.boolean()),
     }))),
     alert: v.optional(v.boolean()),
+    // Module 3 — Plan de salle : serveur assigné, zone logique, position grille.
+    assignedMemberId: v.optional(v.id("members")),
+    zoneId: v.optional(v.id("zones")),
+    gridX: v.optional(v.number()),
+    gridY: v.optional(v.number()),
+    zone: v.optional(v.union(
+      v.literal("salle"), v.literal("bar"), v.literal("cuisine"),
+      v.literal("caisse"), v.literal("terrasse"), v.literal("autre"),
+    )),
+  }).index("by_restaurant", ["restaurantId"])
+    .index("by_zone", ["zoneId"]),
+
+  // Module 3 — Plan de salle : zones logiques (salle, terrasse, bar…).
+  zones: defineTable({
+    restaurantId: v.id("restaurants"),
+    name: v.string(),
+    color: v.string(),
+    order: v.number(),
+    createdAt: v.number(),
   }).index("by_restaurant", ["restaurantId"]),
+
+  // Module 3 — Planning de service : créneaux de présence du personnel.
+  shifts: defineTable({
+    restaurantId: v.id("restaurants"),
+    memberId: v.id("members"),
+    date: v.string(),
+    startTime: v.string(),
+    endTime: v.string(),
+    zone: v.optional(v.union(
+      v.literal("salle"), v.literal("bar"), v.literal("cuisine"),
+      v.literal("caisse"), v.literal("terrasse"), v.literal("autre"),
+    )),
+    checkedInAt: v.optional(v.number()),
+    checkedOutAt: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_restaurant", ["restaurantId"])
+    .index("by_restaurant_date", ["restaurantId", "date"])
+    .index("by_member", ["memberId"]),
 
   payments: defineTable({
     restaurantId: v.id("restaurants"),
