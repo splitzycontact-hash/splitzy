@@ -4,7 +4,7 @@ import { useUser } from '@clerk/clerk-react'
 import { MessageSquare, Send, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
-import { useRestaurantId } from '../context/RestaurantContext'
+import { useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 
@@ -60,6 +60,10 @@ function ThreadRow({
 
 export function ChatPage() {
   const restaurantId = useRestaurantId()
+  const role = useRestaurantRole()
+  // Seuls owner/manager peuvent ouvrir des conversations privées 1:1.
+  // Le staff (viewer) ne voit/n'envoie que sur "Toute la salle".
+  const canDM = role === 'owner' || role === 'manager'
   const { user } = useUser()
   const [activeThread, setActiveThread] = useState('broadcast')
   const [draft, setDraft] = useState('')
@@ -114,7 +118,10 @@ export function ChatPage() {
   const handleSend = async () => {
     const content = draft.trim()
     if (!content || !restaurantId) return
-    const recipientId = activeThread === 'broadcast' ? undefined : activeMember?._id
+    // Garde client : le staff ne peut envoyer qu'en broadcast (le backend
+    // refuse aussi côté serveur — défense en profondeur).
+    const recipientId =
+      !canDM || activeThread === 'broadcast' ? undefined : activeMember?._id
     try {
       await sendMsg({ restaurantId, content, recipientId })
       setDraft('')
@@ -155,21 +162,22 @@ export function ChatPage() {
               active={activeThread === 'broadcast'}
               onClick={() => setActiveThread('broadcast')}
             />
-            {otherMembers.map((m, i) => {
-              const conv = convForMember(m._id)
-              return (
-                <ThreadRow
-                  key={m._id}
-                  label={nameOf(m)}
-                  initial={initialOf(m)}
-                  color={AVATAR_COLORS[i % AVATAR_COLORS.length]}
-                  preview={conv?.lastMsg.content}
-                  unread={conv?.unread ?? 0}
-                  active={activeThread === threadIdFor(m._id)}
-                  onClick={() => me && setActiveThread(threadIdFor(m._id))}
-                />
-              )
-            })}
+            {canDM &&
+              otherMembers.map((m, i) => {
+                const conv = convForMember(m._id)
+                return (
+                  <ThreadRow
+                    key={m._id}
+                    label={nameOf(m)}
+                    initial={initialOf(m)}
+                    color={AVATAR_COLORS[i % AVATAR_COLORS.length]}
+                    preview={conv?.lastMsg.content}
+                    unread={conv?.unread ?? 0}
+                    active={activeThread === threadIdFor(m._id)}
+                    onClick={() => me && setActiveThread(threadIdFor(m._id))}
+                  />
+                )
+              })}
           </div>
         </div>
 

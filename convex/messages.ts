@@ -91,10 +91,23 @@ export const markRead = mutation({
 })
 
 // Messages d'un thread, 60 derniers, du plus ancien au plus récent.
+// Contrôle d'accès : staff → broadcast uniquement ; manager → broadcast + DMs
+// dont il est participant ; owner → tout (visibilité complète).
 export const listThread = query({
   args: { restaurantId: v.id("restaurants"), threadId: v.string() },
   handler: async (ctx, { restaurantId, threadId }) => {
-    await requireRestaurantAccess(ctx, restaurantId)
+    const { identity, role } = await requireRestaurantAccess(ctx, restaurantId)
+    // Staff : accès uniquement au broadcast.
+    if (role === "staff" && threadId !== "broadcast") return []
+    // Manager (non-owner) : doit être participant du thread 1:1.
+    if (threadId !== "broadcast" && role !== "owner") {
+      const me = await ctx.db
+        .query("members")
+        .withIndex("by_restaurant", (q) => q.eq("restaurantId", restaurantId))
+        .filter((q) => q.eq(q.field("clerkUserId"), identity.subject))
+        .first()
+      if (!me || !threadId.split("|").includes(me._id as string)) return []
+    }
     const msgs = await ctx.db
       .query("messages")
       .withIndex("by_restaurant_thread", (q) =>
@@ -111,7 +124,12 @@ export const listThread = query({
 export const listConversations = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
-    const me = await getMe(ctx, restaurantId)
+    const { identity, role } = await requireRestaurantAccess(ctx, restaurantId)
+    const me = await ctx.db
+      .query("members")
+      .withIndex("by_restaurant", (q) => q.eq("restaurantId", restaurantId))
+      .filter((q) => q.eq(q.field("clerkUserId"), identity.subject))
+      .first()
 
     const allMsgs = await ctx.db
       .query("messages")
@@ -140,7 +158,15 @@ export const listConversations = query({
       threads.push({ threadId, lastMsg, unread })
     }
 
-    return threads.sort((a, b) => b.lastMsg.createdAt - a.lastMsg.createdAt)
+    // Filtrer selon le rôle : staff → broadcast seul ; owner/manager → broadcast
+    // + uniquement les DMs dont ils sont participants (pas les DMs entre tiers).
+    const visible = threads.filter(({ threadId }) => {
+      if (threadId === "broadcast") return true
+      if (role === "staff") return false
+      return me ? threadId.split("|").includes(me._id as string) : false
+    })
+
+    return visible.sort((a, b) => b.lastMsg.createdAt - a.lastMsg.createdAt)
   },
 })
 
