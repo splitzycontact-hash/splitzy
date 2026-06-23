@@ -108,6 +108,10 @@ export default defineSchema({
     zoneId: v.optional(v.id("zones")),
     gridX: v.optional(v.number()),
     gridY: v.optional(v.number()),
+    // Nom personnalisé (ex: "Terrasse A") affiché à la place de T{number}.
+    label: v.optional(v.string()),
+    // Forme cosmétique de la pastille sur le plan de salle.
+    shape: v.optional(v.union(v.literal("square"), v.literal("round"))),
     zone: v.optional(v.union(
       v.literal("salle"), v.literal("bar"), v.literal("cuisine"),
       v.literal("caisse"), v.literal("terrasse"), v.literal("autre"),

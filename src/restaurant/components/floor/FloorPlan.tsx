@@ -71,6 +71,7 @@ export default function FloorPlan({
             table={t}
             roster={roster}
             activeZoneId={activeZoneId}
+            selected={selectedTableId === t._id}
             onTableClick={() => onTableClick?.(t._id)}
           />
         )

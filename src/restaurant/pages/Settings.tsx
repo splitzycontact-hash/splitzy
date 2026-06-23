@@ -3747,19 +3747,26 @@ function TablesSection() {
   const removeZone = useMutation(api.zones.remove)
   const updateGridPosition = useMutation(api.tables.updateGridPosition)
   const updateZone = useMutation(api.tables.updateZone)
+  const updateCapacity = useMutation(api.tables.updateCapacity)
+  const updateLabel = useMutation(api.tables.updateLabel)
+  const removeFromGrid = useMutation(api.tables.removeFromGrid)
 
   const [activeZoneId, setActiveZoneId] = useState<Id<'zones'> | null>(null)
   const [selectedTableId, setSelectedTableId] = useState<Id<'tables'> | null>(null)
   const [editingZoneId, setEditingZoneId] = useState<Id<'zones'> | null>(null)
   const [showNewZoneForm, setShowNewZoneForm] = useState(false)
-  const [zonePopoverTableId, setZonePopoverTableId] = useState<Id<'tables'> | null>(null)
+  const [labelDraft, setLabelDraft] = useState('')
 
   const [editName, setEditName] = useState('')
   const [newZoneName, setNewZoneName] = useState('')
   const [newZoneColor, setNewZoneColor] = useState<string>(ZONE_PALETTE[0])
 
   const selectedTable = tables.find(t => t._id === selectedTableId) ?? null
-  const popoverTable = tables.find(t => t._id === zonePopoverTableId) ?? null
+
+  // Synchronise le brouillon de nom quand la table sélectionnée change.
+  useEffect(() => {
+    setLabelDraft(selectedTable?.label ?? '')
+  }, [selectedTableId])
 
   async function handleCreateZone() {
     if (!restaurantId || !newZoneName.trim()) return
@@ -3914,13 +3921,13 @@ function TablesSection() {
         <div className="mb-4">
           <h2 className="text-base font-bold text-dark">Plan de salle</h2>
           <p className="text-xs text-muted mt-0.5">
-            Sélectionnez une table puis cliquez une cellule vide pour la positionner.
+            Cliquez une table pour la sélectionner, puis une cellule vide pour la déplacer. Sélectionnez-la aussi pour modifier ses paramètres.
           </p>
         </div>
 
         {selectedTable && (
           <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
-            Table {selectedTable.number} sélectionnée — cliquez une cellule vide
+            {selectedTable.label ?? `T${selectedTable.number}`} sélectionnée — cliquez une cellule vide pour la déplacer
             <button onClick={() => setSelectedTableId(null)} className="hover:text-amber-950">
               <X size={13} />
             </button>
@@ -3937,49 +3944,107 @@ function TablesSection() {
           selectedTableId={selectedTableId}
           onZoneChange={setActiveZoneId}
           onTableClick={(tableId) => {
-            const t = tables.find(x => x._id === tableId)
-            if (t && t.gridX != null && t.gridY != null) {
-              // Table déjà placée → ouvre le popover d'assignation de zone.
-              setZonePopoverTableId(prev => prev === tableId ? null : tableId)
-            } else {
-              // Table non placée (bac) → sélection pour positionnement.
-              setSelectedTableId(prev => prev === tableId ? null : tableId)
-            }
+            // Toute table (placée ou non) → sélection pour déplacement / paramètres.
+            setSelectedTableId(prev => prev === tableId ? null : tableId)
           }}
           onCellClick={async (x, y) => {
             if (!selectedTableId || !restaurantId) return
             await updateGridPosition({ tableId: selectedTableId, gridX: x, gridY: y })
             setSelectedTableId(null)
-            toast.success('Table positionnée')
+            toast.success('Table déplacée')
           }}
         />
 
-        {popoverTable && (
-          <div className="mt-4 border border-border rounded-xl p-4 flex items-center gap-3">
-            <span className="text-sm font-semibold text-dark">Zone de la table {popoverTable.number}</span>
-            <select
-              value={popoverTable.zoneId ?? ''}
-              onChange={async (e) => {
-                const value = e.target.value
-                await updateZone({
-                  tableId: popoverTable._id,
-                  zoneId: value ? (value as Id<'zones'>) : undefined,
-                })
-                toast.success('Zone mise à jour')
-              }}
-              className="flex-1 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
-            >
-              <option value="">Aucune zone</option>
-              {zones.map(z => (
-                <option key={z._id} value={z._id}>{z.name}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => setZonePopoverTableId(null)}
-              className="text-muted hover:text-dark transition-colors"
-            >
-              <X size={16} />
-            </button>
+        {selectedTable && (
+          <div className="mt-4 border border-border rounded-xl p-4 space-y-3">
+            <div className="flex flex-wrap items-end gap-4">
+              {/* Nom */}
+              <div className="flex-1 min-w-[160px]">
+                <label className="flex items-center gap-1 text-[11px] font-semibold text-muted uppercase tracking-wide mb-1.5">
+                  <Pencil size={11} /> Nom
+                </label>
+                <input
+                  value={labelDraft}
+                  onChange={e => setLabelDraft(e.target.value)}
+                  onBlur={async () => {
+                    if ((selectedTable.label ?? '') === labelDraft.trim()) return
+                    await updateLabel({ tableId: selectedTable._id, label: labelDraft })
+                    toast.success('Nom mis à jour')
+                  }}
+                  onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                  placeholder={`T${selectedTable.number}`}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                />
+              </div>
+
+              {/* Capacité */}
+              <div>
+                <label className="block text-[11px] font-semibold text-muted uppercase tracking-wide mb-1.5">Couverts</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      const next = Math.max(1, selectedTable.capacity - 1)
+                      if (next === selectedTable.capacity) return
+                      await updateCapacity({ tableId: selectedTable._id, capacity: next })
+                    }}
+                    disabled={selectedTable.capacity <= 1}
+                    className="w-9 h-9 rounded-lg border border-border text-dark text-lg font-semibold hover:bg-bg transition-colors disabled:opacity-40"
+                  >
+                    −
+                  </button>
+                  <span className="w-8 text-center text-sm font-bold text-dark tabular-nums">{selectedTable.capacity}</span>
+                  <button
+                    onClick={async () => {
+                      const next = Math.min(30, selectedTable.capacity + 1)
+                      if (next === selectedTable.capacity) return
+                      await updateCapacity({ tableId: selectedTable._id, capacity: next })
+                    }}
+                    disabled={selectedTable.capacity >= 30}
+                    className="w-9 h-9 rounded-lg border border-border text-dark text-lg font-semibold hover:bg-bg transition-colors disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-end gap-4 pt-1">
+              {/* Zone */}
+              <div className="flex-1 min-w-[160px]">
+                <label className="block text-[11px] font-semibold text-muted uppercase tracking-wide mb-1.5">Zone</label>
+                <select
+                  value={selectedTable.zoneId ?? ''}
+                  onChange={async (e) => {
+                    const value = e.target.value
+                    await updateZone({
+                      tableId: selectedTable._id,
+                      zoneId: value ? (value as Id<'zones'>) : undefined,
+                    })
+                    toast.success('Zone mise à jour')
+                  }}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                >
+                  <option value="">Aucune zone</option>
+                  {zones.map(z => (
+                    <option key={z._id} value={z._id}>{z.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Retirer du plan */}
+              {selectedTable.gridX != null && selectedTable.gridY != null && (
+                <button
+                  onClick={async () => {
+                    await removeFromGrid({ tableId: selectedTable._id })
+                    setSelectedTableId(null)
+                    toast.success('Table retirée du plan')
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 size={13} /> Retirer du plan
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

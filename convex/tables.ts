@@ -317,6 +317,43 @@ export const updateZone = mutation({
   },
 })
 
+// Met à jour la capacité (nombre de couverts) d'une table. Bornée 1–50.
+export const updateCapacity = mutation({
+  args: { tableId: v.id("tables"), capacity: v.number() },
+  handler: async (ctx, { tableId, capacity }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+    if (capacity < 1 || capacity > 50) throw new Error("Capacité invalide")
+    await ctx.db.patch(tableId, { capacity })
+    return tableId
+  },
+})
+
+// Renomme une table (label personnalisé). Vide = retour au nom par défaut T{number}.
+export const updateLabel = mutation({
+  args: { tableId: v.id("tables"), label: v.string() },
+  handler: async (ctx, { tableId, label }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+    await ctx.db.patch(tableId, { label: label.trim() || undefined })
+    return tableId
+  },
+})
+
+// Retire une table du plan de salle (efface sa position grille).
+export const removeFromGrid = mutation({
+  args: { tableId: v.id("tables") },
+  handler: async (ctx, { tableId }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+    await ctx.db.patch(tableId, { gridX: undefined, gridY: undefined })
+    return tableId
+  },
+})
+
 // Auto-création paresseuse d'une table manquante. Utilisé par TableEntry quand
 // un client scanne un QR de table qui n'a pas encore de document Convex
 // (ex: setup partiel, ou ajout d'une table sans re-run createBulk).
