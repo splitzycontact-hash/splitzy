@@ -5,12 +5,19 @@ import { MessageSquare, Send, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
-import { useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
+import { useRestaurantId } from '../context/RestaurantContext'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 
 // 4 couleurs cycliques pour les avatars-initiales (alignées palette app).
 const AVATAR_COLORS = ['#E8920A', '#3B82F6', '#8B5CF6', '#10B981']
+
+// Libellés FR des rôles members (owner|manager|staff).
+const ROLE_LABEL: Record<string, string> = {
+  owner: 'Propriétaire',
+  manager: 'Manager',
+  staff: 'Équipier',
+}
 
 type Member = NonNullable<ReturnType<typeof useMembersQuery>>[number]
 function useMembersQuery() {
@@ -23,12 +30,12 @@ const initialOf = (m: Member) => (nameOf(m).trim()[0] ?? '?').toUpperCase()
 const hhmm = (ts: number) =>
   new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
-// Ligne de conversation (panneau gauche). Hors composant : pas de re-création
-// à chaque render (sinon reset d'état + warning react-hooks).
+// Ligne d'annuaire / conversation (panneau gauche). Hors composant : pas de
+// re-création à chaque render (sinon reset d'état + warning react-hooks).
 function ThreadRow({
-  label, initial, color, preview, unread, active, onClick,
+  label, sublabel, initial, color, preview, unread, active, onClick,
 }: {
-  label: string; initial: React.ReactNode; color: string
+  label: string; sublabel?: string; initial: React.ReactNode; color: string
   preview?: string; unread: number; active: boolean; onClick: () => void
 }) {
   return (
@@ -46,9 +53,11 @@ function ThreadRow({
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-[13px] font-semibold ds-text-primary truncate leading-tight">{label}</div>
-        {preview && (
+        {preview ? (
           <div className="text-[11.5px] ds-text-tertiary truncate leading-tight mt-0.5">{preview}</div>
-        )}
+        ) : sublabel ? (
+          <div className="text-[11.5px] ds-text-tertiary truncate leading-tight mt-0.5">{sublabel}</div>
+        ) : null}
       </div>
       {unread > 0 && (
         <span className="text-[10.5px] min-w-[18px] h-[18px] px-1 rounded-full bg-[#EF4444] text-white font-bold flex items-center justify-center flex-shrink-0 tabular-nums">
@@ -61,12 +70,9 @@ function ThreadRow({
 
 export function ChatPage() {
   const restaurantId = useRestaurantId()
-  const role = useRestaurantRole()
-  // Seuls owner/manager peuvent ouvrir des conversations privées 1:1.
-  // Le staff (viewer) ne voit/n'envoie que sur "Toute la salle".
-  const canDM = role === 'owner' || role === 'manager'
   const { user } = useUser()
-  const [activeThread, setActiveThread] = useState('broadcast')
+  // null = broadcast ("Toute la salle"). Sinon, DM avec ce membre.
+  const [selectedMemberId, setSelectedMemberId] = useState<Id<'members'> | null>(null)
   const [draft, setDraft] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -77,64 +83,50 @@ export function ChatPage() {
   )
   const messages = useQuery(
     api.messages.listThread,
-    restaurantId ? { restaurantId, threadId: activeThread } : 'skip',
+    restaurantId
+      ? selectedMemberId
+        ? { restaurantId, recipientId: selectedMemberId }
+        : { restaurantId, threadId: 'broadcast' }
+      : 'skip',
   )
   const sendMsg = useMutation(api.messages.send)
   const markRead = useMutation(api.messages.markRead)
 
   // me._id : ligne `members` du gérant connecté. Absent pour le propriétaire pur
-  // (identifié par restaurants.clerkUserId, sans ligne members) → l'envoi
-  // remontera l'erreur backend "Membre introuvable" via toast.
+  // (sans ligne members) tant qu'il n'a pas envoyé son 1er message — l'envoi
+  // crée la ligne côté backend, et les threadId 1:1 se résolvent ensuite.
   const me = members?.find(m => m.clerkUserId === user?.id) ?? null
-  // Cibles de DM : owner/manager uniquement (jamais le staff — broadcast-only).
-  const otherMembers = (members ?? []).filter(
-    m => m._id !== me?._id && (m.role === 'owner' || m.role === 'manager'),
-  )
+  const otherMembers = (members ?? []).filter(m => m._id !== me?._id)
   const memberById = new Map((members ?? []).map(m => [m._id, m]))
 
+  // threadId 1:1 = [me|member] trié — doit matcher le calcul backend (send).
   const threadIdFor = (memberId: string) =>
-    me ? [me._id, memberId].sort().join('|') : ''
+    me ? [me._id.toString(), memberId.toString()].sort().join('|') : ''
   const convFor = (threadId: string) =>
     conversations?.find(c => c.threadId === threadId)
-  // Conversation 1:1 d'un membre — match exact du threadId (me|memberId trié).
-  // `includes` deviendrait ambigu : owner/manager reçoit aussi les threads tiers
-  // (X|Y) qui contiennent memberId mais ne sont pas la conversation avec `me`.
-  const convForMember = (memberId: string) =>
-    conversations?.find(c => c.threadId === threadIdFor(memberId))
 
-  const activeMember =
-    activeThread === 'broadcast'
-      ? null
-      : otherMembers.find(m => threadIdFor(m._id) === activeThread) ?? null
-  const threadTitle =
-    activeThread === 'broadcast' ? 'Toute la salle' : activeMember ? nameOf(activeMember) : 'Conversation'
+  const activeThreadId = selectedMemberId && me ? threadIdFor(selectedMemberId) : 'broadcast'
+  const selectedMember = selectedMemberId
+    ? otherMembers.find(m => m._id === selectedMemberId) ?? null
+    : null
+  const threadTitle = selectedMember ? nameOf(selectedMember) : 'Toute la salle'
 
-  // Scroll en bas à chaque nouveau message.
+  // Scroll en bas à chaque nouveau message / changement de fil.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages?.length])
+  }, [messages?.length, activeThreadId])
 
   // Marquer le thread comme lu à l'ouverture / au changement.
   useEffect(() => {
     if (!restaurantId) return
-    markRead({ restaurantId, threadId: activeThread }).catch(() => {})
-  }, [activeThread, restaurantId, markRead])
+    markRead({ restaurantId, threadId: activeThreadId }).catch(() => {})
+  }, [activeThreadId, restaurantId, markRead])
 
   const handleSend = async () => {
     const content = draft.trim()
     if (!content || !restaurantId) return
-    // Garde client : le staff ne peut envoyer qu'en broadcast (le backend
-    // refuse aussi côté serveur — défense en profondeur). Pour un DM, on extrait
-    // le destinataire DIRECTEMENT du threadId (me|recipient trié) plutôt que de
-    // dépendre d'`activeMember` — évite le leak où un activeMember non résolu
-    // ferait retomber recipientId à undefined ⇒ message diffusé en broadcast.
-    let recipientId: Id<'members'> | undefined = undefined
-    if (canDM && activeThread !== 'broadcast') {
-      const ids = activeThread.split('|')
-      recipientId = (ids.find(id => id !== me?._id) ?? ids[0]) as Id<'members'>
-    }
     try {
-      await sendMsg({ restaurantId, content, recipientId })
+      await sendMsg({ restaurantId, content, recipientId: selectedMemberId ?? undefined })
       setDraft('')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Échec de l'envoi du message")
@@ -158,37 +150,43 @@ export function ChatPage() {
       <div className="flex h-[calc(100vh-140px)] m-9 mt-6 rounded-[14px] border overflow-hidden"
         style={{ borderColor: 'var(--ds-border)', background: 'var(--ds-bg-surface)' }}
       >
-        {/* Panneau gauche — conversations */}
+        {/* Panneau gauche — broadcast + annuaire */}
         <div className="w-64 shrink-0 border-r flex flex-col" style={{ borderColor: 'var(--ds-border)' }}>
-          <div className="px-3.5 pt-4 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.08em] ds-text-tertiary">
-            Conversations
-          </div>
-          <div className="flex-1 overflow-y-auto px-2 pb-3 flex flex-col gap-px">
+          <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-px">
             <ThreadRow
               label="Toute la salle"
               initial={<Users size={16} />}
               color="#0A0A0A"
               preview={convFor('broadcast')?.lastMsg.content}
               unread={convFor('broadcast')?.unread ?? 0}
-              active={activeThread === 'broadcast'}
-              onClick={() => setActiveThread('broadcast')}
+              active={!selectedMemberId}
+              onClick={() => setSelectedMemberId(null)}
             />
-            {canDM &&
-              otherMembers.map((m, i) => {
-                const conv = convForMember(m._id)
-                return (
-                  <ThreadRow
-                    key={m._id}
-                    label={nameOf(m)}
-                    initial={initialOf(m)}
-                    color={AVATAR_COLORS[i % AVATAR_COLORS.length]}
-                    preview={conv?.lastMsg.content}
-                    unread={conv?.unread ?? 0}
-                    active={activeThread === threadIdFor(m._id)}
-                    onClick={() => me && setActiveThread(threadIdFor(m._id))}
-                  />
-                )
-              })}
+
+            <div className="px-1.5 pt-4 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] ds-text-tertiary">
+              Annuaire
+            </div>
+            {otherMembers.map((m, i) => {
+              const conv = convFor(threadIdFor(m._id))
+              return (
+                <ThreadRow
+                  key={m._id}
+                  label={nameOf(m)}
+                  sublabel={ROLE_LABEL[m.role] ?? m.role}
+                  initial={initialOf(m)}
+                  color={AVATAR_COLORS[i % AVATAR_COLORS.length]}
+                  preview={conv?.lastMsg.content}
+                  unread={conv?.unread ?? 0}
+                  active={selectedMemberId === m._id}
+                  onClick={() => setSelectedMemberId(m._id)}
+                />
+              )
+            })}
+            {members && otherMembers.length === 0 && (
+              <div className="px-2.5 py-3 text-[12px] ds-text-tertiary">
+                Aucun autre membre dans l'équipe.
+              </div>
+            )}
           </div>
         </div>
 

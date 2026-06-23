@@ -27,16 +27,14 @@ export const send = mutation({
     content: v.string(),
   },
   handler: async (ctx, { restaurantId, recipientId, content }) => {
-    const { identity, restaurant, role } = await requireRestaurantAccess(ctx, restaurantId)
+    const { identity, restaurant } = await requireRestaurantAccess(ctx, restaurantId)
 
-    // DM : staff exclu des deux côtés (broadcast-only). Owner/manager ↔ owner/manager.
+    // DM : tout le monde peut écrire à tout le monde. On vérifie seulement que le
+    // destinataire existe et appartient au même restaurant.
     if (recipientId) {
-      if (role === "staff") throw new Error("Le staff ne peut pas envoyer de message privé")
       const recipient = await ctx.db.get(recipientId)
       if (!recipient || recipient.restaurantId !== restaurantId)
         throw new Error("Destinataire introuvable")
-      if (recipient.role === "staff")
-        throw new Error("Impossible d'envoyer un message privé à un membre staff")
     }
 
     let me = await ctx.db
@@ -101,19 +99,26 @@ export const markRead = mutation({
 })
 
 // Messages d'un thread, 60 derniers, du plus ancien au plus récent.
-// Contrôle d'accès : staff → broadcast uniquement ; manager → broadcast + DMs
-// dont il est participant ; owner → tout (visibilité complète).
+// Accès libre : tout membre du restaurant peut lire n'importe quel thread.
+// `recipientId` fourni → thread 1:1 [me|recipient] ; sinon `threadId` (broadcast).
 export const listThread = query({
-  args: { restaurantId: v.id("restaurants"), threadId: v.string() },
-  handler: async (ctx, { restaurantId, threadId }) => {
-    const { role } = await requireRestaurantAccess(ctx, restaurantId)
-    // Staff : accès uniquement au broadcast. Owner + manager : visibilité totale
-    // (toutes les conversations, y compris les DMs entre tiers).
-    if (role === "staff" && threadId !== "broadcast") return []
+  args: {
+    restaurantId: v.id("restaurants"),
+    threadId: v.optional(v.string()),
+    recipientId: v.optional(v.id("members")),
+  },
+  handler: async (ctx, { restaurantId, threadId, recipientId }) => {
+    await requireRestaurantAccess(ctx, restaurantId)
+    let tid = threadId ?? "broadcast"
+    if (recipientId) {
+      const me = await getMe(ctx, restaurantId)
+      if (!me) return []
+      tid = [me._id.toString(), recipientId.toString()].sort().join("|")
+    }
     const msgs = await ctx.db
       .query("messages")
       .withIndex("by_restaurant_thread", (q) =>
-        q.eq("restaurantId", restaurantId).eq("threadId", threadId),
+        q.eq("restaurantId", restaurantId).eq("threadId", tid),
       )
       .order("asc")
       .collect()
@@ -126,7 +131,7 @@ export const listThread = query({
 export const listConversations = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
-    const { identity, role } = await requireRestaurantAccess(ctx, restaurantId)
+    const { identity } = await requireRestaurantAccess(ctx, restaurantId)
     const me = await ctx.db
       .query("members")
       .withIndex("by_restaurant", (q) => q.eq("restaurantId", restaurantId))
@@ -160,14 +165,8 @@ export const listConversations = query({
       threads.push({ threadId, lastMsg, unread })
     }
 
-    // Filtrer selon le rôle : staff → broadcast seul ; owner/manager → toutes
-    // les conversations (broadcast + tous les DMs, y compris entre tiers).
-    const visible = threads.filter(({ threadId }) => {
-      if (threadId === "broadcast") return true
-      return role !== "staff"
-    })
-
-    return visible.sort((a, b) => b.lastMsg.createdAt - a.lastMsg.createdAt)
+    // Accès libre : toutes les conversations sont visibles par tout membre.
+    return threads.sort((a, b) => b.lastMsg.createdAt - a.lastMsg.createdAt)
   },
 })
 
