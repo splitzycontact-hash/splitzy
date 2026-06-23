@@ -19,6 +19,7 @@ import { Planning } from './pages/Planning'
 import { SallePage } from './pages/SallePage'
 import { Settings } from './pages/Settings'
 import { ChatPage } from './pages/ChatPage'
+import { useChatNotifications } from './hooks/useChatNotifications'
 
 const clerkReady = (() => {
   const k = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined
@@ -56,6 +57,13 @@ function PendingInviteWatcher() {
   return null
 }
 
+// Rendu à l'intérieur de RestaurantGuard (donc RestaurantProvider) : le hook a
+// accès à restaurantId + au routeur (useLocation). Ne rend rien.
+function ChatNotificationsMount() {
+  useChatNotifications()
+  return null
+}
+
 export function RestaurantApp() {
   return (
     <>
@@ -73,6 +81,7 @@ export function RestaurantApp() {
                 path="/*"
                 element={
                   <RestaurantGuard>
+                    <ChatNotificationsMount />
                     <Routes>
                       <Route path="/"             element={<Overview />} />
                       <Route path="/tables"       element={<Tables />} />
