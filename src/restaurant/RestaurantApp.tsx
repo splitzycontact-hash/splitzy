@@ -18,6 +18,7 @@ import { Clients } from './pages/Clients'
 import { Planning } from './pages/Planning'
 import { SallePage } from './pages/SallePage'
 import { Settings } from './pages/Settings'
+import { ChatPage } from './pages/ChatPage'
 
 const clerkReady = (() => {
   const k = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined
@@ -76,6 +77,7 @@ export function RestaurantApp() {
                       <Route path="/"             element={<Overview />} />
                       <Route path="/tables"       element={<Tables />} />
                       <Route path="/salle"        element={<RoleGuard allowed={['owner', 'manager']}><SallePage /></RoleGuard>} />
+                      <Route path="/chat"         element={<ChatPage />} />
                       <Route path="/reputation"   element={<Reputation />} />
                       <Route path="/analytics"    element={<Analytics />} />
                       <Route path="/factures"     element={<Factures />} />

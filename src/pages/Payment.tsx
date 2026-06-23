@@ -1,12 +1,15 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
+import { useQuery } from 'convex/react'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
 import { MOCK_CARDS } from '../data/session'
 import { httpMutation } from '../utils/convexHttp'
+import { api } from '../../convex/_generated/api'
+import type { Id } from '../../convex/_generated/dataModel'
 
 export function Payment() {
   const { state, dispatch } = useSession()
@@ -15,6 +18,15 @@ export function Payment() {
   const [loading, setLoading] = useState<string | null>(null)
 
   const selectedCard = MOCK_CARDS.find(c => c.id === state.selectedCardId) ?? MOCK_CARDS[0]
+
+  // Message spécial du restaurant (plat du jour…) — bandeau discret en haut.
+  // Query non critique : si le WS tarde, le bandeau ne s'affiche simplement pas.
+  const specialMessage = useQuery(
+    api.restaurants.getSpecialMessage,
+    state.convexRestaurantId
+      ? { restaurantId: state.convexRestaurantId as Id<'restaurants'> }
+      : 'skip',
+  )
 
   const totalStr = formatEur(total).replace('€', '')
 
@@ -118,6 +130,18 @@ export function Payment() {
           </div>
         </div>
       </div>
+
+      {/* Bandeau message spécial du restaurant (plat du jour, info…) */}
+      {specialMessage && (
+        <div style={{
+          background: '#FEF3C7', color: '#92400E',
+          padding: '10px 20px', textAlign: 'center', flexShrink: 0,
+          fontSize: 13, fontWeight: 600, lineHeight: 1.35,
+          borderBottom: '1px solid #FDE68A',
+        }}>
+          {specialMessage}
+        </div>
+      )}
 
       {/* Cards carousel */}
       <div style={{ padding: '20px 0 0' }}>

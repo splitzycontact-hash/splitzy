@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Grid3x3, Star, TrendingUp,
   Utensils, Users, Receipt, Plug, Settings, CalendarDays,
-  ArrowUpRight, ChevronsUpDown, LayoutGrid,
+  ArrowUpRight, ChevronsUpDown, LayoutGrid, MessageSquare,
 } from 'lucide-react'
 import { useUser, useClerk } from '@clerk/clerk-react'
 import { useQuery } from 'convex/react'
@@ -16,10 +16,11 @@ const clerkReady = (() => {
   return typeof k === 'string' && k.startsWith('pk_') && k.length > 20
 })()
 
-const PILOTAGE_ITEMS: { label: string; icon: React.ElementType; to: string; exact?: boolean; badge?: boolean; roles?: RestaurantRole[] }[] = [
+const PILOTAGE_ITEMS: { label: string; icon: React.ElementType; to: string; exact?: boolean; badge?: boolean; unreadBadge?: boolean; roles?: RestaurantRole[] }[] = [
   { label: "Vue d'ensemble", icon: LayoutDashboard, to: '/restaurant',            exact: true, badge: false },
   { label: 'Tables live',   icon: Grid3x3,          to: '/restaurant/tables',     exact: false, badge: false },
   { label: 'Salle',         icon: LayoutGrid,       to: '/restaurant/salle',      exact: false, badge: false, roles: ['owner', 'manager'] },
+  { label: 'Chat équipe',   icon: MessageSquare,    to: '/restaurant/chat',       exact: false, unreadBadge: true },
   { label: 'Réputation',    icon: Star,             to: '/restaurant/reputation', exact: false, badge: true  },
   { label: 'Analytics',     icon: TrendingUp,       to: '/restaurant/analytics',  exact: false, badge: false },
 ]
@@ -84,9 +85,9 @@ function NavSectionLabel({ label }: { label: string }) {
 }
 
 function NavItem({
-  to, exact, icon: Icon, label, count,
+  to, exact, icon: Icon, label, count, redCount,
 }: {
-  to: string; exact?: boolean; icon: React.ElementType; label: string; count?: number
+  to: string; exact?: boolean; icon: React.ElementType; label: string; count?: number; redCount?: number
 }) {
   return (
     <NavLink
@@ -106,6 +107,11 @@ function NavItem({
             style={{ color: isActive ? 'var(--ds-accent)' : 'var(--ds-text-tertiary)', flexShrink: 0 }}
           />
           <span className="flex-1 truncate">{label}</span>
+          {redCount !== undefined && redCount > 0 && (
+            <span className="text-[11px] px-1.5 py-px rounded-full font-bold tabular-nums bg-[#EF4444] text-white">
+              {redCount}
+            </span>
+          )}
           {count !== undefined && count > 0 && (
             <span
               className="text-[11px] px-1.5 py-px rounded-full font-semibold tabular-nums"
@@ -167,6 +173,10 @@ export function Sidebar() {
     api.feedbacks.getNewCount,
     restaurantId ? { restaurantId } : 'skip',
   ) ?? 0
+  const unread = useQuery(
+    api.messages.getUnreadCount,
+    restaurantId ? { restaurantId } : 'skip',
+  ) ?? 0
 
   return (
     <aside
@@ -205,6 +215,7 @@ export function Sidebar() {
               icon={item.icon}
               label={item.label}
               count={item.badge ? newFeedbackCount : undefined}
+              redCount={item.unreadBadge ? unread : undefined}
             />
           ))}
         </div>

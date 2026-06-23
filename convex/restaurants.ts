@@ -47,6 +47,17 @@ export const updateSpecialMessage = mutation({
   },
 })
 
+// Message spécial (plat du jour…) affiché au convive ANONYME sur l'écran de
+// paiement. Public, par restaurantId (id Convex non énumérable). Ne renvoie QUE
+// ce champ cosmétique destiné à tous les clients — aucune donnée sensible.
+export const getSpecialMessage = query({
+  args: { restaurantId: v.id("restaurants") },
+  handler: async (ctx, { restaurantId }) => {
+    const r = await ctx.db.get(restaurantId)
+    return r?.specialMessage ?? null
+  },
+})
+
 export const getBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, { slug }) => {
