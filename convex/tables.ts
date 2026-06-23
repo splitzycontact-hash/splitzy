@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server"
+import { query, mutation, internalQuery } from "./_generated/server"
 import { v } from "convex/values"
 import { requireRestaurantAccess } from "./authz"
 
@@ -390,4 +390,11 @@ export const ensureForRestaurant = mutation({
       status: "free",
     })
   },
+})
+
+// Toutes les tables d'un restaurant — usage interne (insights cron, sans auth).
+export const listAll = internalQuery({
+  args: { restaurantId: v.id("restaurants") },
+  handler: async (ctx, { restaurantId }) =>
+    ctx.db.query("tables").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).collect(),
 })

@@ -1,4 +1,4 @@
-import { query, mutation, action } from "./_generated/server"
+import { query, mutation, action, internalQuery } from "./_generated/server"
 import { v } from "convex/values"
 import { requireRestaurantAccess, requireIdentity } from "./authz"
 
@@ -168,4 +168,10 @@ export const setLogoStorageId = mutation({
 export const getLogoUrl = query({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, { storageId }) => ctx.storage.getUrl(storageId),
+})
+
+// Tous les ids de restaurants — usage interne (cron insights tous restaurants).
+export const listAllIds = internalQuery({
+  args: {},
+  handler: async (ctx) => (await ctx.db.query("restaurants").collect()).map(r => r._id),
 })

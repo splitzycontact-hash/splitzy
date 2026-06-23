@@ -1,4 +1,4 @@
-import { query, mutation, internalMutation } from "./_generated/server"
+import { query, mutation, internalMutation, internalQuery } from "./_generated/server"
 import { v } from "convex/values"
 import { internal } from "./_generated/api"
 import { requireRestaurantAccess } from "./authz"
@@ -270,4 +270,11 @@ export const getOverviewStats = query({
     const todayTips = todayPayments.reduce((s, p) => s + p.tipCents, 0)
     return { todayCA, todayTips, totalCA, totalTips, avgTipPct, txCount: encaisse.length }
   },
+})
+
+// Tous les paiements d'un restaurant — usage interne (insights cron, sans auth).
+export const listAll = internalQuery({
+  args: { restaurantId: v.id("restaurants") },
+  handler: async (ctx, { restaurantId }) =>
+    ctx.db.query("payments").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).collect(),
 })

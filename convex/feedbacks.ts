@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server"
+import { query, mutation, internalQuery } from "./_generated/server"
 import { v } from "convex/values"
 import { requireRestaurantAccess } from "./authz"
 
@@ -79,4 +79,11 @@ export const getNewCount = query({
     const items = await ctx.db.query("feedbacks").withIndex("by_restaurant_new", q => q.eq("restaurantId", restaurantId).eq("isNew", true)).collect()
     return items.length
   },
+})
+
+// Tous les feedbacks d'un restaurant — usage interne (insights cron, sans auth).
+export const listAll = internalQuery({
+  args: { restaurantId: v.id("restaurants") },
+  handler: async (ctx, { restaurantId }) =>
+    ctx.db.query("feedbacks").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).order("desc").collect(),
 })
