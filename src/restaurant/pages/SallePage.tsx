@@ -5,7 +5,7 @@ import {
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import { toast } from 'sonner'
-import { UserPlus, X, Check, Power, Users, Star, Unlock } from 'lucide-react'
+import { UserPlus, X, Check, Power, Users, Star, Unlock, Download } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId } from '../context/RestaurantContext'
@@ -186,6 +186,14 @@ export function SallePage() {
     api.members.getTeamMembers,
     restaurantId ? { restaurantId } : 'skip',
   )
+  // Paiements encaissés du jour → récap de clôture de service (modal + export CSV).
+  const todayStart = useMemo(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime()
+  }, [])
+  const payments = useQuery(
+    api.payments.list,
+    restaurantId ? { restaurantId, from: todayStart } : 'skip',
+  )
 
   const assignServer = useMutation(api.tables.assignServer)
   const clearAll = useMutation(api.tables.clearAllAssignments)
@@ -198,6 +206,7 @@ export function SallePage() {
   const [activeZoneId, setActiveZoneId] = useState<Id<'zones'> | null>(null)
   const [dragName, setDragName] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [showRecap, setShowRecap] = useState(false)
 
   // Timer d'inactivité : tick toutes les 30 s pour réactualiser les temps écoulés
   // (les TableChip et les lignes sidebar recalculent depuis sittingStartedAt).
@@ -288,11 +297,41 @@ export function SallePage() {
     }
   }
 
-  async function handleClearAll() {
+  function handleClearAll() {
     if (!restaurantId) return
-    if (!window.confirm('Fin de service : détacher tous les serveurs de toutes les tables ?')) return
+    setShowRecap(true)
+  }
+
+  async function handleConfirmClose() {
+    if (!restaurantId) return
     await clearAll({ restaurantId })
+    setShowRecap(false)
     toast.success('Service clôturé')
+  }
+
+  // Stats du jour (paiements encaissés) + export CSV (séparateur `;`, BOM Excel FR).
+  const enc = (payments ?? []).filter(p => p.status === 'Encaissé')
+  const ca = enc.reduce((s, p) => s + p.subtotalCents, 0)
+  const tips = enc.reduce((s, p) => s + (p.tipCents ?? 0), 0)
+  const tickets = enc.length
+  const couverts = enc.reduce((s, p) => s + (p.guests ?? 0), 0)
+  function exportCSV() {
+    const lines = [
+      'Table;Montant (€);Pourboire (€);Moyen paiement;Couverts;Heure',
+      ...enc.map(p => [
+        p.tableNumber ?? '',
+        (p.subtotalCents / 100).toFixed(2).replace('.', ','),
+        ((p.tipCents ?? 0) / 100).toFixed(2).replace('.', ','),
+        p.paymentMethod ?? '',
+        p.guests ?? '',
+        new Date(p.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      ].join(';')),
+    ]
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' })),
+      download: `service-${new Date().toISOString().slice(0, 10)}.csv`,
+    })
+    a.click()
   }
 
   async function handleToggleAlert(tableId: Id<'tables'>) {
@@ -453,6 +492,45 @@ export function SallePage() {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {showRecap && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-bold text-dark">Récap du service</h2>
+              <button onClick={() => setShowRecap(false)}><X size={20} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              {([
+                ['CA', `${(ca / 100).toFixed(2)} €`],
+                ['Pourboires', `${(tips / 100).toFixed(2)} €`],
+                ['Tickets', `${tickets}`],
+                ['Couverts', `${couverts}`],
+                ['Panier moyen', tickets ? `${(ca / tickets / 100).toFixed(2)} €` : '—'],
+              ] as [string, string][]).map(([l, v]) => (
+                <div key={l} className="bg-bg rounded-xl p-4">
+                  <p className="text-xs text-muted mb-1">{l}</p>
+                  <p className="text-xl font-bold text-dark">{v}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={exportCSV}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium text-mid hover:bg-bg transition-colors"
+              >
+                <Download size={15} /> Export CSV
+              </button>
+              <button
+                onClick={handleConfirmClose}
+                className="flex-1 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors"
+              >
+                Clôturer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </RestaurantLayout>
   )
 }
