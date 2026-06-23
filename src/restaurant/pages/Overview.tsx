@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useQuery } from 'convex/react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../../convex/_generated/api'
@@ -280,6 +281,13 @@ export function Overview() {
 
   const isLoading = rawTables === undefined
 
+  // Horloge rafraîchie toutes les 30 s — recalcule les alertes temps réel.
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
+
   // ── KPIs ──────────────────────────────────────────────────────
   const caTotal   = stats?.todayCA   ?? 0
   const tipsTotal = stats?.todayTips ?? 0
@@ -302,6 +310,28 @@ export function Overview() {
   // ── Recent payments ───────────────────────────────────────────
   const payments = (rawPayments ?? []) as ConvexPayment[]
   const recentPayments = payments.slice(0, 6)
+
+  // ── Alertes manager temps réel ────────────────────────────────
+  const stuckPayments = payments.filter(p =>
+    p.status === 'En attente' && now - p.createdAt > 4 * 60_000
+  )
+  const lastOk = payments.filter(p => p.status === 'Encaissé')
+    .sort((a, b) => b.createdAt - a.createdAt)[0]
+  const qrInactive = tables.some(t => t.status === 'dining') &&
+    (!lastOk || now - lastOk.createdAt > 18 * 60_000)
+
+  const alerts: { key: string; msg: string; onClick?: () => void }[] = [
+    ...stuckPayments.map(p => ({
+      key: `stuck-${p.tableNumber}`,
+      msg: `Table ${p.tableNumber} : paiement bloqué depuis ${Math.floor((now - p.createdAt) / 60_000)} min`,
+    })),
+    ...(qrInactive ? [{ key: 'qr', msg: 'Aucun paiement depuis 18 min — problème QR code ?' }] : []),
+    ...(badNew.length > 0 ? [{
+      key: 'feedback',
+      msg: `${badNew.length} avis négatif${badNew.length > 1 ? 's' : ''} non traité${badNew.length > 1 ? 's' : ''}`,
+      onClick: () => navigate('/restaurant/reputation'),
+    }] : []),
+  ]
 
   // ── Croissance réelle vs hier (null si pas de CA hier → "—") ──
   const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
@@ -332,6 +362,18 @@ export function Overview() {
         }
         live
       />
+
+      {alerts.length > 0 && (
+        <div className="mx-9 mt-4 flex flex-col gap-2">
+          {alerts.map(a => (
+            <div key={a.key} onClick={a.onClick}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium${a.onClick ? ' cursor-pointer hover:bg-red-100' : ''}`}>
+              <AlertTriangle size={16} className="shrink-0" />
+              {a.msg}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="px-9 py-6 space-y-5">
 
@@ -498,15 +540,6 @@ export function Overview() {
             </div>
           </div>
         </section>
-
-        {/* ── Alerte avis négatifs non traités ── */}
-        {badNew.length > 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700">
-            <AlertTriangle size={16} />
-            <span className="text-sm font-semibold">{badNew.length} avis négatif(s) non traité(s) ce service</span>
-            <button onClick={() => navigate('/restaurant/reputation')} className="ml-auto text-xs underline">Voir →</button>
-          </div>
-        )}
 
         {/* ── Main grid ── */}
         <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-3.5">
