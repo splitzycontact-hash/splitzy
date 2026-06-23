@@ -48,16 +48,26 @@ export const send = mutation({
     if (!me) {
       const isOwner = restaurant.clerkUserId === identity.subject
       if (!isOwner) throw new Error("Membre introuvable")
-      const memberId = await ctx.db.insert("members", {
-        restaurantId,
-        clerkUserId: identity.subject,
-        name: identity.name ?? identity.email ?? "Owner",
-        email: identity.email ?? "",
-        role: "owner" as const,
-        status: "active" as const,
-        invitedAt: Date.now(),
-      })
-      me = await ctx.db.get(memberId)
+      // Vérifier si créé entre-temps (race condition)
+      const existing = await ctx.db
+        .query("members")
+        .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", identity.subject))
+        .filter((q) => q.eq(q.field("restaurantId"), restaurantId))
+        .first()
+      if (existing) {
+        me = existing
+      } else {
+        const memberId = await ctx.db.insert("members", {
+          restaurantId,
+          clerkUserId: identity.subject,
+          name: identity.name ?? identity.email ?? "Owner",
+          email: identity.email ?? "",
+          role: "owner" as const,
+          status: "active" as const,
+          invitedAt: Date.now(),
+        })
+        me = await ctx.db.get(memberId)
+      }
     }
 
     if (!me) throw new Error("Membre introuvable")
@@ -130,9 +140,9 @@ export const listThread = query({
       .withIndex("by_restaurant_thread", (q) =>
         q.eq("restaurantId", restaurantId).eq("threadId", tid),
       )
-      .order("asc")
-      .collect()
-    return msgs.slice(-60)
+      .order("desc")
+      .take(60)
+    return msgs.reverse()
   },
 })
 

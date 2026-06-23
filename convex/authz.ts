@@ -12,15 +12,16 @@ export async function requireRestaurantAccess(
   const identity = await requireIdentity(ctx)
   const restaurant = await ctx.db.get(restaurantId)
   if (!restaurant) throw new Error("Restaurant introuvable")
-  if (restaurant.clerkUserId && restaurant.clerkUserId === identity.subject) {
+  if (restaurant.clerkUserId === identity.subject) {
     return { identity, restaurant, role: "owner" as const }
   }
-  const members = await ctx.db
+  // Utiliser by_clerkUserId au lieu de scan complet by_restaurant
+  const me = await ctx.db
     .query("members")
-    .withIndex("by_restaurant", (q: any) => q.eq("restaurantId", restaurantId))
-    .collect()
-  const me = members.find((m: any) => m.clerkUserId === identity.subject && m.status === "active")
-  if (!me) throw new Error("Accès refusé")
+    .withIndex("by_clerkUserId", (q: any) => q.eq("clerkUserId", identity.subject))
+    .filter((q: any) => q.eq(q.field("restaurantId"), restaurantId))
+    .first()
+  if (!me || me.status !== "active") throw new Error("Accès refusé")
   if (!allowedRoles.includes(me.role)) throw new Error("Privilèges insuffisants")
-  return { identity, restaurant, role: me.role }
+  return { identity, restaurant, role: me.role as "owner" | "manager" | "staff" }
 }
