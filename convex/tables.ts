@@ -281,6 +281,18 @@ export const assignServer = mutation({
   },
 })
 
+// Bascule l'indicateur d'alerte/VIP d'une table (étoile sidebar + bordure orange
+// sur la pastille du plan de salle). Owner/manager only.
+export const toggleAlert = mutation({
+  args: { tableId: v.id("tables") },
+  handler: async (ctx, { tableId }) => {
+    const t = await ctx.db.get(tableId)
+    if (!t) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, t.restaurantId, ["owner", "manager"])
+    await ctx.db.patch(tableId, { alert: !t.alert })
+  },
+})
+
 // Désassigne tous les serveurs des tables du restaurant. Retourne le nombre de
 // tables effectivement modifiées (celles qui portaient une assignation).
 export const clearAllAssignments = mutation({

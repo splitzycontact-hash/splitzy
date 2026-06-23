@@ -32,6 +32,8 @@ interface FloorPlanProps {
   // Mode service : enrobe chaque table d'un conteneur droppable (DnD). Absent en
   // config → la table est rendue telle quelle. Le wrapper doit porter une `key`.
   wrapTable?: (tableId: Id<"tables">, node: React.ReactNode) => React.ReactNode
+  // Tick d'horloge propagé aux TableChip pour le timer d'inactivité (service).
+  now?: number
 }
 
 // Plan de salle : grille CSS positionnant les tables (gridX/gridY) sur des
@@ -51,6 +53,7 @@ export default function FloorPlan({
   onTableClick,
   onZoneChange,
   wrapTable,
+  now,
 }: FloorPlanProps) {
   // Tables placées indexées par "x,y" pour un lookup O(1) dans la double boucle.
   const placed = new Map<string, Doc<"tables">>()
@@ -73,6 +76,7 @@ export default function FloorPlan({
             activeZoneId={activeZoneId}
             selected={selectedTableId === t._id}
             onTableClick={() => onTableClick?.(t._id)}
+            now={now}
           />
         )
         // Mode service : wrapTable enrobe la pastille d'un conteneur droppable

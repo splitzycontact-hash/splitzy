@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import { toast } from 'sonner'
-import { UserPlus, X, Check, Power, Users } from 'lucide-react'
+import { UserPlus, X, Check, Power, Users, Star, Unlock } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
-import type { Id } from '../../../convex/_generated/dataModel'
+import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId } from '../context/RestaurantContext'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
@@ -121,6 +121,61 @@ function DroppableTable({ tableId, children }: { tableId: Id<'tables'>; children
   )
 }
 
+// Ligne d'une table assignée à un serveur (sidebar « En service ») : nom, timer
+// d'inactivité, toggle alerte ⭐, et libération manuelle (dining/payment only).
+function AssignedTableRow({
+  table, now, onToggleAlert, onRelease,
+}: {
+  table: Doc<'tables'>
+  now: number
+  onToggleAlert: () => void
+  onRelease: () => void
+}) {
+  const elapsedMin = table.sittingStartedAt != null
+    ? Math.floor((now - table.sittingStartedAt) / 60000)
+    : null
+  const showTimer = elapsedMin != null && elapsedMin >= 30
+  const danger = elapsedMin != null && elapsedMin >= 60
+  const canRelease = table.status === 'dining' || table.status === 'payment'
+
+  return (
+    <div className="flex items-center gap-1.5 pl-4 pr-1 py-1">
+      <span className="text-xs font-semibold text-mid shrink-0">{table.label ?? `T${table.number}`}</span>
+      {showTimer && (
+        <span
+          className={`text-[10px] font-bold leading-none px-1.5 py-0.5 rounded ${danger ? 'animate-pulse' : ''}`}
+          style={{
+            background: danger ? '#FEE2E2' : '#FFEDD5',
+            color: danger ? '#DC2626' : '#EA580C',
+          }}
+        >
+          {elapsedMin}min
+        </span>
+      )}
+      <div className="ml-auto flex items-center gap-0.5 shrink-0">
+        <button
+          onClick={onToggleAlert}
+          title={table.alert ? 'Retirer l\'alerte' : 'Marquer en alerte'}
+          className="flex items-center justify-center rounded-lg transition-colors hover:bg-brand-bg"
+          style={{ width: 26, height: 26 }}
+        >
+          <Star size={13} className={table.alert ? 'text-brand fill-brand' : 'text-muted'} />
+        </button>
+        {canRelease && (
+          <button
+            onClick={onRelease}
+            title="Libérer la table"
+            className="flex items-center justify-center rounded-lg transition-colors hover:bg-red-50"
+            style={{ width: 26, height: 26 }}
+          >
+            <Unlock size={13} className="text-red-500" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function SallePage() {
   const restaurantId = useRestaurantId()
   const overview = useQuery(
@@ -134,6 +189,8 @@ export function SallePage() {
 
   const assignServer = useMutation(api.tables.assignServer)
   const clearAll = useMutation(api.tables.clearAllAssignments)
+  const toggleAlert = useMutation(api.tables.toggleAlert)
+  const resetToFree = useMutation(api.tables.resetToFree)
   const checkIn = useMutation(api.shifts.checkIn)
   const createShift = useMutation(api.shifts.create)
   const removeShift = useMutation(api.shifts.remove)
@@ -142,15 +199,28 @@ export function SallePage() {
   const [dragName, setDragName] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
 
+  // Timer d'inactivité : tick toutes les 30 s pour réactualiser les temps écoulés
+  // (les TableChip et les lignes sidebar recalculent depuis sittingStartedAt).
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
-  // Nombre de tables assignées par membre — affiché dans le roster.
-  const assignedCountByMember = useMemo(() => {
-    const m = new Map<string, number>()
+  // Tables assignées regroupées par serveur — alimente le compteur du roster et
+  // les lignes de la sidebar (timer + toggle alerte + libération). Triées par n°.
+  const tablesByMember = useMemo(() => {
+    const m = new Map<string, Doc<'tables'>[]>()
     if (overview) {
       for (const t of overview.tables) {
-        if (t.assignedMemberId) m.set(t.assignedMemberId, (m.get(t.assignedMemberId) ?? 0) + 1)
+        if (!t.assignedMemberId) continue
+        const arr = m.get(t.assignedMemberId) ?? []
+        arr.push(t)
+        m.set(t.assignedMemberId, arr)
       }
+      for (const arr of m.values()) arr.sort((a, b) => a.number - b.number)
     }
     return m
   }, [overview])
@@ -225,6 +295,16 @@ export function SallePage() {
     toast.success('Service clôturé')
   }
 
+  async function handleToggleAlert(tableId: Id<'tables'>) {
+    await toggleAlert({ tableId })
+  }
+
+  async function handleRelease(t: Doc<'tables'>) {
+    if (!window.confirm(`Libérer T${t.number} ? Le paiement en cours sera annulé.`)) return
+    await resetToFree({ tableId: t._id })
+    toast.success('Table libérée')
+  }
+
   return (
     <RestaurantLayout>
       <PageHeader
@@ -259,6 +339,7 @@ export function SallePage() {
                 activeZoneId={activeZoneId}
                 onZoneChange={setActiveZoneId}
                 onTableClick={handleTableClick}
+                now={now}
                 wrapTable={(tableId, node) => (
                   <DroppableTable key={tableId} tableId={tableId}>{node}</DroppableTable>
                 )}
@@ -325,21 +406,38 @@ export function SallePage() {
             )}
 
             <div className="flex flex-col gap-2">
-              {overview.staffToday.map(s => (
-                <DraggableServer
-                  key={s.memberId}
-                  memberId={s.memberId}
-                  name={s.memberName}
-                  colorIndex={s.colorIndex}
-                  checkedIn={s.isPresent}
-                  assignedCount={assignedCountByMember.get(s.memberId) ?? 0}
-                  onCheckIn={async () => { await checkIn({ shiftId: s.shiftId }); toast.success('Arrivée pointée') }}
-                  onRemove={async () => {
-                    await removeShift({ shiftId: s.shiftId })
-                    toast.success('Retiré du service')
-                  }}
-                />
-              ))}
+              {overview.staffToday.map(s => {
+                const assigned = tablesByMember.get(s.memberId) ?? []
+                return (
+                  <div key={s.memberId} className="flex flex-col">
+                    <DraggableServer
+                      memberId={s.memberId}
+                      name={s.memberName}
+                      colorIndex={s.colorIndex}
+                      checkedIn={s.isPresent}
+                      assignedCount={assigned.length}
+                      onCheckIn={async () => { await checkIn({ shiftId: s.shiftId }); toast.success('Arrivée pointée') }}
+                      onRemove={async () => {
+                        await removeShift({ shiftId: s.shiftId })
+                        toast.success('Retiré du service')
+                      }}
+                    />
+                    {assigned.length > 0 && (
+                      <div className="mt-0.5 border-l-2 border-border ml-2">
+                        {assigned.map(t => (
+                          <AssignedTableRow
+                            key={t._id}
+                            table={t}
+                            now={now}
+                            onToggleAlert={() => handleToggleAlert(t._id)}
+                            onRelease={() => handleRelease(t)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
