@@ -79,15 +79,25 @@ export const send = mutation({
 })
 
 // Marquer un thread comme lu pour le membre courant.
+// `recipientId` fourni → thread 1:1 [me|recipient] (résolu côté serveur, symétrique
+// de listThread) ; sinon `threadId` (défaut "broadcast"). Les deux sont optionnels
+// pour accepter aussi bien { threadId } (ChatPage) que { recipientId } (FloatingChat).
 export const markRead = mutation({
-  args: { restaurantId: v.id("restaurants"), threadId: v.string() },
-  handler: async (ctx, { restaurantId, threadId }) => {
+  args: {
+    restaurantId: v.id("restaurants"),
+    threadId: v.optional(v.string()),
+    recipientId: v.optional(v.id("members")),
+  },
+  handler: async (ctx, { restaurantId, threadId, recipientId }) => {
     const me = await getMe(ctx, restaurantId)
     if (!me) return
+    const tid = recipientId
+      ? [me._id.toString(), recipientId.toString()].sort().join("|")
+      : threadId ?? "broadcast"
     const msgs = await ctx.db
       .query("messages")
       .withIndex("by_restaurant_thread", (q) =>
-        q.eq("restaurantId", restaurantId).eq("threadId", threadId),
+        q.eq("restaurantId", restaurantId).eq("threadId", tid),
       )
       .collect()
     await Promise.all(

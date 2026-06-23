@@ -38,6 +38,10 @@ export default {
         muted: '#9CA3AF',
         border: '#E5E7EB',
         bg: '#F4F4F5',
+        // Alias génériques (FloatingChat & co.) — primaire de marque + surface
+        // thémable. `background` suit le thème dashboard via la CSS var.
+        primary: { DEFAULT: '#E8920A', foreground: '#FFFFFF' },
+        background: 'var(--ds-bg-surface)',
         success: '#22C55E',
         error: '#EF4444',
         ink: {

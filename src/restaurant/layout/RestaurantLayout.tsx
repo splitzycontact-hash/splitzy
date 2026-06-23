@@ -8,6 +8,7 @@ import {
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { Sidebar } from './Sidebar'
+import { FloatingChat } from '../components/FloatingChat'
 import { PrintProvider, usePrintState } from '../context/PrintContext'
 import { PrintReport } from '../components/PrintReport'
 import { ReportPeriodSelector } from '../components/ReportPeriodSelector'
@@ -80,6 +81,7 @@ function MobileBottomNav() {
 function LayoutInner({ children }: { children: ReactNode }) {
   const { theme } = useTheme()
   const print = usePrintState()
+  const restaurantId = useRestaurantId()
 
   return (
     <PrintProvider onOpen={print.openSelector}>
@@ -93,6 +95,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
           {children}
         </div>
         <MobileBottomNav />
+        {restaurantId && <FloatingChat restaurantId={restaurantId} />}
         <ReportPeriodSelector
           open={print.selectorOpen}
           onClose={print.closeSelector}

@@ -1,0 +1,286 @@
+import { useState, useEffect, useRef } from 'react'
+import { useQuery, useMutation } from 'convex/react'
+import { api } from '../../../convex/_generated/api'
+import { MessageSquare, X, ChevronLeft, Send, Users } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { useUser } from '@clerk/clerk-react'
+import type { Id } from '../../../convex/_generated/dataModel'
+
+// 4 couleurs cycliques pour les avatars-initiales (alignées ChatPage).
+const AVATAR_COLORS = ['#E8920A', '#3B82F6', '#8B5CF6', '#10B981']
+const ROLE_LABEL: Record<string, string> = {
+  owner: 'Propriétaire',
+  manager: 'Manager',
+  staff: 'Équipier',
+}
+
+type Member = NonNullable<ReturnType<typeof useQuery<typeof api.members.getTeamMembers>>>[number]
+
+const nameOf = (m: Member) => m.displayName || m.firstName || m.name
+const initialOf = (m: Member) => (nameOf(m).trim()[0] ?? '?').toUpperCase()
+const hhmm = (ts: number) =>
+  new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+
+export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'> }) {
+  const location = useLocation()
+  const [isOpen, setIsOpen] = useState(false)
+  // undefined = liste convos, null = broadcast, Id = DM
+  const [activeId, setActiveId] = useState<Id<'members'> | null | undefined>(undefined)
+  const [draft, setDraft] = useState('')
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  const convos = useQuery(api.messages.listConversations, { restaurantId })
+  const members = useQuery(api.members.getTeamMembers, { restaurantId })
+  const msgs = useQuery(api.messages.listThread,
+    activeId !== undefined
+      ? activeId === null
+        ? { restaurantId, threadId: 'broadcast' }
+        : { restaurantId, recipientId: activeId }
+      : 'skip'
+  )
+  const sendMsg = useMutation(api.messages.send)
+  const markRead = useMutation(api.messages.markRead)
+
+  const totalUnread = convos?.reduce((s, c) => s + (c.unread ?? 0), 0) ?? 0
+  const prevUnread = useRef(totalUnread)
+
+  // Auto-ouvrir sur nouvelle notif si pas déjà sur /chat
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (totalUnread > prevUnread.current && !location.pathname.includes('/chat')) {
+      const newest = convos?.find(c => (c.unread ?? 0) > 0)
+      if (newest) {
+        setIsOpen(true)
+        const ids = newest.threadId === 'broadcast' ? [] : newest.threadId.split('|')
+        // trouver l'autre participant dans ids (pas me)
+        setActiveId(newest.threadId === 'broadcast' ? null : ids[0] as Id<'members'>)
+      }
+    }
+    prevUnread.current = totalUnread
+  }, [totalUnread, convos, location.pathname])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [msgs])
+
+  useEffect(() => {
+    if (activeId !== undefined && restaurantId) {
+      markRead({ restaurantId, threadId: activeId === null ? 'broadcast' : undefined, recipientId: activeId ?? undefined })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, restaurantId])
+
+  async function handleSend() {
+    if (!draft.trim()) return
+    await sendMsg({ restaurantId, content: draft.trim(), recipientId: activeId ?? undefined })
+    setDraft('')
+  }
+
+  // --- Dérivations pour le rendu (annuaire, titres, "mes" messages) ---
+  const { user } = useUser()
+  const me = members?.find(m => m.clerkUserId === user?.id) ?? null
+  const otherMembers = (members ?? []).filter(m => m._id !== me?._id)
+  const memberById = new Map((members ?? []).map(m => [m._id, m]))
+  const threadIdFor = (memberId: string) =>
+    me ? [me._id.toString(), memberId.toString()].sort().join('|') : ''
+  const convFor = (threadId: string) => convos?.find(c => c.threadId === threadId)
+  const selectedMember = activeId ? otherMembers.find(m => m._id === activeId) ?? null : null
+  const threadTitle = activeId === null ? 'Toute la salle' : selectedMember ? nameOf(selectedMember) : ''
+  const inThread = activeId !== undefined
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      void handleSend()
+    }
+  }
+
+  if (location.pathname.includes('/chat')) return null
+
+  return (
+    <>
+      {/* FAB */}
+      <button
+        onClick={() => setIsOpen(o => !o)}
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary shadow-xl flex items-center justify-center hover:scale-105 transition-transform">
+        <MessageSquare size={22} className="text-primary-foreground"/>
+        {totalUnread > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+            {totalUnread > 9 ? '9+' : totalUnread}
+          </span>
+        )}
+      </button>
+
+      {/* Panel */}
+      {isOpen && (
+        <div className="fixed bottom-24 right-6 z-50 w-[360px] h-[520px] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+          {/* Header */}
+          <div
+            className="px-3.5 py-3 border-b flex items-center gap-2 shrink-0"
+            style={{ borderColor: 'var(--ds-border)' }}
+          >
+            {inThread && (
+              <button
+                onClick={() => setActiveId(undefined)}
+                aria-label="Retour"
+                className="p-1 -ml-1 rounded-md hover:ds-bg-subtle ds-text-secondary"
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
+            <span className="text-[14px] font-semibold ds-text-primary truncate flex-1">
+              {inThread ? threadTitle : 'Messages'}
+            </span>
+            <button
+              onClick={() => setIsOpen(false)}
+              aria-label="Fermer"
+              className="p-1 -mr-1 rounded-md hover:ds-bg-subtle ds-text-tertiary"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Liste des conversations */}
+          {!inThread && (
+            <div className="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-px">
+              <ThreadRow
+                label="Toute la salle"
+                initial={<Users size={16} />}
+                color="#0A0A0A"
+                preview={convFor('broadcast')?.lastMsg.content}
+                unread={convFor('broadcast')?.unread ?? 0}
+                onClick={() => setActiveId(null)}
+              />
+              <div className="px-1.5 pt-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] ds-text-tertiary">
+                Annuaire
+              </div>
+              {otherMembers.map((m, i) => {
+                const conv = convFor(threadIdFor(m._id))
+                return (
+                  <ThreadRow
+                    key={m._id}
+                    label={nameOf(m)}
+                    sublabel={ROLE_LABEL[m.role] ?? m.role}
+                    initial={initialOf(m)}
+                    color={AVATAR_COLORS[i % AVATAR_COLORS.length]}
+                    preview={conv?.lastMsg.content}
+                    unread={conv?.unread ?? 0}
+                    onClick={() => setActiveId(m._id)}
+                  />
+                )
+              })}
+              {members && otherMembers.length === 0 && (
+                <div className="px-2.5 py-3 text-[12px] ds-text-tertiary">
+                  Aucun autre membre dans l'équipe.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Fil + composer */}
+          {inThread && (
+            <>
+              <div className="flex-1 overflow-y-auto px-3.5 py-3 flex flex-col gap-2">
+                {msgs && msgs.length === 0 && (
+                  <div className="m-auto text-center ds-text-tertiary text-[12.5px]">
+                    Aucun message — commencez la conversation !
+                  </div>
+                )}
+                {msgs?.map(msg => {
+                  const mine = !!me && msg.senderId === me._id
+                  const sender = memberById.get(msg.senderId)
+                  const senderName = mine ? 'Vous' : sender ? nameOf(sender) : 'Membre'
+                  return (
+                    <div
+                      key={msg._id}
+                      className={`flex flex-col max-w-[78%] ${mine ? 'self-end items-end' : 'self-start items-start'}`}
+                    >
+                      <div className="text-[10px] ds-text-tertiary mb-0.5 px-1">
+                        {senderName} · {hhmm(msg.createdAt)}
+                      </div>
+                      <div
+                        className="px-3 py-1.5 rounded-2xl text-[13px] leading-snug whitespace-pre-wrap break-words"
+                        style={
+                          mine
+                            ? { background: '#3B82F6', color: '#FFFFFF' }
+                            : { background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-primary)' }
+                        }
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  )
+                })}
+                <div ref={bottomRef} />
+              </div>
+
+              <div
+                className="border-t px-3 py-2.5 flex items-end gap-2 shrink-0"
+                style={{ borderColor: 'var(--ds-border)' }}
+              >
+                <textarea
+                  rows={1}
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder={`Message à ${threadTitle}…`}
+                  className="flex-1 resize-none rounded-[10px] border px-3 py-2 text-[14px] outline-none max-h-24"
+                  style={{
+                    background: 'var(--ds-bg-base)',
+                    borderColor: 'var(--ds-border)',
+                    color: 'var(--ds-text-primary)',
+                  }}
+                />
+                <button
+                  onClick={() => void handleSend()}
+                  disabled={!draft.trim()}
+                  aria-label="Envoyer"
+                  className="w-9 h-9 rounded-[10px] flex items-center justify-center text-white shrink-0 disabled:opacity-40 transition-opacity"
+                  style={{ background: '#3B82F6' }}
+                >
+                  <Send size={15} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
+// Ligne d'annuaire / conversation (réplique allégée de ChatPage.ThreadRow).
+function ThreadRow({
+  label, sublabel, initial, color, preview, unread, onClick,
+}: {
+  label: string; sublabel?: string; initial: React.ReactNode; color: string
+  preview?: string; unread: number; onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-[8px] text-left transition-colors hover:ds-bg-subtle"
+    >
+      <div
+        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[13px] font-bold flex-shrink-0"
+        style={{ background: color }}
+      >
+        {initial}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] font-semibold ds-text-primary truncate leading-tight">{label}</div>
+        {preview ? (
+          <div className="text-[11.5px] ds-text-tertiary truncate leading-tight mt-0.5">{preview}</div>
+        ) : sublabel ? (
+          <div className="text-[11.5px] ds-text-tertiary truncate leading-tight mt-0.5">{sublabel}</div>
+        ) : null}
+      </div>
+      {unread > 0 && (
+        <span className="text-[10.5px] min-w-[18px] h-[18px] px-1 rounded-full bg-[#EF4444] text-white font-bold flex items-center justify-center flex-shrink-0 tabular-nums">
+          {unread}
+        </span>
+      )}
+    </button>
+  )
+}
