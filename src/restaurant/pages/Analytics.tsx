@@ -5,7 +5,7 @@ import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import { formatEur } from '../../utils/formatCurrency'
-import { Download, Printer, Calendar, TrendingUp, TrendingDown, Sparkles, ArrowRight, Star, Clock, UtensilsCrossed } from 'lucide-react'
+import { Download, Printer, Calendar, TrendingUp, TrendingDown, Sparkles, ArrowRight, Star, Clock, UtensilsCrossed, Banknote } from 'lucide-react'
 
 type PeriodKey = 'today' | 'week' | 'month' | 'year' | 'custom'
 
@@ -23,7 +23,7 @@ const HEAT_COLORS = ['#F4F4F5','#FFEAC2','#FFCF85','#F5A435','#D9810E','#A8650B'
 
 type ConvexPayment = {
   totalCents: number; tipCents: number; subtotalCents: number;
-  createdAt: number; status: string; guests: number; tableNumber: number
+  createdAt: number; status: string; guests: number; tableNumber: number; paymentMethod?: string
 }
 
 // Mesure la largeur réelle du conteneur pour rendre les SVG de charts à l'échelle
@@ -270,6 +270,7 @@ export function Analytics() {
   const rawFeedbacks   = useQuery(api.feedbacks.list,             restaurantId ? { restaurantId } : 'skip')
   const rawTables      = useQuery(api.tables.list,                restaurantId ? { restaurantId } : 'skip')
   const latestInsights = useQuery(api.insights.getLatestInsights, restaurantId ? { restaurantId } : 'skip')
+  const overview       = useQuery(api.payments.getOverviewStats,  restaurantId ? { restaurantId } : 'skip')
   const isPro          = restaurant?.plan === 'pro'
 
   const payments = (rawPayments ?? []) as ConvexPayment[]
@@ -506,6 +507,55 @@ export function Analytics() {
     ? ((avgBasket - prevAvgBasket) / prevAvgBasket * 100)
     : null
 
+  // — KPI opérationnels (client-side) —
+  const totalTables    = (rawTables ?? []).length
+  const occupiedTables = (rawTables ?? []).filter(t => t.status !== 'free').length
+  const tauxOccupation = totalTables > 0 ? Math.round((occupiedTables / totalTables) * 100) : 0
+
+  const nbJours = Math.max(1, Math.round((periodEnd - periodStart) / 86400000))
+  const tauxRotation = totalTables > 0
+    ? (encaisse.length / totalTables / nbJours).toFixed(1)
+    : '—'
+
+  // Répartition des moyens de paiement (sur la période filtrée)
+  const paymentSplit = (() => {
+    const methodMap: Record<string, { count: number; cents: number }> = {}
+    for (const p of encaisse) {
+      const m = p.paymentMethod ?? 'Autre'
+      if (!methodMap[m]) methodMap[m] = { count: 0, cents: 0 }
+      methodMap[m].count++
+      methodMap[m].cents += p.subtotalCents
+    }
+    const rows = Object.entries(methodMap)
+      .map(([method, v]) => ({ method, count: v.count, cents: v.cents }))
+      .sort((a, b) => b.cents - a.cents)
+    const totalCents = rows.reduce((s, r) => s + r.cents, 0)
+    return rows.map(r => ({ ...r, pct: totalCents > 0 ? Math.round((r.cents / totalCents) * 100) : 0 }))
+  })()
+
+  // Temps moyen d'encaissement : amplitude des paiements d'une même table sur une journée
+  const tableTimeAvg = (() => {
+    const groups: Record<string, { min: number; max: number; n: number }> = {}
+    for (const p of encaisse) {
+      const d = new Date(p.createdAt)
+      const key = `${p.tableNumber}-${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+      if (!groups[key]) groups[key] = { min: p.createdAt, max: p.createdAt, n: 0 }
+      groups[key].min = Math.min(groups[key].min, p.createdAt)
+      groups[key].max = Math.max(groups[key].max, p.createdAt)
+      groups[key].n++
+    }
+    const spans = Object.values(groups).filter(g => g.n > 1).map(g => (g.max - g.min) / 60000)
+    if (spans.length === 0) return null
+    return Math.round(spans.reduce((s, v) => s + v, 0) / spans.length)
+  })()
+  const avgTableMinDisplay = tableTimeAvg ?? avgTableMin
+
+  // Commission J+1 (1,5% sur le volume du jour) — net estimé reversé au restaurant
+  const commissionRate  = 0.015
+  const todayVolume     = overview?.todayCA ?? 0
+  const commissionToday = Math.round(todayVolume * commissionRate)
+  const netToday        = todayVolume - commissionToday
+
   return (
     <RestaurantLayout>
       <PageHeader
@@ -585,7 +635,7 @@ export function Analytics() {
 
         {/* KPI strip */}
         <div
-          className="grid grid-cols-2 xl:grid-cols-4 border rounded-[12px] overflow-hidden"
+          className="grid grid-cols-2 xl:grid-cols-3 border rounded-[12px] overflow-hidden"
           style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
         >
           {[
@@ -617,9 +667,24 @@ export function Analytics() {
               sparkColor: 'var(--ds-text-primary)',
             },
             {
-              label: 'Temps moyen / table', accent: false,
-              value: avgTableMin !== null ? String(avgTableMin) : '—', suffix: avgTableMin !== null ? 'min' : '',
-              delta: 'service en cours', up: true, vs: '',
+              label: "Taux d'occupation", accent: false,
+              value: `${tauxOccupation}%`,
+              sub: `${occupiedTables}/${totalTables} tables actives`,
+              spark: 'M0 15 L8 12 L16 13 L24 9 L32 11 L40 7 L48 8 L60 5',
+              sparkColor: '#3B82F6',
+            },
+            {
+              label: 'Rotation', accent: false,
+              value: tauxRotation, suffix: tauxRotation !== '—' ? 'serv./j' : '',
+              sub: 'par table sur la période',
+              spark: 'M0 14 L8 13 L16 11 L24 12 L32 9 L40 10 L48 7 L60 8',
+              sparkColor: '#8B5CF6',
+            },
+            {
+              label: 'Temps moy. table', accent: false,
+              value: avgTableMinDisplay !== null ? String(avgTableMinDisplay) : '—',
+              suffix: avgTableMinDisplay !== null ? 'min' : '',
+              sub: tableTimeAvg !== null ? 'durée moyenne de paiement' : 'service en cours',
               spark: 'M0 6 L8 8 L16 9 L24 12 L32 11 L40 14 L48 16 L60 17',
               sparkColor: '#22C55E',
             },
@@ -627,7 +692,11 @@ export function Analytics() {
             <div
               key={i}
               className="flex flex-col gap-2 px-5 py-4 relative"
-              style={{ borderRight: i < 3 ? `1px solid var(--ds-border)` : 'none', minHeight: '112px' }}
+              style={{
+                borderRight: i % 3 !== 2 ? '1px solid var(--ds-border)' : 'none',
+                borderTop: i >= 3 ? '1px solid var(--ds-border)' : 'none',
+                minHeight: '112px',
+              }}
             >
               <div className="text-[11px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">{kpi.label}</div>
               <div
@@ -639,16 +708,20 @@ export function Analytics() {
                   <span className="text-[18px] font-semibold ds-text-secondary tracking-normal ml-0.5">{kpi.suffix}</span>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 text-[12px] ds-text-secondary">
-                <span
-                  className="inline-flex items-center gap-0.5 font-semibold"
-                  style={{ color: kpi.up ? 'var(--ds-success-strong)' : 'var(--ds-error-strong)' }}
-                >
-                  {kpi.up ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
-                  {kpi.delta}
-                </span>
-                <span className="ds-text-tertiary">{kpi.vs}</span>
-              </div>
+              {('delta' in kpi && kpi.delta) ? (
+                <div className="flex items-center gap-1.5 text-[12px] ds-text-secondary">
+                  <span
+                    className="inline-flex items-center gap-0.5 font-semibold"
+                    style={{ color: kpi.up ? 'var(--ds-success-strong)' : 'var(--ds-error-strong)' }}
+                  >
+                    {kpi.up ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
+                    {kpi.delta}
+                  </span>
+                  {'vs' in kpi && <span className="ds-text-tertiary">{kpi.vs}</span>}
+                </div>
+              ) : (
+                <div className="text-[12px] ds-text-tertiary">{'sub' in kpi ? kpi.sub : ''}</div>
+              )}
               <Sparkline path={kpi.spark} color={kpi.sparkColor} />
             </div>
           ))}
@@ -1027,6 +1100,56 @@ export function Analytics() {
             </div>
           </div>
 
+        </div>
+
+        {/* Répartition des paiements */}
+        <div className="ds-panel">
+          <div className="flex items-center justify-between px-5 py-4 border-b gap-3" style={{ borderColor: 'var(--ds-border)' }}>
+            <div>
+              <div className="font-bold text-[14.5px] tracking-[-0.015em] ds-text-primary">Répartition des paiements</div>
+              <div className="text-[12px] ds-text-tertiary mt-0.5">Par moyen de paiement · {currentPeriodLabel}</div>
+            </div>
+            <span className="text-[12px] ds-text-secondary tabular-nums flex-shrink-0">
+              {encaisse.length} paiement{encaisse.length > 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            {paymentSplit.length > 0 ? paymentSplit.map(row => (
+              <div key={row.method} className="flex items-center gap-3">
+                <span className="text-[12.5px] font-medium ds-text-primary w-24 flex-shrink-0 truncate">{row.method}</span>
+                <div className="flex-1 h-[8px] rounded-full overflow-hidden" style={{ background: 'var(--ds-bg-subtle)' }}>
+                  <div className="h-full rounded-full transition-all" style={{ width: `${row.pct}%`, background: '#E8920A' }} />
+                </div>
+                <span className="text-[12px] ds-text-tertiary tabular-nums w-10 text-right flex-shrink-0">{row.pct}%</span>
+                <span className="font-semibold text-[13px] ds-text-primary tabular-nums w-16 text-right flex-shrink-0">{formatEur(row.cents)}</span>
+              </div>
+            )) : <div className="text-[12px] ds-text-tertiary py-4 text-center">Aucun paiement sur cette période</div>}
+          </div>
+        </div>
+
+        {/* Commission J+1 */}
+        <div
+          className="flex items-center justify-between gap-3 px-4 py-3 rounded-[10px] border"
+          style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}
+        >
+          <div className="flex items-center gap-2 text-[12.5px] ds-text-secondary">
+            <Banknote size={15} style={{ color: 'var(--ds-text-tertiary)', flexShrink: 0 }} />
+            {todayVolume > 0 ? (
+              <span>
+                Virement prévu lundi · <strong className="ds-text-primary font-semibold">~{formatEur(netToday)}</strong> net
+                <span className="ds-text-tertiary"> (commission {formatEur(commissionToday)})</span>
+              </span>
+            ) : (
+              <span>Aucun encaissement aujourd'hui — prochain virement après vos premiers paiements</span>
+            )}
+          </div>
+          <a
+            href="/restaurant/factures"
+            className="inline-flex items-center gap-1 text-[12px] font-medium flex-shrink-0"
+            style={{ color: 'var(--ds-accent)' }}
+          >
+            Détail dans Factures <ArrowRight size={11} />
+          </a>
         </div>
 
         {/* Insights IA */}
