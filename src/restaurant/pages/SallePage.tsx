@@ -235,6 +235,11 @@ function AssignedTableRow({
   )
 }
 
+type DialogState =
+  | { type: 'release'; table: Doc<'tables'> }
+  | { type: 'close_no_pay'; table: Doc<'tables'> }
+  | null
+
 export function SallePage() {
   const restaurantId = useRestaurantId()
   const overview = useQuery(
@@ -276,6 +281,7 @@ export function SallePage() {
   const [showAdd, setShowAdd] = useState(false)
   const [showRecap, setShowRecap] = useState(false)
   const [sendingReport, setSendingReport] = useState(false)
+  const [dialog, setDialog] = useState<DialogState>(null)
 
   // Timer d'inactivité : tick toutes les 30 s pour réactualiser les temps écoulés
   // (les TableChip et les lignes sidebar recalculent depuis sittingStartedAt).
@@ -435,10 +441,15 @@ export function SallePage() {
     await toggleAlert({ tableId })
   }
 
-  async function handleRelease(t: Doc<'tables'>) {
-    if (!window.confirm(`Libérer T${t.number} ? Le paiement en cours sera annulé.`)) return
-    await resetToFree({ tableId: t._id })
+  function handleRelease(t: Doc<'tables'>) {
+    setDialog({ type: 'release', table: t })
+  }
+
+  async function confirmRelease() {
+    if (!dialog || dialog.type !== 'release') return
+    await resetToFree({ tableId: dialog.table._id })
     toast.success('Table libérée')
+    setDialog(null)
   }
 
   async function handleForcePayment(t: Doc<'tables'>) {
@@ -709,6 +720,36 @@ export function SallePage() {
                 className="flex-1 px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors"
               >
                 Clôturer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dialog?.type === 'release' && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.4)' }}
+        >
+          <div className="bg-white rounded-2xl p-6 w-80 shadow-xl space-y-4">
+            <h3 className="font-semibold text-base">
+              Libérer T{dialog.table.number} ?
+            </h3>
+            <p className="text-sm ds-text-secondary">
+              Le paiement en cours sera annulé.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setDialog(null)}
+                className="px-4 py-2 text-sm rounded-xl border border-border"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmRelease}
+                className="px-4 py-2 text-sm rounded-xl bg-red-500 text-white"
+              >
+                Libérer
               </button>
             </div>
           </div>
