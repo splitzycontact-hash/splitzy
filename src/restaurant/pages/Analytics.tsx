@@ -6,7 +6,7 @@ import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import { formatEur } from '../../utils/formatCurrency'
-import { Download, Printer, Calendar, TrendingUp, TrendingDown, Sparkles, ArrowRight, Star, Clock, UtensilsCrossed, Banknote } from 'lucide-react'
+import { Download, Printer, Calendar, TrendingUp, TrendingDown, Sparkles, ArrowRight, Star, Clock, UtensilsCrossed, Banknote, CalendarClock, Archive, AlertTriangle } from 'lucide-react'
 import { PieChart, Pie, Cell } from 'recharts'
 
 type PeriodKey = 'today' | 'week' | 'month' | 'year' | 'custom'
@@ -91,7 +91,7 @@ const PRIORITY_CFG_A = {
   low:    { textColor: 'var(--ds-text-secondary)', cardBg: 'var(--ds-bg-base)' },
 } as const
 
-const TYPE_ICON_A = { revenue: TrendingUp, reputation: Star, operations: Clock, menu: UtensilsCrossed } as const
+const TYPE_ICON_A = { revenue: TrendingUp, reputation: Star, operations: Clock, menu: UtensilsCrossed, forecast: CalendarClock, dormant_item: Archive, low_basket: AlertTriangle } as const
 
 function formatRel(ts: number): string {
   const h = Math.floor((Date.now() - ts) / 3600000)

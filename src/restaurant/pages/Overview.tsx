@@ -10,7 +10,7 @@ import { deltaPct } from '../lib/billing'
 import {
   Euro, Grid3x3, HandCoins, Sparkles, Star,
   Activity, ArrowRight, TrendingUp, CheckCircle2,
-  AlertTriangle, Clock, UtensilsCrossed,
+  AlertTriangle, Clock, UtensilsCrossed, CalendarClock, Archive,
 } from 'lucide-react'
 
 type ConvexTable   = { number: number; status: string; amountCents?: number; paidCents?: number; durationMinutes?: number; alert?: boolean }
@@ -197,10 +197,13 @@ const PRIORITY_CONFIG = {
 } as const
 
 const TYPE_ICON = {
-  revenue:    TrendingUp,
-  reputation: Star,
-  operations: Clock,
-  menu:       UtensilsCrossed,
+  revenue:      TrendingUp,
+  reputation:   Star,
+  operations:   Clock,
+  menu:         UtensilsCrossed,
+  forecast:     CalendarClock,
+  dormant_item: Archive,
+  low_basket:   AlertTriangle,
 } as const
 
 function formatRelativeDate(ts: number): string {
