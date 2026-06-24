@@ -262,6 +262,20 @@ export default defineSchema({
     isActive: v.boolean(),              // archivage doux (jamais de delete)
     createdAt: v.number(),
     createdBy: v.optional(v.id("members")),
+    // Pool de confiance — notes laissées par le manager après un service confirmé.
+    // Une note par convocation (remplacée si re-notée). La moyenne ★ est calculée
+    // côté UI à partir de ce tableau (voir extras.addRating + ExtrasPage).
+    ratings: v.optional(
+      v.array(
+        v.object({
+          convocationId: v.id("extraConvocations"),
+          stars: v.number(),            // borné 1..5 à l'écriture
+          comment: v.optional(v.string()),
+          ratedAt: v.number(),
+          ratedBy: v.optional(v.id("members")),
+        }),
+      ),
+    ),
   }).index("by_restaurant", ["restaurantId"])
     .index("by_restaurant_active", ["restaurantId", "isActive"]),
 

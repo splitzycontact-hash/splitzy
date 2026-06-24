@@ -18,3 +18,39 @@ export const list = query({
       .collect()
   },
 })
+
+// Convocations récentes d'un restaurant (toutes confondues), enrichies du nom de
+// l'extra + d'un flag `rated` (cette convocation a déjà reçu une note). Alimente
+// l'onglet Convocations de la page Extras. Tri sentAt DESC, plafonné à 100.
+// owner/manager uniquement.
+export const listByRestaurant = query({
+  args: { restaurantId: v.id("restaurants") },
+  handler: async (ctx, { restaurantId }) => {
+    await requireRestaurantAccess(ctx, restaurantId, ["owner", "manager"])
+    const convocations = await ctx.db
+      .query("extraConvocations")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
+      .collect()
+    convocations.sort((a, b) => b.sentAt - a.sentAt)
+    const recent = convocations.slice(0, 100)
+    return await Promise.all(
+      recent.map(async c => {
+        const extra = await ctx.db.get(c.extraId)
+        const rated = (extra?.ratings ?? []).some(r => r.convocationId === c._id)
+        return {
+          _id: c._id,
+          extraId: c.extraId,
+          firstName: extra?.firstName ?? "",
+          lastName: extra?.lastName ?? "",
+          subject: c.subject,
+          shiftDate: c.shiftDate ?? "",
+          shiftStart: c.shiftStart ?? "",
+          shiftEnd: c.shiftEnd ?? "",
+          sentAt: c.sentAt,
+          response: c.response ?? null,
+          rated,
+        }
+      }),
+    )
+  },
+})

@@ -112,6 +112,41 @@ export const archive = mutation({
   },
 })
 
+// ─── Pool de confiance — notation d'un extra après un service ────────────────────
+// addRating : le manager note un extra (1..5 ★ + commentaire optionnel) sur une
+// convocation passée. Une note par convocation (re-noter remplace l'ancienne). La
+// convocation doit appartenir à l'extra. owner/manager uniquement.
+export const addRating = mutation({
+  args: {
+    extraId: v.id("extras"),
+    convocationId: v.id("extraConvocations"),
+    stars: v.number(),
+    comment: v.optional(v.string()),
+  },
+  handler: async (ctx, { extraId, convocationId, stars, comment }) => {
+    const extra = await ctx.db.get(extraId)
+    if (!extra) throw new Error("Extra introuvable")
+    await requireRestaurantAccess(ctx, extra.restaurantId, ["owner", "manager"])
+    const convocation = await ctx.db.get(convocationId)
+    if (!convocation || convocation.extraId !== extraId) {
+      throw new Error("Convocation invalide")
+    }
+    const s = Math.max(1, Math.min(5, Math.round(stars)))
+    const ratedBy = await currentMemberId(ctx, extra.restaurantId)
+    const existing = extra.ratings ?? []
+    // Une note par convocation : on remplace si déjà notée.
+    const next = existing.filter(r => r.convocationId !== convocationId)
+    next.push({
+      convocationId,
+      stars: s,
+      comment: comment?.trim() || undefined,
+      ratedAt: Date.now(),
+      ...(ratedBy ? { ratedBy } : {}),
+    })
+    await ctx.db.patch(extraId, { ratings: next })
+  },
+})
+
 // ─── Convocation par email (Resend) ─────────────────────────────────────────────
 // Même pattern que invitations.create : action `fetch` (runtime Convex par défaut,
 // PAS de "use node" → aucune dépendance npm) + internalQuery pour l'authz (l'action
