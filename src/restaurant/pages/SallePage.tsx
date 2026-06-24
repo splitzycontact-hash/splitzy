@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery, useMutation } from 'convex/react'
+import { useQuery, useMutation, useAction } from 'convex/react'
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
@@ -219,6 +219,7 @@ export function SallePage() {
   const clearAll = useMutation(api.tables.clearAllAssignments)
   const toggleAlert = useMutation(api.tables.toggleAlert)
   const resetToFree = useMutation(api.tables.resetToFree)
+  const sendTipReport = useAction(api.closures.sendTipReport)
   const checkIn = useMutation(api.shifts.checkIn)
   const createShift = useMutation(api.shifts.create)
   const removeShift = useMutation(api.shifts.remove)
@@ -227,6 +228,7 @@ export function SallePage() {
   const [dragName, setDragName] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [showRecap, setShowRecap] = useState(false)
+  const [sendingReport, setSendingReport] = useState(false)
 
   // Timer d'inactivité : tick toutes les 30 s pour réactualiser les temps écoulés
   // (les TableChip et les lignes sidebar recalculent depuis sittingStartedAt).
@@ -329,9 +331,32 @@ export function SallePage() {
     toast.success('Service clôturé')
   }
 
-  // M11-C — Envoi du rapport de répartition (email/PDF aux équipiers). Stub pour l'instant.
-  function handleSendReport() {
-    toast.info('Envoi du rapport — disponible prochainement')
+  // M11-C — Envoie le rapport de répartition par email : un email à chaque
+  // serveur (son montant) + un récap complet à l'owner/managers. Calcul refait
+  // côté backend (closures.sendTipReport), le front n'est pas la source de vérité.
+  async function handleSendReport() {
+    if (!restaurantId || sendingReport) return
+    setSendingReport(true)
+    try {
+      const r = await sendTipReport({ restaurantId, serviceDate: todayKey() })
+      if (r.noTips) {
+        toast.info('Aucun pourboire à répartir ce soir')
+      } else if (r.emailDisabled) {
+        toast.error("Envoi d'emails indisponible (clé Resend manquante)")
+      } else {
+        const parts: string[] = []
+        if (r.sent) parts.push(`${r.sent} serveur${r.sent > 1 ? 's' : ''}`)
+        if (r.ownerSent) parts.push('récap gérant')
+        toast.success(parts.length ? `Rapport envoyé : ${parts.join(' + ')}` : 'Rapport envoyé')
+        if (r.failed) toast.error(`${r.failed} email${r.failed > 1 ? 's' : ''} en échec`)
+        if (r.skipped) toast.info(`${r.skipped} serveur${r.skipped > 1 ? 's' : ''} sans email`)
+      }
+    } catch (err) {
+      console.error('[SallePage] sendTipReport:', err)
+      toast.error("Échec de l'envoi du rapport")
+    } finally {
+      setSendingReport(false)
+    }
   }
 
   // Stats du jour (paiements encaissés) + export CSV (séparateur `;`, BOM Excel FR).
@@ -591,9 +616,10 @@ export function SallePage() {
 
                 <button
                   onClick={handleSendReport}
-                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-dark text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                  disabled={sendingReport}
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-dark text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <Send size={15} /> Envoyer le rapport
+                  <Send size={15} /> {sendingReport ? 'Envoi en cours…' : 'Envoyer le rapport'}
                 </button>
               </div>
             )}
