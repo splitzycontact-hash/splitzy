@@ -138,7 +138,7 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
       return {
         date,
         line1: `Table ${p.tableNumber} · ${p.guests} convive${p.guests > 1 ? 's' : ''}`,
-        line2: `${methodLabel(p.paymentMethod)}${tipPct > 0 ? ` · Pourboire ${tipPct}%` : ''}`,
+        line2: `${methodLabel(p.paymentMethod ?? 'card')}${tipPct > 0 ? ` · Pourboire ${tipPct}%` : ''}`,
         amount: formatEur(p.totalCents),
       }
     })
@@ -624,7 +624,7 @@ export function Clients() {
 
       // Moyen de paiement dominant + sa part (%).
       const methodCounts: Record<string, number> = {}
-      for (const p of pmts) methodCounts[p.paymentMethod] = (methodCounts[p.paymentMethod] ?? 0) + 1
+      for (const p of pmts) { const m = p.paymentMethod ?? 'card'; methodCounts[m] = (methodCounts[m] ?? 0) + 1 }
       const [topMethod, topCount] = Object.entries(methodCounts).sort((a, b) => b[1] - a[1])[0] ?? ['', 0]
       const methodPct = visits > 0 ? Math.round((topCount / visits) * 100) : 0
 

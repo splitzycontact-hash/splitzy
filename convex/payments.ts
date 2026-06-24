@@ -285,7 +285,7 @@ export const listAll = internalQuery({
 // ("today" | "week" | "month" — défaut : tout l'historique). Montants en cents,
 // regroupés par famille (carte/Apple Pay/Google Pay/espèces/autre).
 export const getPaymentMethodBreakdown = query({
-  args: { restaurantId: v.id("restaurants"), period: v.optional(v.string()) },
+  args: { restaurantId: v.id("restaurants"), period: v.string() }, // "today"|"week"|"month"
   handler: async (ctx, { restaurantId, period }) => {
     await requireRestaurantAccess(ctx, restaurantId)
     const rows = await ctx.db
@@ -302,9 +302,12 @@ export const getPaymentMethodBreakdown = query({
       card: 0, apple_pay: 0, google_pay: 0, cash: 0, other: 0,
     }
     for (const p of rows) {
+      // Le statut "payé" dans ce schéma est "Encaissé" (il n'existe pas de
+      // statut "succeeded" — voir payments.status). Montant = totalCents (le
+      // champ "amountCents" de la spec n'existe pas ici).
       if (p.status !== "Encaissé") continue
       if (p.createdAt < from) continue
-      breakdown[normalizePaymentMethod(p.paymentMethod)] += p.subtotalCents
+      breakdown[normalizePaymentMethod(p.paymentMethod)] += p.totalCents
     }
     return breakdown
   },
