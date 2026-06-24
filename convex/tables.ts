@@ -45,11 +45,13 @@ export const getOne = query({
     if (!table) return null
     // L6 : getOne est public (flux convive). Projeter uniquement les champs
     // nécessaires au flux convive — ne JAMAIS exposer assignedMemberId, gridX,
-    // gridY, label, alert, sittingStartedAt (données internes gérant).
+    // gridY, label, alert, sittingStartedAt, isVip (données internes gérant).
+    // forcePaymentMode EST exposé : le convive en a besoin pour basculer en
+    // écran paiement quand le manager déclenche tables.forcePayment (M5).
     const { _id, restaurantId, number, capacity, status, guests,
-            amountCents, paidCents, orderItems, paidTipCents } = table
+            amountCents, paidCents, orderItems, paidTipCents, forcePaymentMode } = table
     return { _id, restaurantId, number, capacity, status, guests,
-             amountCents, paidCents, orderItems, paidTipCents }
+             amountCents, paidCents, orderItems, paidTipCents, forcePaymentMode }
   },
 })
 
@@ -431,6 +433,83 @@ export const ensureForRestaurant = mutation({
       number,
       capacity: capacity ?? 4,
       status: "free",
+    })
+  },
+})
+
+// M5 — Forcer le paiement : passe la table en "payment" et lève le flag convive.
+// La page convive (abonnée à tables.getOne) bascule en temps réel sur l'écran
+// paiement. Owner/manager only.
+export const forcePayment = mutation({
+  args: { tableId: v.id("tables") },
+  handler: async (ctx, { tableId }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+    await ctx.db.patch(tableId, { status: "payment", forcePaymentMode: true })
+  },
+})
+
+// M5 — Marquer (ou démarquer) une table VIP. Quand on active le VIP ET qu'un
+// serveur est assigné, on envoie un message chat 1:1 au serveur (même format de
+// thread que messages.send). L'expéditeur owner sans ligne `members` ne déclenche
+// pas la notif (me === null) — le flag VIP est tout de même posé. Owner/manager only.
+export const setVip = mutation({
+  args: { tableId: v.id("tables"), isVip: v.boolean() },
+  handler: async (ctx, { tableId, isVip }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+    await ctx.db.patch(tableId, { isVip })
+
+    if (isVip && table.assignedMemberId) {
+      const identity = await ctx.auth.getUserIdentity()
+      if (!identity) return
+      const me = await ctx.db
+        .query("members")
+        .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
+        .filter(q => q.eq(q.field("restaurantId"), table.restaurantId))
+        .first()
+      if (me) {
+        const threadId = [me._id.toString(), table.assignedMemberId.toString()].sort().join("|")
+        await ctx.db.insert("messages", {
+          restaurantId: table.restaurantId,
+          senderId: me._id,
+          recipientId: table.assignedMemberId,
+          threadId,
+          content: `⭐ Table ${table.number} — client VIP, attention particulière.`,
+          createdAt: Date.now(),
+          readBy: [me._id],
+        })
+      }
+    }
+  },
+})
+
+// M5 — Clôture manuelle sans encaissement (client parti, repas offert, erreur…).
+// Libère la table comme resetToFree mais marque closedWithoutPayment pour le suivi.
+// reason est accepté pour de futurs logs (non persisté ici). Owner/manager only.
+export const closeWithoutPayment = mutation({
+  args: {
+    tableId: v.id("tables"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, { tableId }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+    await ctx.db.patch(tableId, {
+      status: "free",
+      guests: 0,
+      assignedMemberId: undefined,
+      orderItems: [],
+      amountCents: 0,
+      paidCents: 0,
+      paidTipCents: 0,
+      sittingStartedAt: undefined,
+      forcePaymentMode: false,
+      isVip: false,
+      closedWithoutPayment: true,
     })
   },
 })

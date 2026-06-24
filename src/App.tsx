@@ -1,8 +1,11 @@
-import { lazy, Suspense, type ReactNode } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, LazyMotion, domAnimation } from 'framer-motion'
+import { useQuery } from 'convex/react'
 import { SessionProvider, useSession } from './context/SessionContext'
 import { PhoneWrapper } from './components/layout/PhoneWrapper'
+import { api } from '../convex/_generated/api'
+import type { Id } from '../convex/_generated/dataModel'
 
 // TableEntry est l'entrée QR — eager-load pour éviter un round-trip chunk
 // supplémentaire sur Safari iOS (économise 300-500ms sur le chemin critique).
@@ -69,10 +72,37 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+// M5 — Watcher temps réel "Forcer le paiement". Abonné à la table Convex tant
+// que le convive est dans le flow ; quand le manager déclenche tables.forcePayment
+// (forcePaymentMode → true), redirige automatiquement vers l'écran paiement.
+// TableEntry ne peut pas porter ce watch : il se démonte dès la navigation vers
+// /welcome. On garde donc le watcher monté au niveau de ConsumerAppContent.
+function ForcePaymentWatcher() {
+  const { state } = useSession()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const liveTable = useQuery(
+    api.tables.getOne,
+    state.convexTableId ? { tableId: state.convexTableId as Id<'tables'> } : 'skip',
+  )
+  useEffect(() => {
+    if (!liveTable?.forcePaymentMode) return
+    // /payment est ProtectedRoute (userName requis) : sans nom, la redirection
+    // rebondirait vers /welcome en boucle. On attend que le convive soit entré.
+    if (!state.userName.trim()) return
+    const p = location.pathname
+    // Déjà sur l'écran paiement ou au-delà → ne pas couper le flow.
+    if (p === '/payment' || p === '/confirmation' || p === '/feedback' || p === '/feedback/sent') return
+    navigate('/payment', { replace: true })
+  }, [liveTable?.forcePaymentMode, state.userName, location.pathname, navigate])
+  return null
+}
+
 function ConsumerAppContent() {
   const location = useLocation()
   return (
     <PhoneWrapper>
+      <ForcePaymentWatcher />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/t/:slug/:tableNumber" element={<TableEntry />} />

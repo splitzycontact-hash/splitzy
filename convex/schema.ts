@@ -123,6 +123,15 @@ export default defineSchema({
       paid: v.optional(v.boolean()),
     }))),
     alert: v.optional(v.boolean()),
+    // M5 — Salle interactive (actions manager). Tous optionnels → aucun document
+    // existant n'est affecté.
+    //  forcePaymentMode : la page convive bascule immédiatement en écran paiement
+    //    (réactif via tables.getOne, qui expose ce champ — voir projection getOne).
+    //  isVip            : badge VIP doré + notif chat au serveur assigné.
+    //  closedWithoutPayment : table libérée manuellement sans encaissement.
+    forcePaymentMode: v.optional(v.boolean()),
+    isVip: v.optional(v.boolean()),
+    closedWithoutPayment: v.optional(v.boolean()),
     // Module 3 — Plan de salle : serveur assigné, zone logique, position grille.
     assignedMemberId: v.optional(v.id("members")),
     zoneId: v.optional(v.id("zones")),
