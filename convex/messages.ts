@@ -76,12 +76,16 @@ export const send = mutation({
       ? [me._id, recipientId].sort().join("|")
       : "broadcast"
 
+    // L10 : rejeter un message vide (après trim) — pas d'insert de contenu vide.
+    const body = content.trim().slice(0, 1000)
+    if (!body) throw new Error("Message vide")
+
     return ctx.db.insert("messages", {
       restaurantId,
       senderId: me._id,
       recipientId,
       threadId,
-      content: content.trim().slice(0, 1000),
+      content: body,
       createdAt: Date.now(),
       readBy: [me._id], // l'expéditeur a déjà "lu" son propre message
     })

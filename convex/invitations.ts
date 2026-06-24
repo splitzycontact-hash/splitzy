@@ -232,10 +232,9 @@ export const accept = mutation({
   },
   handler: async (ctx, { token, firstName, lastName }) => {
     const identity = await ctx.auth.getUserIdentity()
-    // Diagnostic prod : on logge l'identité complète pour voir ce que le JWT
-    // Clerk transmet réellement (en particulier si le claim `email` est émis).
-    // Visible via `npx convex logs`. À retirer une fois le template JWT stabilisé.
-    console.log("[invitations.accept] identity:", JSON.stringify(identity))
+    // Diagnostic prod : on logge UNIQUEMENT la présence du claim `email` du JWT
+    // Clerk (jamais l'identité complète — PII). Visible via `npx convex logs`.
+    console.log("[invitations.accept] identity.hasEmail:", !!identity?.email)
     if (!identity) {
       // JWT Clerk non reçu côté Convex : template "convex" absent ou token pas
       // encore rafraîchi. ConvexError → le message remonte au client (un

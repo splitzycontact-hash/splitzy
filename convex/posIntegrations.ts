@@ -185,7 +185,7 @@ export const getByProviderInternal = internalQuery({
 // ── POS-specific sync handlers ─────────────────────────────────────────────
 
 async function syncSquare(apiKey: string, locationId: string) {
-  const res = await fetch("https://connect.squareupsandbox.com/v2/orders/search", {
+  const res = await fetch("https://connect.squareup.com/v2/orders/search", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,

@@ -30,6 +30,9 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const table = await ctx.db.get(args.tableId)
     if (!table || table.restaurantId !== args.restaurantId) throw new Error("Table introuvable pour ce restaurant")
+    // L11 : borner les tags (entrée publique flux convive) — anti-abus.
+    if (args.tags.length > 10) throw new Error("Trop de tags")
+    if (args.tags.some(t => t.length > 50)) throw new Error("Tag trop long")
     const stars = Math.max(1, Math.min(5, Math.round(args.stars)))
     const text = (args.text ?? "").slice(0, 2000)
     const now = Date.now()

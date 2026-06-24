@@ -41,7 +41,15 @@ export const list = query({
 export const getOne = query({
   args: { tableId: v.id("tables") },
   handler: async (ctx, { tableId }) => {
-    return (await ctx.db.get(tableId)) ?? null
+    const table = await ctx.db.get(tableId)
+    if (!table) return null
+    // L6 : getOne est public (flux convive). Projeter uniquement les champs
+    // nécessaires au flux convive — ne JAMAIS exposer assignedMemberId, gridX,
+    // gridY, label, alert, sittingStartedAt (données internes gérant).
+    const { _id, restaurantId, number, capacity, status, guests,
+            amountCents, paidCents, orderItems, paidTipCents } = table
+    return { _id, restaurantId, number, capacity, status, guests,
+             amountCents, paidCents, orderItems, paidTipCents }
   },
 })
 
