@@ -5,7 +5,7 @@ import {
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import { toast } from 'sonner'
-import { UserPlus, X, Check, Power, Users, Star, Unlock, Download } from 'lucide-react'
+import { UserPlus, X, Check, Power, Users, Star, Unlock, Download, Coins, Send, ChefHat } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId } from '../context/RestaurantContext'
@@ -29,6 +29,21 @@ const TABLE_PREFIX = 'table:'
 // sinon un shift créé ici n'apparaîtrait pas dans le roster du jour.
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+// M11-B — Libellés FR du mode de répartition (restaurants.tipSettings.mode) et
+// du rôle d'un membre, affichés dans le récap de clôture.
+const TIP_MODE_LABEL: Record<string, string> = {
+  equal: 'Égalitaire',
+  hours: 'Prorata heures',
+  points: 'Par coefficient',
+  table: 'Par table',
+  revenue: 'Par CA',
+}
+const ROLE_LABEL: Record<string, string> = {
+  owner: 'Propriétaire',
+  manager: 'Manager',
+  staff: 'Équipier',
 }
 
 // Serveur du roster, draggable. Affiche pastille colorée + pointage + retrait.
@@ -194,6 +209,11 @@ export function SallePage() {
     api.payments.list,
     restaurantId ? { restaurantId, from: todayStart } : 'skip',
   )
+  // M11-B — Répartition des pourboires selon restaurants.tipSettings (mode + part cuisine).
+  const tipDist = useQuery(
+    api.closures.getTipDistribution,
+    restaurantId ? { restaurantId, serviceDate: todayKey() } : 'skip',
+  )
 
   const assignServer = useMutation(api.tables.assignServer)
   const clearAll = useMutation(api.tables.clearAllAssignments)
@@ -307,6 +327,11 @@ export function SallePage() {
     await clearAll({ restaurantId })
     setShowRecap(false)
     toast.success('Service clôturé')
+  }
+
+  // M11-C — Envoi du rapport de répartition (email/PDF aux équipiers). Stub pour l'instant.
+  function handleSendReport() {
+    toast.info('Envoi du rapport — disponible prochainement')
   }
 
   // Stats du jour (paiements encaissés) + export CSV (séparateur `;`, BOM Excel FR).
@@ -495,7 +520,7 @@ export function SallePage() {
 
       {showRecap && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md mx-4">
+          <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-lg mx-4 max-h-[88vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-dark">Récap du service</h2>
               <button onClick={() => setShowRecap(false)}><X size={20} /></button>
@@ -514,6 +539,65 @@ export function SallePage() {
                 </div>
               ))}
             </div>
+
+            {/* M11-B — Répartition des pourboires selon tipSettings */}
+            {tipDist && tipDist.totalTips > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Coins size={16} className="text-brand" />
+                    <h3 className="text-sm font-bold text-dark">Répartition des pourboires</h3>
+                  </div>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-bg text-brand">
+                    {TIP_MODE_LABEL[tipDist.mode] ?? tipDist.mode}
+                  </span>
+                </div>
+
+                <div className="bg-bg rounded-xl p-4 mb-3 flex items-center justify-between">
+                  <span className="text-xs text-muted">Total collecté ce soir</span>
+                  <span className="text-lg font-bold text-dark">{(tipDist.totalTips / 100).toFixed(2)} €</span>
+                </div>
+
+                {tipDist.kitchenShare > 0 && (
+                  <div className="flex items-center justify-between px-4 py-2 mb-3 rounded-lg border border-border">
+                    <span className="flex items-center gap-1.5 text-sm text-mid"><ChefHat size={14} /> Cuisine</span>
+                    <span className="text-sm font-semibold text-dark">{(tipDist.kitchenShare / 100).toFixed(2)} €</span>
+                  </div>
+                )}
+
+                {tipDist.distribution.length > 0 ? (
+                  <div className="rounded-xl border border-border overflow-hidden">
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 bg-bg text-[11px] font-semibold text-muted uppercase tracking-wide">
+                      <span>Serveur</span>
+                      <span className="text-center">Tables</span>
+                      <span className="text-right">Montant</span>
+                    </div>
+                    {tipDist.distribution.map((d) => (
+                      <div key={d.memberId} className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2.5 border-t border-border items-center">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-dark truncate">{d.name}</p>
+                          <p className="text-[11px] text-muted">{ROLE_LABEL[d.role] ?? d.role}</p>
+                        </div>
+                        <span className="text-sm text-mid text-center tabular-nums">{d.tablesServed}</span>
+                        <span className="text-sm font-bold text-dark text-right tabular-nums flex items-center gap-1 justify-end">
+                          {(d.amountCents / 100).toFixed(2)} € <Star size={12} className="text-brand" fill="currentColor" />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted text-center py-3">Aucun serveur éligible à la répartition.</p>
+                )}
+
+                <button
+                  onClick={handleSendReport}
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-dark text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  <Send size={15} /> Envoyer le rapport
+                </button>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={exportCSV}
