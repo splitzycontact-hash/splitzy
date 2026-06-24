@@ -57,22 +57,57 @@ export const updateStatus = mutation({
     tableId: v.id("tables"),
     status: v.union(v.literal("free"), v.literal("dining"), v.literal("payment"), v.literal("paid")),
     guests: v.optional(v.number()),
+    // M2 : amountCents honoré UNIQUEMENT pour un appelant authentifié (owner/manager,
+    // ex. dashboard simulate/send modal). Un convive anonyme ne peut PAS fixer la
+    // note — elle vient du POS / du gérant, jamais du client public.
     amountCents: v.optional(v.number()),
     orderItems: v.optional(v.array(v.object({
       name: v.string(),
       qty: v.number(),
       unitCents: v.number(),
     }))),
+    // M2 : cross-check IDOR — si fourni (flux convive), la table DOIT appartenir
+    // à ce restaurant (résolu depuis le slug scanné côté client).
+    restaurantId: v.optional(v.id("restaurants")),
   },
-  handler: async (ctx, { tableId, status, guests, amountCents, orderItems }) => {
+  handler: async (ctx, { tableId, status, guests, amountCents, orderItems, restaurantId }) => {
     const existing = await ctx.db.get(tableId)
     if (!existing) throw new Error("Table introuvable")
+
+    // M2 (IDOR) : la table scannée doit appartenir au restaurant du slug. Échoue
+    // si un tableId d'un autre restaurant est passé avec un restaurantId connu.
+    if (restaurantId !== undefined && existing.restaurantId !== restaurantId) {
+      throw new Error("Table invalide")
+    }
+
+    // Appelant authentifié owner/manager (dashboard) ? Sinon = convive anonyme.
+    let isStaff = false
+    try {
+      await requireRestaurantAccess(ctx, existing.restaurantId, ["owner", "manager"])
+      isStaff = true
+    } catch { /* convive anonyme : non authentifié → restrictions M2 ci-dessous */ }
+
+    // M2 : convive anonyme — seules les transitions du flux convive sont permises.
+    // Le gérant authentifié garde tous les droits (reset, re-simulation, etc.).
+    if (!isStaff) {
+      const ALLOWED: Record<string, string[]> = {
+        free: ["dining"],
+        dining: ["payment"],
+        payment: ["paid"],
+      }
+      if (!ALLOWED[existing.status]?.includes(status)) {
+        throw new Error(`Transition ${existing.status}→${status} non autorisée`)
+      }
+    }
+
     const patch: Record<string, unknown> = { status }
     if (guests !== undefined) patch.guests = Math.max(0, guests)
-    if (amountCents !== undefined) {
+
+    // M2 : amountCents (la note) n'est patché QUE pour un gérant authentifié — un
+    // convive anonyme ne peut pas injecter un montant arbitraire.
+    if (isStaff && amountCents !== undefined) {
       patch.amountCents = Math.max(0, amountCents)
-      const wasFreshSitting = !existing
-        || existing.status === "free"
+      const wasFreshSitting = existing.status === "free"
         || existing.status === "paid"
         || (existing.paidCents ?? 0) === 0
       if (wasFreshSitting) {

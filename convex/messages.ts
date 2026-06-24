@@ -104,6 +104,8 @@ export const markRead = mutation({
     const tid = recipientId
       ? [me._id.toString(), recipientId.toString()].sort().join("|")
       : threadId ?? "broadcast"
+    // M3 : ne marquer lu qu'un thread dont on est participant (broadcast = public).
+    if (tid !== "broadcast" && !tid.split("|").includes(me._id.toString())) return
     const msgs = await ctx.db
       .query("messages")
       .withIndex("by_restaurant_thread", (q) =>
@@ -129,11 +131,16 @@ export const listThread = query({
   },
   handler: async (ctx, { restaurantId, threadId, recipientId }) => {
     await requireRestaurantAccess(ctx, restaurantId)
+    const me = await getMe(ctx, restaurantId)
     let tid = threadId ?? "broadcast"
     if (recipientId) {
-      const me = await getMe(ctx, restaurantId)
       if (!me) return []
       tid = [me._id.toString(), recipientId.toString()].sort().join("|")
+    }
+    // M3 : garde participant — un thread 1:1 "[a]|[b]" n'est lisible que par a et b.
+    // Bloque un staff qui reconstruirait un threadId pour lire des DMs tiers.
+    if (tid !== "broadcast" && me && !tid.split("|").includes(me._id.toString())) {
+      return []
     }
     const msgs = await ctx.db
       .query("messages")
@@ -185,8 +192,13 @@ export const listConversations = query({
       threads.push({ threadId, lastMsg, unread })
     }
 
-    // Accès libre : toutes les conversations sont visibles par tout membre.
-    return threads.sort((a, b) => b.lastMsg.createdAt - a.lastMsg.createdAt)
+    // M3 : ne renvoyer que les threads dont `me` est participant (broadcast = public).
+    // Un staff ne voit plus les DMs 1:1 owner↔manager auxquels il ne participe pas.
+    const visible = threads.filter(({ threadId }) =>
+      threadId === "broadcast" ||
+      (me ? threadId.split("|").includes(me._id.toString()) : false),
+    )
+    return visible.sort((a, b) => b.lastMsg.createdAt - a.lastMsg.createdAt)
   },
 })
 

@@ -130,6 +130,7 @@ export function TableEntry() {
         tableId: ctx.table!._id,
         status: 'dining',
         guests: ctx.table!.capacity ?? 4,
+        restaurantId: ctx.restaurant._id, // M2 : cross-check IDOR côté backend
       }).catch(err => console.error('[TableEntry] updateStatus failed', err))
 
       // /welcome est l'écran d'entrée consumer (Landing). /items est protégée
