@@ -22,6 +22,31 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
 const HEAT_HOURS = ['11','12','13','14','15','16','17','18','19','20','21','22']
 const HEAT_COLORS = ['#F4F4F5','#FFEAC2','#FFCF85','#F5A435','#D9810E','#A8650B']
 
+// Répartition des moyens de paiement — buckets sémantiques + couleurs du donut.
+// payments.paymentMethod est un v.string() libre : le client envoie la marque de
+// carte (visa/mastercard/amex), 'card', 'apple_pay', 'google_pay', et 'cash' pour
+// un règlement espèces. On regroupe ces valeurs brutes en 4 familles + "autre".
+type PayBucket = 'card' | 'apple_pay' | 'google_pay' | 'cash' | 'other'
+const PAY_META: Record<PayBucket, { label: string; color: string }> = {
+  card:       { label: 'Carte bancaire', color: '#3B82F6' }, // CB — bleu
+  apple_pay:  { label: 'Apple Pay',      color: '#18181B' }, // noir
+  google_pay: { label: 'Google Pay',     color: '#22C55E' }, // vert
+  cash:       { label: 'Espèces',        color: '#9CA3AF' }, // gris
+  other:      { label: 'Autre',          color: '#D4D4D8' },
+}
+const PAY_ORDER: PayBucket[] = ['card', 'apple_pay', 'google_pay', 'cash', 'other']
+function toPayBucket(m: string | undefined): PayBucket {
+  const k = (m ?? '').toLowerCase()
+  if (k === 'apple_pay') return 'apple_pay'
+  if (k === 'google_pay') return 'google_pay'
+  if (k === 'cash' || k === 'especes' || k === 'espèces') return 'cash'
+  if (k === 'visa' || k === 'mastercard' || k === 'amex' || k === 'card' || k === 'cb') return 'card'
+  return k ? 'other' : 'card' // méthode vide (démo historique) → supposée carte
+}
+// Géométrie du donut SVG (rayon / circonférence pour le strokeDasharray)
+const DONUT_R = 52
+const DONUT_C = 2 * Math.PI * DONUT_R
+
 type ConvexPayment = {
   totalCents: number; tipCents: number; subtotalCents: number;
   createdAt: number; status: string; guests: number; tableNumber: number; paymentMethod?: string
@@ -519,21 +544,38 @@ export function Analytics() {
     ? (encaisse.length / totalTables / nbJours).toFixed(1)
     : '—'
 
-  // Répartition des moyens de paiement (sur la période filtrée)
+  // Répartition des moyens de paiement (sur la période filtrée) — regroupée par
+  // famille (carte / Apple Pay / Google Pay / espèces / autre) pour le donut.
   const paymentSplit = (() => {
-    const methodMap: Record<string, { count: number; cents: number }> = {}
-    for (const p of encaisse) {
-      const m = p.paymentMethod ?? 'Autre'
-      if (!methodMap[m]) methodMap[m] = { count: 0, cents: 0 }
-      methodMap[m].count++
-      methodMap[m].cents += p.subtotalCents
+    const acc: Record<PayBucket, { count: number; cents: number }> = {
+      card:       { count: 0, cents: 0 }, apple_pay: { count: 0, cents: 0 },
+      google_pay: { count: 0, cents: 0 }, cash:      { count: 0, cents: 0 },
+      other:      { count: 0, cents: 0 },
     }
-    const rows = Object.entries(methodMap)
-      .map(([method, v]) => ({ method, count: v.count, cents: v.cents }))
+    for (const p of encaisse) {
+      const b = toPayBucket(p.paymentMethod)
+      acc[b].count++
+      acc[b].cents += p.subtotalCents
+    }
+    const totalCents = PAY_ORDER.reduce((s, b) => s + acc[b].cents, 0)
+    return PAY_ORDER
+      .map(b => ({
+        bucket: b, label: PAY_META[b].label, color: PAY_META[b].color,
+        count: acc[b].count, cents: acc[b].cents,
+        pct: totalCents > 0 ? Math.round((acc[b].cents / totalCents) * 100) : 0,
+      }))
+      .filter(r => r.cents > 0)
       .sort((a, b) => b.cents - a.cents)
-    const totalCents = rows.reduce((s, r) => s + r.cents, 0)
-    return rows.map(r => ({ ...r, pct: totalCents > 0 ? Math.round((r.cents / totalCents) * 100) : 0 }))
   })()
+  const paymentTotalCents = paymentSplit.reduce((s, r) => s + r.cents, 0)
+  // Segments cumulatifs du donut. offset (-dashoffset) = début du segment, calculé
+  // depuis la somme des cents qui précèdent (pas de réassignation pendant le render).
+  const donutSegments = paymentSplit.map((r, i) => {
+    const before = paymentSplit.slice(0, i).reduce((s, x) => s + x.cents, 0)
+    const frac = paymentTotalCents > 0 ? r.cents / paymentTotalCents : 0
+    const beforeFrac = paymentTotalCents > 0 ? before / paymentTotalCents : 0
+    return { color: r.color, dash: frac * DONUT_C, offset: -beforeFrac * DONUT_C }
+  })
 
   // Temps moyen d'encaissement : amplitude des paiements d'une même table sur une journée
   const tableTimeAvg = (() => {
@@ -1115,17 +1157,45 @@ export function Analytics() {
               {encaisse.length} paiement{encaisse.length > 1 ? 's' : ''}
             </span>
           </div>
-          <div className="px-5 py-4 space-y-3">
-            {paymentSplit.length > 0 ? paymentSplit.map(row => (
-              <div key={row.method} className="flex items-center gap-3">
-                <span className="text-[12.5px] font-medium ds-text-primary w-24 flex-shrink-0 truncate">{row.method}</span>
-                <div className="flex-1 h-[8px] rounded-full overflow-hidden" style={{ background: 'var(--ds-bg-subtle)' }}>
-                  <div className="h-full rounded-full transition-all" style={{ width: `${row.pct}%`, background: '#E8920A' }} />
+          <div className="px-5 py-5">
+            {paymentSplit.length > 0 ? (
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                {/* Donut SVG (hand-rolled, cohérent avec les autres charts) */}
+                <div className="relative flex-shrink-0" style={{ width: 140, height: 140 }}>
+                  <svg viewBox="0 0 140 140" style={{ width: 140, height: 140, display: 'block' }}>
+                    <circle cx="70" cy="70" r={DONUT_R} fill="none" stroke="var(--ds-bg-subtle)" strokeWidth="18" />
+                    {donutSegments.map((seg, i) => (
+                      <circle
+                        key={i}
+                        cx="70" cy="70" r={DONUT_R}
+                        fill="none"
+                        stroke={seg.color}
+                        strokeWidth="18"
+                        strokeDasharray={`${seg.dash} ${DONUT_C - seg.dash}`}
+                        strokeDashoffset={seg.offset}
+                        transform="rotate(-90 70 70)"
+                        style={{ transition: 'stroke-dasharray .4s ease' }}
+                      />
+                    ))}
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="font-extrabold text-[18px] tabular-nums ds-text-primary leading-none">{formatEur(paymentTotalCents)}</span>
+                    <span className="text-[10.5px] ds-text-tertiary mt-1">encaissé</span>
+                  </div>
                 </div>
-                <span className="text-[12px] ds-text-tertiary tabular-nums w-10 text-right flex-shrink-0">{row.pct}%</span>
-                <span className="font-semibold text-[13px] ds-text-primary tabular-nums w-16 text-right flex-shrink-0">{formatEur(row.cents)}</span>
+                {/* Légende : pastille couleur · libellé · % · montant */}
+                <div className="flex-1 w-full space-y-2.5">
+                  {paymentSplit.map(row => (
+                    <div key={row.bucket} className="flex items-center gap-3">
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: row.color }} />
+                      <span className="text-[12.5px] font-medium ds-text-primary flex-1 truncate">{row.label}</span>
+                      <span className="text-[12px] ds-text-tertiary tabular-nums w-10 text-right flex-shrink-0">{row.pct}%</span>
+                      <span className="font-semibold text-[13px] ds-text-primary tabular-nums w-16 text-right flex-shrink-0">{formatEur(row.cents)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            )) : <div className="text-[12px] ds-text-tertiary py-4 text-center">Aucun paiement sur cette période</div>}
+            ) : <div className="text-[12px] ds-text-tertiary py-4 text-center">Aucun paiement sur cette période</div>}
           </div>
         </div>
 
