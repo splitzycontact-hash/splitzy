@@ -9,7 +9,7 @@ import {
   Download, Store, QrCode, UserCog, Bell, UserRound,
   CreditCard, Sparkles, Plus, MoreHorizontal, Trash2,
   Check, Shield, KeyRound, ChevronRight, Utensils, Beer, Coffee, Upload, X,
-  Mail, Phone, Archive, History, Pencil, LayoutGrid,
+  Mail, Phone, Archive, History, Pencil, LayoutGrid, Coins,
 } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
@@ -26,12 +26,13 @@ import { generateBillingInvoicePDF, downloadAllInvoices, type BillingInvoiceData
 // dashboard.clerk.com (instance clerk.splitzy.fr).
 const FEATURE_MFA_ENABLED = false
 
-type SectionKey = 'restaurant' | 'menu' | 'tables' | 'qr' | 'notifications' | 'pos' | 'billing' | 'team' | 'account' | 'plan'
+type SectionKey = 'restaurant' | 'menu' | 'tables' | 'qr' | 'tips' | 'notifications' | 'pos' | 'billing' | 'team' | 'account' | 'plan'
 
 const SUB_NAV: { key: SectionKey; label: string; icon: React.ElementType; pendingDot?: boolean }[] = [
   { key: 'restaurant',    label: 'Restaurant',       icon: Store       },
   { key: 'tables',        label: 'Tables & Plan',     icon: LayoutGrid  },
   { key: 'qr',            label: 'QR Codes',          icon: QrCode      },
+  { key: 'tips',          label: 'Pourboires',        icon: Coins       },
   { key: 'team',          label: 'Équipe',            icon: UserCog, pendingDot: true },
   { key: 'notifications', label: 'Notifications',    icon: Bell        },
   { key: 'account',       label: 'Compte',            icon: UserRound   },
@@ -4053,6 +4054,159 @@ function TablesSection() {
   )
 }
 
+type TipMode = 'equal' | 'hours' | 'points' | 'table' | 'revenue'
+
+const TIP_MODES: { id: TipMode; label: string; desc: string }[] = [
+  { id: 'equal',   label: 'Égalitaire',           desc: 'Pot commun réparti à parts égales entre tous les présents.' },
+  { id: 'hours',   label: 'Au prorata des heures', desc: 'Réparti selon les heures travaillées (check-in / check-out).' },
+  { id: 'points',  label: 'Par coefficient',       desc: 'Chaque rôle reçoit un coefficient (points).' },
+  { id: 'table',   label: 'Par table',             desc: 'Réparti selon les tables assignées à chaque membre.' },
+  { id: 'revenue', label: 'Par CA',                desc: "Au prorata du chiffre d'affaires encaissé par chacun." },
+]
+
+const INPUT_STYLE = {
+  background: 'var(--ds-bg-surface)',
+  borderColor: 'var(--ds-border)',
+  color: 'var(--ds-text-primary)',
+  fontSize: '16px',
+} as const
+
+function TipSettingsSection({ restaurant, restaurantId }: { restaurant: any; restaurantId: Id<'restaurants'> | null | undefined }) {
+  const updateTipSettings = useMutation((api.restaurants as any).updateTipSettings)
+  const existing = restaurant?.tipSettings as
+    | { mode: TipMode; kitchenSharePct?: number; roleCoefficients?: { owner?: number; manager?: number; staff?: number } }
+    | undefined
+
+  const [mode, setMode] = useState<TipMode>(existing?.mode ?? 'equal')
+  const [kitchenSharePct, setKitchenSharePct] = useState<number>(existing?.kitchenSharePct ?? 0)
+  const [coeffs, setCoeffs] = useState({
+    owner:   existing?.roleCoefficients?.owner   ?? 1,
+    manager: existing?.roleCoefficients?.manager ?? 1,
+    staff:   existing?.roleCoefficients?.staff   ?? 0.8,
+  })
+  const [saving, setSaving] = useState(false)
+
+  // Resync once the restaurant doc loads.
+  useEffect(() => {
+    const e = restaurant?.tipSettings
+    if (!e) return
+    setMode(e.mode)
+    setKitchenSharePct(e.kitchenSharePct ?? 0)
+    setCoeffs({
+      owner:   e.roleCoefficients?.owner   ?? 1,
+      manager: e.roleCoefficients?.manager ?? 1,
+      staff:   e.roleCoefficients?.staff   ?? 0.8,
+    })
+  }, [restaurant?._id])
+
+  // "table" et "revenue" répartissent déjà par contribution → pas de part cuisine.
+  const showKitchen = mode !== 'table' && mode !== 'revenue'
+
+  async function handleSave() {
+    if (!restaurantId) return
+    setSaving(true)
+    try {
+      const payload: any = { mode }
+      if (showKitchen && kitchenSharePct > 0) payload.kitchenSharePct = kitchenSharePct
+      if (mode === 'points') {
+        payload.roleCoefficients = { owner: coeffs.owner, manager: coeffs.manager, staff: coeffs.staff }
+      }
+      await updateTipSettings({ restaurantId, tipSettings: payload })
+      toast.success('Paramètres sauvegardés')
+    } catch {
+      toast.error("Échec de l'enregistrement")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="ds-panel">
+      <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+        <div>
+          <div className="font-bold text-[13.5px] ds-text-primary">Répartition des pourboires</div>
+          <div className="text-[12px] ds-text-tertiary mt-0.5">Comment les pourboires sont partagés à la clôture du service</div>
+        </div>
+      </div>
+
+      <div className="px-5 py-5 space-y-5">
+        {/* Mode */}
+        <div>
+          <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Mode de répartition</label>
+          <select
+            value={mode}
+            onChange={e => setMode(e.target.value as TipMode)}
+            className="w-full rounded-lg border px-3 py-2 outline-none"
+            style={INPUT_STYLE}
+          >
+            {TIP_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+          <div className="text-[12px] ds-text-tertiary mt-1.5">{TIP_MODES.find(m => m.id === mode)?.desc}</div>
+        </div>
+
+        {/* Coefficients par rôle — mode "points" */}
+        {mode === 'points' && (
+          <div>
+            <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Coefficients par rôle</label>
+            <div className="grid grid-cols-3 gap-3">
+              {([['owner', 'Propriétaire'], ['manager', 'Manager'], ['staff', 'Équipier']] as const).map(([k, label]) => (
+                <div key={k}>
+                  <div className="text-[11.5px] ds-text-tertiary mb-1">{label}</div>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={coeffs[k]}
+                    onChange={e => setCoeffs(c => ({ ...c, [k]: Math.max(0, Number(e.target.value) || 0) }))}
+                    className="w-full rounded-lg border px-3 py-2 outline-none"
+                    style={INPUT_STYLE}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* % cuisine — sauf table / revenue */}
+        {showKitchen && (
+          <div>
+            <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">
+              % pour la cuisine <span className="ds-text-tertiary font-normal">(optionnel)</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={30}
+                step={1}
+                value={kitchenSharePct}
+                onChange={e => setKitchenSharePct(Math.max(0, Math.min(30, Number(e.target.value) || 0)))}
+                className="w-28 rounded-lg border px-3 py-2 outline-none"
+                style={INPUT_STYLE}
+              />
+              <span className="text-[13px] ds-text-tertiary">% du pot commun reversé à la cuisine (0–30)</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div
+        className="flex items-center justify-end px-5 py-3 border-t"
+        style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}
+      >
+        <button
+          onClick={handleSave}
+          disabled={saving || !restaurantId}
+          className="px-4 py-2 rounded-lg text-white text-[13px] font-semibold transition-colors disabled:opacity-50"
+          style={{ background: '#E8920A' }}
+        >
+          {saving ? 'Enregistrement…' : 'Enregistrer'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function Settings() {
   const restaurant = useRestaurant()
   const restaurantId = useRestaurantId()
@@ -4357,6 +4511,10 @@ export function Settings() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {section === 'tips' && (
+              <TipSettingsSection restaurant={restaurant} restaurantId={restaurantId} />
             )}
 
             {section === 'pos' && (

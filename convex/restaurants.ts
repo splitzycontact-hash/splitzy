@@ -47,6 +47,33 @@ export const updateSpecialMessage = mutation({
   },
 })
 
+// M11 — Répartition des pourboires (clôture de service). Owner/manager seulement.
+// tipSettings absent ⇒ défaut "equal" côté calcul (ce champ reste optionnel en DB).
+export const updateTipSettings = mutation({
+  args: {
+    restaurantId: v.id("restaurants"),
+    tipSettings: v.object({
+      mode: v.union(
+        v.literal("equal"),
+        v.literal("hours"),
+        v.literal("points"),
+        v.literal("table"),
+        v.literal("revenue"),
+      ),
+      kitchenSharePct: v.optional(v.number()),
+      roleCoefficients: v.optional(v.object({
+        owner: v.optional(v.number()),
+        manager: v.optional(v.number()),
+        staff: v.optional(v.number()),
+      })),
+    }),
+  },
+  handler: async (ctx, { restaurantId, tipSettings }) => {
+    await requireRestaurantAccess(ctx, restaurantId, ["owner", "manager"])
+    await ctx.db.patch(restaurantId, { tipSettings })
+  },
+})
+
 // Message spécial (plat du jour…) affiché au convive ANONYME sur l'écran de
 // paiement. Public, par restaurantId (id Convex non énumérable). Ne renvoie QUE
 // ce champ cosmétique destiné à tous les clients — aucune donnée sensible.

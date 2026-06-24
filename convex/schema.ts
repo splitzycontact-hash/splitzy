@@ -27,6 +27,23 @@ export default defineSchema({
     // Module 3 — Plan de salle : dimensions de la grille du plan (défaut 12×8).
     floorGridCols: v.optional(v.number()),
     floorGridRows: v.optional(v.number()),
+    // M11 — Répartition des pourboires (clôture de service). Optionnel : défaut
+    // "equal" si absent (restos existants non affectés). Voir restaurants.updateTipSettings.
+    tipSettings: v.optional(v.object({
+      mode: v.union(
+        v.literal("equal"),    // pot commun égalitaire
+        v.literal("hours"),    // prorata heures travaillées
+        v.literal("points"),   // coefficients par rôle
+        v.literal("table"),    // par tables assignées
+        v.literal("revenue"),  // prorata CA encaissé
+      ),
+      kitchenSharePct: v.optional(v.number()), // 0-100, % pour la cuisine
+      roleCoefficients: v.optional(v.object({  // mode "points" uniquement
+        owner: v.optional(v.number()),
+        manager: v.optional(v.number()),
+        staff: v.optional(v.number()),
+      })),
+    })),
   }).index("by_slug", ["slug"])
     .index("by_clerk_user", ["clerkUserId"]),
 
