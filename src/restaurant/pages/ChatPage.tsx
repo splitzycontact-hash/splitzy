@@ -8,6 +8,7 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId } from '../context/RestaurantContext'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
+import { useServiceStartTs } from '../hooks/useServiceStartTs'
 
 // 4 couleurs cycliques pour les avatars-initiales (alignées palette app).
 const AVATAR_COLORS = ['#E8920A', '#3B82F6', '#8B5CF6', '#10B981']
@@ -76,17 +77,18 @@ export function ChatPage() {
   const [draft, setDraft] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  const sinceTs = useServiceStartTs()
   const members = useMembersQuery()
   const conversations = useQuery(
     api.messages.listConversations,
-    restaurantId ? { restaurantId } : 'skip',
+    restaurantId ? { restaurantId, sinceTs } : 'skip',
   )
   const messages = useQuery(
     api.messages.listThread,
     restaurantId
       ? selectedMemberId
-        ? { restaurantId, recipientId: selectedMemberId }
-        : { restaurantId, threadId: 'broadcast' }
+        ? { restaurantId, recipientId: selectedMemberId, sinceTs }
+        : { restaurantId, threadId: 'broadcast', sinceTs }
       : 'skip',
   )
   const sendMsg = useMutation(api.messages.send)
@@ -200,7 +202,9 @@ export function ChatPage() {
           <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
             {messages && messages.length === 0 && (
               <div className="m-auto text-center ds-text-tertiary text-[13px]">
-                Aucun message — commencez la conversation !
+                {!selectedMemberId
+                  ? 'Aucun message depuis le début du service.'
+                  : 'Aucun message — commencez la conversation !'}
               </div>
             )}
             {messages?.map(msg => {

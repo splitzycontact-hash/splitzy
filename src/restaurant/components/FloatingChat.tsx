@@ -5,6 +5,7 @@ import { MessageSquare, X, ChevronLeft, Send, Users } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { useUser } from '@clerk/clerk-react'
 import type { Id } from '../../../convex/_generated/dataModel'
+import { useServiceStartTs } from '../hooks/useServiceStartTs'
 
 // 4 couleurs cycliques pour les avatars-initiales (alignées ChatPage).
 const AVATAR_COLORS = ['#E8920A', '#3B82F6', '#8B5CF6', '#10B981']
@@ -29,13 +30,14 @@ export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'>
   const [draft, setDraft] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const convos = useQuery(api.messages.listConversations, { restaurantId })
+  const sinceTs = useServiceStartTs()
+  const convos = useQuery(api.messages.listConversations, { restaurantId, sinceTs })
   const members = useQuery(api.members.getTeamMembers, { restaurantId })
   const msgs = useQuery(api.messages.listThread,
     activeId !== undefined
       ? activeId === null
-        ? { restaurantId, threadId: 'broadcast' }
-        : { restaurantId, recipientId: activeId }
+        ? { restaurantId, threadId: 'broadcast', sinceTs }
+        : { restaurantId, recipientId: activeId, sinceTs }
       : 'skip'
   )
   const sendMsg = useMutation(api.messages.send)
@@ -191,7 +193,9 @@ export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'>
               <div className="flex-1 overflow-y-auto px-3.5 py-3 flex flex-col gap-2">
                 {msgs && msgs.length === 0 && (
                   <div className="m-auto text-center ds-text-tertiary text-[12.5px]">
-                    Aucun message — commencez la conversation !
+                    {activeId === null
+                      ? 'Aucun message depuis le début du service.'
+                      : 'Aucun message — commencez la conversation !'}
                   </div>
                 )}
                 {msgs?.map(msg => {

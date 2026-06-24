@@ -8,6 +8,7 @@ import { useUser, useClerk } from '@clerk/clerk-react'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { useRestaurant, useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
+import { useServiceStartTs } from '../hooks/useServiceStartTs'
 import { StandaloneThemeToggle } from '../components/StandaloneThemeToggle'
 import { ROLE_LABEL, type RestaurantRole } from '../lib/roles'
 
@@ -174,9 +175,10 @@ export function Sidebar() {
     api.feedbacks.getNewCount,
     restaurantId ? { restaurantId } : 'skip',
   ) ?? 0
+  const sinceTs = useServiceStartTs()
   const unread = useQuery(
     api.messages.getUnreadCount,
-    restaurantId ? { restaurantId } : 'skip',
+    restaurantId ? { restaurantId, sinceTs } : 'skip',
   ) ?? 0
 
   return (

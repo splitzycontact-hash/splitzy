@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import { useRestaurantId } from '../context/RestaurantContext'
+import { useServiceStartTs } from './useServiceStartTs'
 
 // Notifie le gérant/staff d'un nouveau message chat : toast Sonner (si on n'est
 // pas déjà sur /restaurant/chat) + Notification navigateur (si l'onglet est
@@ -13,8 +14,9 @@ export function useChatNotifications() {
   const location = useLocation()
   const onChatPage = location.pathname === '/restaurant/chat'
 
+  const sinceTs = useServiceStartTs()
   const members = useQuery(api.members.getTeamMembers, restaurantId ? { restaurantId } : 'skip')
-  const conversations = useQuery(api.messages.listConversations, restaurantId ? { restaurantId } : 'skip')
+  const conversations = useQuery(api.messages.listConversations, restaurantId ? { restaurantId, sinceTs } : 'skip')
 
   const prevUnread = useRef<Record<string, number>>({})
   const initialized = useRef(false)

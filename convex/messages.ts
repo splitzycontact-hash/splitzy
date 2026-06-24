@@ -132,8 +132,10 @@ export const listThread = query({
     restaurantId: v.id("restaurants"),
     threadId: v.optional(v.string()),
     recipientId: v.optional(v.id("members")),
+    // M6-A : timestamp début de service — masque les messages des services précédents.
+    sinceTs: v.optional(v.number()),
   },
-  handler: async (ctx, { restaurantId, threadId, recipientId }) => {
+  handler: async (ctx, { restaurantId, threadId, recipientId, sinceTs }) => {
     await requireRestaurantAccess(ctx, restaurantId)
     const me = await getMe(ctx, restaurantId)
     let tid = threadId ?? "broadcast"
@@ -153,15 +155,20 @@ export const listThread = query({
       )
       .order("desc")
       .take(60)
-    return msgs.reverse()
+    const filtered = sinceTs ? msgs.filter((m) => m.createdAt >= sinceTs) : msgs
+    return filtered.reverse()
   },
 })
 
 // Résumé des conversations : dernier message par thread + nb de non lus,
 // trié par dernier message décroissant.
 export const listConversations = query({
-  args: { restaurantId: v.id("restaurants") },
-  handler: async (ctx, { restaurantId }) => {
+  args: {
+    restaurantId: v.id("restaurants"),
+    // M6-A : timestamp début de service — masque les messages des services précédents.
+    sinceTs: v.optional(v.number()),
+  },
+  handler: async (ctx, { restaurantId, sinceTs }) => {
     const { identity } = await requireRestaurantAccess(ctx, restaurantId)
     const me = await ctx.db
       .query("members")
@@ -169,13 +176,15 @@ export const listConversations = query({
       .filter((q) => q.eq(q.field("clerkUserId"), identity.subject))
       .first()
 
-    const allMsgs = await ctx.db
-      .query("messages")
-      .withIndex("by_restaurant_date", (q) =>
-        q.eq("restaurantId", restaurantId),
-      )
-      .order("desc")
-      .collect()
+    const allMsgs = (
+      await ctx.db
+        .query("messages")
+        .withIndex("by_restaurant_date", (q) =>
+          q.eq("restaurantId", restaurantId),
+        )
+        .order("desc")
+        .collect()
+    ).filter((m) => !sinceTs || m.createdAt >= sinceTs)
 
     // allMsgs est trié par createdAt desc → le premier vu par thread est le dernier message.
     const byThread = new Map<string, (typeof allMsgs)[number]>()
@@ -208,16 +217,22 @@ export const listConversations = query({
 
 // Nombre total de messages non lus (toutes conversations) — badge sidebar.
 export const getUnreadCount = query({
-  args: { restaurantId: v.id("restaurants") },
-  handler: async (ctx, { restaurantId }) => {
+  args: {
+    restaurantId: v.id("restaurants"),
+    // M6-A : timestamp début de service — masque les messages des services précédents.
+    sinceTs: v.optional(v.number()),
+  },
+  handler: async (ctx, { restaurantId, sinceTs }) => {
     const me = await getMe(ctx, restaurantId)
     if (!me) return 0
-    const allMsgs = await ctx.db
-      .query("messages")
-      .withIndex("by_restaurant_date", (q) =>
-        q.eq("restaurantId", restaurantId),
-      )
-      .collect()
+    const allMsgs = (
+      await ctx.db
+        .query("messages")
+        .withIndex("by_restaurant_date", (q) =>
+          q.eq("restaurantId", restaurantId),
+        )
+        .collect()
+    ).filter((m) => !sinceTs || m.createdAt >= sinceTs)
     return allMsgs.filter(
       (m) => !m.readBy.includes(me._id) && m.senderId !== me._id,
     ).length
