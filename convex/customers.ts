@@ -113,6 +113,21 @@ export const saveContact = mutation({
     const email = args.email?.trim().toLowerCase() || undefined
     if (!phone && !email && !args.customerId) return null
 
+    // SECURITY (L3) : mutation publique (flow convive). Refuse tout customerId /
+    // paymentId qui n'appartient pas au restaurant ciblé → pas de write cross-tenant.
+    if (args.customerId) {
+      const customer = await ctx.db.get(args.customerId)
+      if (!customer || customer.restaurantId !== restaurantId) {
+        throw new Error("Client introuvable")
+      }
+    }
+    if (args.paymentId) {
+      const payment = await ctx.db.get(args.paymentId)
+      if (!payment || payment.restaurantId !== restaurantId) {
+        throw new Error("Paiement introuvable")
+      }
+    }
+
     // 1. Consolidation prioritaire : même profil (row déjà créée cette session).
     let existing = args.customerId ? await ctx.db.get(args.customerId) : null
     // 2. Sinon dédupe par téléphone puis email sur ce restaurant.

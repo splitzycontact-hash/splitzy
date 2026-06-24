@@ -5,12 +5,11 @@ import { requireRestaurantAccess } from "./authz"
 // Module 3 — Plan de salle : zones logiques d'un restaurant (salle, terrasse,
 // bar…). Les tables y sont rattachées via tables.zoneId.
 
-// Query — retourne [] si non authentifié (jamais de throw côté lecture).
+// Query — garde cross-tenant : accès restreint aux membres du restaurant ciblé.
 export const list = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
-    const identity = await ctx.auth.getUserIdentity()
-    if (!identity) return []
+    await requireRestaurantAccess(ctx, restaurantId)
     const zones = await ctx.db
       .query("zones")
       .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))

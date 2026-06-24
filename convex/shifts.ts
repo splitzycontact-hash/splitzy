@@ -22,6 +22,11 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     await requireRestaurantAccess(ctx, args.restaurantId, ["owner", "manager"])
+    // SECURITY (L5) : le membre planifié doit appartenir à CE restaurant.
+    const member = await ctx.db.get(args.memberId)
+    if (!member || member.restaurantId !== args.restaurantId) {
+      throw new Error("Membre introuvable dans ce restaurant")
+    }
     return ctx.db.insert("shifts", {
       restaurantId: args.restaurantId,
       memberId: args.memberId,

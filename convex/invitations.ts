@@ -210,7 +210,8 @@ export const getByToken = query({
 export const listByRestaurant = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
-    await requireRestaurantAccess(ctx, restaurantId)
+    // SECURITY (L9) : tokens d'invitation = secrets. Réservé owner/manager.
+    await requireRestaurantAccess(ctx, restaurantId, ["owner", "manager"])
     const invitations = await ctx.db
       .query("restaurantInvitations")
       .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
