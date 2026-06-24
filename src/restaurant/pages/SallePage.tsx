@@ -522,7 +522,7 @@ export function SallePage() {
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="px-9 py-6 flex flex-col lg:flex-row gap-5">
           {/* Plan */}
-          <div className="flex-1 bg-white rounded-xl border border-border shadow-card p-6">
+          <div className="flex-1 min-w-0 bg-white rounded-xl border border-border shadow-card p-6">
             {placedCount === 0 ? (
               <div className="text-sm text-muted py-12 text-center">
                 Aucune table positionnée. Placez vos tables dans Paramètres → Tables &amp; Plan.
