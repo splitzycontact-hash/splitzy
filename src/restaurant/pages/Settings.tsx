@@ -2267,7 +2267,8 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                           boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                         }}
                       >
-                        {(['owner', 'manager', 'staff'] as MemberRole[]).map(r => (
+                        {/* SECURITY (H2) : "owner" non proposé — promotion vers owner interdite côté backend */}
+                        {(['manager', 'staff'] as const).map(r => (
                           <button
                             key={r}
                             onClick={() => {

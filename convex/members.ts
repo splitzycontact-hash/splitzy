@@ -64,12 +64,16 @@ export const syncMyProfile = mutation({
 export const updateMemberRole = mutation({
   args: {
     memberId: v.id("members"),
-    role: v.union(v.literal("owner"), v.literal("manager"), v.literal("staff")),
+    // SECURITY (H2) : "owner" retiré — un manager (ou owner) ne peut promouvoir personne owner.
+    role: v.union(v.literal("manager"), v.literal("staff")),
   },
   handler: async (ctx, { memberId, role }) => {
     const member = await ctx.db.get(memberId)
     if (!member) throw new Error("Member not found")
-    await requireRestaurantAccess(ctx, member.restaurantId, ["owner", "manager"])
+    // SECURITY (H2) : seul un owner peut changer un rôle (plus de manager→owner).
+    const { identity } = await requireRestaurantAccess(ctx, member.restaurantId, ["owner"])
+    // SECURITY (H2) : interdit de modifier son propre rôle (anti escalade / lock-out).
+    if (member.clerkUserId === identity.subject) throw new Error("Action interdite sur soi-même")
     await ctx.db.patch(memberId, { role })
   },
 })
@@ -79,7 +83,10 @@ export const removeMember = mutation({
   handler: async (ctx, { memberId }) => {
     const member = await ctx.db.get(memberId)
     if (!member) throw new Error("Member not found")
-    await requireRestaurantAccess(ctx, member.restaurantId, ["owner", "manager"])
+    // SECURITY (H2) : seul un owner peut retirer un membre.
+    const { identity } = await requireRestaurantAccess(ctx, member.restaurantId, ["owner"])
+    // SECURITY (H2) : interdit de se retirer soi-même.
+    if (member.clerkUserId === identity.subject) throw new Error("Action interdite sur soi-même")
     await ctx.db.delete(memberId)
   },
 })

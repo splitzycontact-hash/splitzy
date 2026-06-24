@@ -1,9 +1,12 @@
 import { query, internalMutation } from "./_generated/server"
 import { v } from "convex/values"
+import { requireRestaurantAccess } from "./authz"
 
 export const getLatestInsights = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
+    // SECURITY (M4) : garde cross-tenant — l'appelant doit avoir accès au restaurant.
+    await requireRestaurantAccess(ctx, restaurantId)
     return ctx.db
       .query("insights")
       .withIndex("by_restaurant_date", q => q.eq("restaurantId", restaurantId))

@@ -1,6 +1,5 @@
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server"
 import { v } from "convex/values"
-import { internal } from "./_generated/api"
 import { requireRestaurantAccess } from "./authz"
 
 export const list = query({
@@ -90,17 +89,12 @@ export const create = mutation({
     // (http.ts → confirmPayment) le passe à "Encaissé" ET crédite la table. La
     // référence (echoed par le webhook) permet de matcher la confirmation ; à
     // défaut de ref PSP réelle (démo), on en génère une côté serveur.
+    // SECURITY (H1) : plus aucune auto-confirmation. Sans `provider` PSP réel, le
+    // paiement reste "En attente" — seul le webhook PSP signé (http.ts →
+    // confirmPayment) peut le passer à "Encaissé" ET créditer la table. Le
+    // providerRef généré sert au matching d'un éventuel webhook réel ; aucun
+    // scheduler ne confirme jamais côté serveur sur l'affirmation du client.
     const ref = providerRef ?? crypto.randomUUID()
-    // DÉMO (aucun PSP réel branché) : sans `provider` fourni par un SDK de
-    // paiement, aucun webhook ne viendra jamais confirmer ce paiement — il
-    // resterait "En attente" pour toujours et le dashboard n'afficherait rien
-    // (table.paidCents jamais crédité). On marque le paiement provider="demo"
-    // et on programme la confirmation serveur via le MÊME chemin que le
-    // webhook (confirmPayment : idempotent + montant vérifié + réconciliation
-    // table). ⚠ À RETIRER au branchement d'un vrai PSP : un paiement réel doit
-    // arriver avec provider+providerRef et n'être confirmé QUE par http.ts
-    // (webhook signé) — jamais auto-confirmé sur l'affirmation du client.
-    const effectiveProvider = provider ?? "demo"
     const paymentId = await ctx.db.insert("payments", {
       ...paymentData,
       subtotalCents,
@@ -110,17 +104,10 @@ export const create = mutation({
       status: "En attente",
       createdAt: now,
       dateLabel,
-      provider: effectiveProvider,
+      provider,
       providerRef: ref,
       paidItemNames,
     })
-    if (!provider) {
-      await ctx.scheduler.runAfter(0, internal.payments.confirmPayment, {
-        provider: "demo",
-        providerRef: ref,
-        amountCents: totalCents,
-      })
-    }
 
     // Table : paiement INITIÉ → statut "payment" (sans créditer paidCents : le
     // crédit n'a lieu qu'à la confirmation PSP réelle dans confirmPayment).

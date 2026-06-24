@@ -107,8 +107,8 @@ export const listByWeek = query({
 export const getServiceOverview = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) => {
-    const identity = await ctx.auth.getUserIdentity()
-    if (!identity) return null
+    // SECURITY (M1) : garde cross-tenant — accès restreint au restaurant ciblé (null sinon).
+    try { await requireRestaurantAccess(ctx, restaurantId) } catch { return null }
 
     const today = new Date().toISOString().slice(0, 10)
     const [shifts, tables, zones] = await Promise.all([
