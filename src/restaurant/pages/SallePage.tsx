@@ -5,7 +5,7 @@ import {
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import { toast } from 'sonner'
-import { UserPlus, X, Check, Power, Users, Star, Unlock, Download, Coins, Send, ChefHat, PhoneCall } from 'lucide-react'
+import { UserPlus, X, Check, Power, Users, Star, Unlock, Download, Coins, Send, ChefHat, PhoneCall, Crown, Zap } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId } from '../context/RestaurantContext'
@@ -139,13 +139,15 @@ function DroppableTable({ tableId, children }: { tableId: Id<'tables'>; children
 // Ligne d'une table assignée à un serveur (sidebar « En service ») : nom, timer
 // d'inactivité, toggle alerte ⭐, et libération manuelle (dining/payment only).
 function AssignedTableRow({
-  table, now, onToggleAlert, onRelease, onCallManager,
+  table, now, onToggleAlert, onRelease, onCallManager, onSetVip, onForcePayment,
 }: {
   table: Doc<'tables'>
   now: number
   onToggleAlert: () => void
   onRelease: () => void
   onCallManager: () => void
+  onSetVip: () => void
+  onForcePayment: () => void
 }) {
   const elapsedMin = table.sittingStartedAt != null
     ? Math.floor((now - table.sittingStartedAt) / 60000)
@@ -160,6 +162,14 @@ function AssignedTableRow({
     <div className="pl-4 pr-1 py-1">
       <div className="flex items-center gap-1.5">
         <span className="text-xs font-semibold text-mid shrink-0">{table.label ?? `T${table.number}`}</span>
+        {table.isVip && (
+          <span className="text-[9px] font-bold px-1 py-0.5 rounded animate-pulse"
+            style={{ background: '#FEF9C3', color: '#B45309' }}>⭐ VIP</span>
+        )}
+        {table.forcePaymentMode && (
+          <span className="text-[9px] font-bold px-1 py-0.5 rounded animate-pulse"
+            style={{ background: '#FFEDD5', color: '#EA580C' }}>⚡</span>
+        )}
         {showTimer && (
           <span
             className={`text-[10px] font-bold leading-none px-1.5 py-0.5 rounded ${danger ? 'animate-pulse' : ''}`}
@@ -180,6 +190,27 @@ function AssignedTableRow({
           >
             <Star size={13} className={table.alert ? 'text-brand fill-brand' : 'text-muted'} />
           </button>
+          {isActive && !table.isVip && (
+            <button onClick={onSetVip} title="Marquer VIP"
+              className="flex items-center justify-center rounded-lg transition-colors hover:bg-yellow-50"
+              style={{ width: 26, height: 26 }}>
+              <Crown size={13} className="text-yellow-500" />
+            </button>
+          )}
+          {isActive && table.isVip && (
+            <button onClick={onSetVip} title="Retirer VIP"
+              className="flex items-center justify-center rounded-lg transition-colors hover:bg-yellow-50"
+              style={{ width: 26, height: 26 }}>
+              <Crown size={13} className="text-yellow-500 fill-yellow-400" />
+            </button>
+          )}
+          {table.status === 'dining' && !table.forcePaymentMode && (
+            <button onClick={onForcePayment} title="Forcer paiement QR"
+              className="flex items-center justify-center rounded-lg transition-colors hover:bg-orange-50"
+              style={{ width: 26, height: 26 }}>
+              <Zap size={13} className="text-orange-500" />
+            </button>
+          )}
           {isActive && (
             <button
               onClick={onRelease}
@@ -232,6 +263,8 @@ export function SallePage() {
   const clearAll = useMutation(api.tables.clearAllAssignments)
   const toggleAlert = useMutation(api.tables.toggleAlert)
   const resetToFree = useMutation(api.tables.resetToFree)
+  const forcePaymentMut = useMutation(api.tables.forcePayment)
+  const setVipMut = useMutation(api.tables.setVip)
   const sendTipReport = useAction(api.closures.sendTipReport)
   const checkIn = useMutation(api.shifts.checkIn)
   const createShift = useMutation(api.shifts.create)
@@ -408,6 +441,16 @@ export function SallePage() {
     toast.success('Table libérée')
   }
 
+  async function handleForcePayment(t: Doc<'tables'>) {
+    await forcePaymentMut({ tableId: t._id })
+    toast.success(`Paiement QR forcé — T${t.number}`)
+  }
+
+  async function handleSetVip(t: Doc<'tables'>) {
+    await setVipMut({ tableId: t._id, isVip: !t.isVip })
+    toast.success(t.isVip ? 'VIP retiré' : `T${t.number} — VIP activé`)
+  }
+
   // M6-B — Alerte le gérant en temps réel depuis une table : message broadcast
   // (contenu normalisé côté serveur) → apparaît dans le chat de toute l'équipe.
   async function handleCallManager(t: Doc<'tables'>) {
@@ -548,6 +591,8 @@ export function SallePage() {
                             onToggleAlert={() => handleToggleAlert(t._id)}
                             onRelease={() => handleRelease(t)}
                             onCallManager={() => handleCallManager(t)}
+                            onSetVip={() => handleSetVip(t)}
+                            onForcePayment={() => handleForcePayment(t)}
                           />
                         ))}
                       </div>

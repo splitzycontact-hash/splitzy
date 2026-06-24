@@ -67,6 +67,18 @@ export default function TableChip({ table, roster, activeZoneId, selected, onTab
           {elapsedMin}min
         </span>
       )}
+      {table.isVip && (
+        <span className="text-[9px] font-bold leading-none mt-1 px-1 py-0.5 rounded animate-pulse"
+          style={{ background: '#FEF9C3', color: '#B45309' }}>
+          ⭐ VIP
+        </span>
+      )}
+      {table.forcePaymentMode && (
+        <span className="text-[9px] font-bold leading-none mt-1 px-1 py-0.5 rounded animate-pulse"
+          style={{ background: '#FFEDD5', color: '#EA580C' }}>
+          ⚡ QR
+        </span>
+      )}
     </button>
   )
 }
