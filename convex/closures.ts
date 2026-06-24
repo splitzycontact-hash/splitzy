@@ -68,7 +68,12 @@ export const getTipDistribution = query({
       ctx.db
         .query("tables")
         .withIndex("by_restaurant", (q) => q.eq("restaurantId", args.restaurantId))
-        .filter((q) => q.eq(q.field("status"), "paid"))
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("status"), "paid"),
+            q.eq(q.field("status"), "payment"),
+          ),
+        )
         .collect(),
       ctx.db
         .query("shifts")

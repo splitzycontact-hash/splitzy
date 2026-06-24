@@ -48,13 +48,26 @@ function buildInsights(
       ? recentFbs.reduce((s, f) => s + f.stars, 0) / recentFbs.length
       : null
 
-    const tagCount: Record<string, number> = {}
+    // Tags from ALL feedbacks (for positive/neutral contexts)
+    const tagCountAll: Record<string, number> = {}
     for (const fb of feedbacks) {
       for (const tag of fb.tags) {
-        tagCount[tag] = (tagCount[tag] ?? 0) + 1
+        tagCountAll[tag] = (tagCountAll[tag] ?? 0) + 1
       }
     }
-    const topTags = Object.entries(tagCount)
+    const topTagsAll = Object.entries(tagCountAll)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([t]) => t)
+
+    // Tags only from NEGATIVE feedbacks (≤2★) — used for "Problèmes signalés"
+    const tagCountNeg: Record<string, number> = {}
+    for (const fb of feedbacks.filter(f => f.stars <= 2)) {
+      for (const tag of fb.tags) {
+        tagCountNeg[tag] = (tagCountNeg[tag] ?? 0) + 1
+      }
+    }
+    const topTagsNeg = Object.entries(tagCountNeg)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([t]) => t)
@@ -67,18 +80,18 @@ function buildInsights(
 
     if (avg >= 4.5) {
       title = "Excellente réputation — continuez ainsi"
-      body = `Note moyenne de ${avg.toFixed(1)}/5 sur ${total} avis. ${Math.round(posCount / total * 100)}% des clients ont donné 4 étoiles ou plus.${topTags.length ? ` Points forts : ${topTags.join(", ")}.` : ""}`
+      body = `Note moyenne de ${avg.toFixed(1)}/5 sur ${total} avis. ${Math.round(posCount / total * 100)}% des clients ont donné 4 étoiles ou plus.${topTagsAll.length ? ` Points forts : ${topTagsAll.join(", ")}.` : ""}`
     } else if (avg >= 4) {
       title = "Bonne réputation avec marge de progression"
-      body = `Note moyenne de ${avg.toFixed(1)}/5 sur ${total} avis. ${negCount > 0 ? `${negCount} avis très négatif${negCount > 1 ? "s" : ""} (≤ 2 étoiles) à traiter.` : "Aucun avis très négatif."}${topTags.length ? ` Thèmes récurrents : ${topTags.join(", ")}.` : ""}`
+      body = `Note moyenne de ${avg.toFixed(1)}/5 sur ${total} avis. ${negCount > 0 ? `${negCount} avis très négatif${negCount > 1 ? "s" : ""} (≤ 2 étoiles) à traiter.` : "Aucun avis très négatif."}${topTagsAll.length ? ` Thèmes récurrents : ${topTagsAll.join(", ")}.` : ""}`
       if (negCount > 0) actionText = "Analyser les avis négatifs pour identifier les axes d'amélioration"
     } else if (avg >= 3) {
       title = "Réputation mitigée — action recommandée"
-      body = `Note moyenne de ${avg.toFixed(1)}/5 sur ${total} avis. ${Math.round(negCount / total * 100)}% des clients ont donné 2 étoiles ou moins.${topTags.length ? ` Problèmes signalés : ${topTags.join(", ")}.` : ""}`
+      body = `Note moyenne de ${avg.toFixed(1)}/5 sur ${total} avis. ${Math.round(negCount / total * 100)}% des clients ont donné 2 étoiles ou moins.${topTagsNeg.length ? ` Problèmes signalés : ${topTagsNeg.join(", ")}.` : ""}`
       actionText = "Identifier les points de friction et contacter les clients insatisfaits"
     } else {
       title = "Réputation dégradée — intervention urgente"
-      body = `Note critique de ${avg.toFixed(1)}/5 sur ${total} avis. ${Math.round(negCount / total * 100)}% d'avis très négatifs. Une action immédiate est nécessaire.${topTags.length ? ` Problèmes signalés : ${topTags.join(", ")}.` : ""}`
+      body = `Note critique de ${avg.toFixed(1)}/5 sur ${total} avis. ${Math.round(negCount / total * 100)}% d'avis très négatifs. Une action immédiate est nécessaire.${topTagsNeg.length ? ` Problèmes signalés : ${topTagsNeg.join(", ")}.` : ""}`
       actionText = "Réunion d'équipe prioritaire pour corriger les problèmes identifiés"
     }
 

@@ -350,8 +350,23 @@ export const clearAllAssignments = mutation({
       .collect()
     let cleared = 0
     for (const t of tables) {
-      if (t.assignedMemberId !== undefined) {
-        await ctx.db.patch(t._id, { assignedMemberId: undefined })
+      if (t.assignedMemberId !== undefined || t.status !== "free") {
+        await ctx.db.patch(t._id, {
+          assignedMemberId: undefined,
+          // Reset active tables so the next service starts clean
+          ...(t.status !== "free" ? {
+            status: "free",
+            guests: undefined,
+            amountCents: undefined,
+            orderItems: undefined,
+            alert: undefined,
+            paidCents: undefined,
+            paidTipCents: undefined,
+            sittingStartedAt: undefined,
+            forcePaymentMode: undefined,
+            isVip: undefined,
+          } : {}),
+        })
         cleared++
       }
     }
