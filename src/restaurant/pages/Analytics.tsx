@@ -284,6 +284,7 @@ function AnalyticsInsightsBlock({
 
 export function Analytics() {
   const [period, setPeriod]           = useState<PeriodKey>('month')
+  const [kpiPeriod, setKpiPeriod]     = useState<'day' | 'week' | 'month'>('week')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd]     = useState('')
   const [hovered, setHovered]         = useState<{ x: number; y: number; day: string; total: number } | null>(null)
@@ -296,6 +297,7 @@ export function Analytics() {
   const rawTables      = useQuery(api.tables.list,                restaurantId ? { restaurantId } : 'skip')
   const latestInsights = useQuery(api.insights.getLatestInsights, restaurantId ? { restaurantId } : 'skip')
   const overview       = useQuery(api.payments.getOverviewStats,  restaurantId ? { restaurantId } : 'skip')
+  const kpiComp        = useQuery(api.analytics.getKpiComparison,  restaurantId ? { restaurantId, period: kpiPeriod } : 'skip')
   const isPro          = restaurant?.plan === 'pro'
 
   const payments = (rawPayments ?? []) as ConvexPayment[]
@@ -590,6 +592,18 @@ export function Analytics() {
   const commissionToday = Math.round(todayVolume * commissionRate)
   const netToday        = todayVolume - commissionToday
 
+  // — Comparaison N-1 (Analytics-B) : jour / semaine / mois via api.analytics.getKpiComparison —
+  const KPI_TAB_META: Record<'day' | 'week' | 'month', { label: string; vs: string }> = {
+    day:   { label: "Aujourd'hui",   vs: 'vs hier' },
+    week:  { label: 'Cette semaine', vs: 'vs semaine dernière' },
+    month: { label: 'Ce mois',       vs: 'vs mois dernier' },
+  }
+  const kpiCards = kpiComp ? [
+    { label: "Chiffre d'affaires", value: formatEur(kpiComp.current.ca),     delta: kpiComp.deltas.ca,        accent: true },
+    { label: 'Couverts',           value: String(kpiComp.current.covers),    delta: kpiComp.deltas.covers,    accent: false },
+    { label: 'Ticket moyen',       value: kpiComp.current.covers > 0 ? formatEur(Math.round(kpiComp.current.avgTicket)) : '—', delta: kpiComp.deltas.avgTicket, accent: false },
+  ] : null
+
   return (
     <RestaurantLayout>
       <PageHeader
@@ -666,6 +680,64 @@ export function Analytics() {
             />
           </div>
         )}
+
+        {/* Comparaison N-1 (Analytics-B) — jour / semaine / mois vs période précédente */}
+        <div
+          className="rounded-[12px] border overflow-hidden"
+          style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
+        >
+          <div className="flex items-center justify-between gap-4 px-5 py-3 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+            <div className="text-[13px] font-semibold ds-text-primary">Comparaison vs période précédente</div>
+            <div className="flex items-center gap-1">
+              {(['day', 'week', 'month'] as const).map(key => (
+                <button
+                  key={key}
+                  onClick={() => setKpiPeriod(key)}
+                  className="px-3 py-1.5 rounded-[7px] text-[13px] transition-colors"
+                  style={{
+                    background: kpiPeriod === key ? 'var(--ds-bg-subtle)' : 'none',
+                    color: kpiPeriod === key ? 'var(--ds-text-primary)' : 'var(--ds-text-secondary)',
+                    fontWeight: kpiPeriod === key ? 600 : 500,
+                  }}
+                >
+                  {KPI_TAB_META[key].label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3">
+            {kpiCards ? kpiCards.map((kpi, i) => (
+              <div
+                key={kpi.label}
+                className="flex flex-col gap-2 px-5 py-4"
+                style={{ borderRight: i < 2 ? '1px solid var(--ds-border)' : 'none', minHeight: '104px' }}
+              >
+                <div className="text-[11px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">{kpi.label}</div>
+                <div
+                  className="font-extrabold tabular-nums leading-none tracking-[-0.035em] mt-auto"
+                  style={{ fontSize: '28px', color: kpi.accent ? 'var(--ds-accent)' : 'var(--ds-text-primary)' }}
+                >
+                  {kpi.value}
+                </div>
+                <div className="flex items-center gap-1.5 text-[12px] ds-text-secondary">
+                  {kpi.delta === null ? (
+                    <span className="font-semibold ds-text-tertiary">—</span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-0.5 font-semibold"
+                      style={{ color: kpi.delta > 0 ? 'var(--ds-success-strong)' : kpi.delta < 0 ? 'var(--ds-error-strong)' : 'var(--ds-text-secondary)' }}
+                    >
+                      {kpi.delta > 0 ? '↑' : kpi.delta < 0 ? '↓' : ''} {Math.abs(kpi.delta)}%
+                    </span>
+                  )}
+                  <span>{KPI_TAB_META[kpiPeriod].vs}</span>
+                </div>
+              </div>
+            )) : (
+              <div className="px-5 py-8 text-[13px] ds-text-tertiary text-center sm:col-span-3">Chargement…</div>
+            )}
+          </div>
+        </div>
 
         {/* KPI strip */}
         <div
