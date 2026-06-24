@@ -5,7 +5,7 @@ import {
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import { toast } from 'sonner'
-import { UserPlus, X, Check, Power, Users, Star, Unlock, Download, Coins, Send, ChefHat, PhoneCall, Crown, Zap } from 'lucide-react'
+import { UserPlus, X, Check, Power, Users, Star, Unlock, Download, Coins, Send, ChefHat, PhoneCall, Crown, Zap, XCircle } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId } from '../context/RestaurantContext'
@@ -139,7 +139,7 @@ function DroppableTable({ tableId, children }: { tableId: Id<'tables'>; children
 // Ligne d'une table assignée à un serveur (sidebar « En service ») : nom, timer
 // d'inactivité, toggle alerte ⭐, et libération manuelle (dining/payment only).
 function AssignedTableRow({
-  table, now, onToggleAlert, onRelease, onCallManager, onSetVip, onForcePayment,
+  table, now, onToggleAlert, onRelease, onCallManager, onSetVip, onForcePayment, onCloseWithoutPayment,
 }: {
   table: Doc<'tables'>
   now: number
@@ -148,6 +148,7 @@ function AssignedTableRow({
   onCallManager: () => void
   onSetVip: () => void
   onForcePayment: () => void
+  onCloseWithoutPayment: () => void
 }) {
   const elapsedMin = table.sittingStartedAt != null
     ? Math.floor((now - table.sittingStartedAt) / 60000)
@@ -231,6 +232,17 @@ function AssignedTableRow({
           <PhoneCall className="w-3 h-3" /> Appeler le gérant
         </button>
       )}
+      {isActive && (
+        <button
+          onClick={onCloseWithoutPayment}
+          className="mt-1 w-full flex items-center justify-center gap-1.5
+                     text-[11px] text-red-400 hover:text-red-600
+                     border border-dashed border-red-200 rounded-md py-1
+                     transition-colors"
+        >
+          <XCircle className="w-3 h-3" /> Clôturer sans paiement
+        </button>
+      )}
     </div>
   )
 }
@@ -275,6 +287,7 @@ export function SallePage() {
   const createShift = useMutation(api.shifts.create)
   const removeShift = useMutation(api.shifts.remove)
   const callManager = useMutation(api.messages.callManager)
+  const closeWithoutPaymentMut = useMutation(api.tables.closeWithoutPayment)
 
   const [activeZoneId, setActiveZoneId] = useState<Id<'zones'> | null>(null)
   const [dragName, setDragName] = useState<string | null>(null)
@@ -282,6 +295,7 @@ export function SallePage() {
   const [showRecap, setShowRecap] = useState(false)
   const [sendingReport, setSendingReport] = useState(false)
   const [dialog, setDialog] = useState<DialogState>(null)
+  const [closeReason, setCloseReason] = useState('')
 
   // Timer d'inactivité : tick toutes les 30 s pour réactualiser les temps écoulés
   // (les TableChip et les lignes sidebar recalculent depuis sittingStartedAt).
@@ -452,6 +466,21 @@ export function SallePage() {
     setDialog(null)
   }
 
+  function handleCloseWithoutPayment(t: Doc<'tables'>) {
+    setCloseReason('')
+    setDialog({ type: 'close_no_pay', table: t })
+  }
+
+  async function confirmCloseWithoutPayment() {
+    if (!dialog || dialog.type !== 'close_no_pay') return
+    await closeWithoutPaymentMut({
+      tableId: dialog.table._id,
+      reason: closeReason || undefined,
+    })
+    toast.success('Table clôturée sans paiement')
+    setDialog(null)
+  }
+
   async function handleForcePayment(t: Doc<'tables'>) {
     await forcePaymentMut({ tableId: t._id })
     toast.success(`Paiement QR forcé — T${t.number}`)
@@ -604,6 +633,7 @@ export function SallePage() {
                             onCallManager={() => handleCallManager(t)}
                             onSetVip={() => handleSetVip(t)}
                             onForcePayment={() => handleForcePayment(t)}
+                            onCloseWithoutPayment={() => handleCloseWithoutPayment(t)}
                           />
                         ))}
                       </div>
@@ -750,6 +780,35 @@ export function SallePage() {
                 className="px-4 py-2 text-sm rounded-xl bg-red-500 text-white"
               >
                 Libérer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {dialog?.type === 'close_no_pay' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center"
+             style={{ background: 'rgba(0,0,0,0.4)' }}>
+          <div className="bg-white rounded-2xl p-6 w-80 shadow-xl space-y-4">
+            <h3 className="font-semibold text-base">
+              Clôturer T{dialog.table.number} sans paiement
+            </h3>
+            <select value={closeReason}
+              onChange={e => setCloseReason(e.target.value)}
+              className="w-full border border-border rounded-xl px-3 py-2 text-sm">
+              <option value="">Raison (optionnelle)</option>
+              <option value="offert">Repas offert</option>
+              <option value="erreur">Erreur de table</option>
+              <option value="incident">Incident client</option>
+              <option value="autre">Autre</option>
+            </select>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setDialog(null)}
+                className="px-4 py-2 text-sm rounded-xl border border-border">
+                Annuler
+              </button>
+              <button onClick={confirmCloseWithoutPayment}
+                className="px-4 py-2 text-sm rounded-xl bg-red-500 text-white">
+                Clôturer
               </button>
             </div>
           </div>
