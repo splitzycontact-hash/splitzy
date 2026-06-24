@@ -19,6 +19,46 @@ async function getMe(ctx: any, restaurantId: any) {
     .first()
 }
 
+// Résout la ligne `members` de l'appelant pour un restaurant donné, en la créant
+// à la volée pour l'owner pur (identifié par restaurants.clerkUserId, sans ligne
+// members) afin qu'il puisse aussi être expéditeur. Throw si l'appelant n'est ni
+// membre ni owner. Partagé par send et callManager.
+async function ensureMe(ctx: any, restaurantId: any, identity: any, restaurant: any) {
+  let me = await ctx.db
+    .query("members")
+    .withIndex("by_restaurant", (q: any) => q.eq("restaurantId", restaurantId))
+    .filter((q: any) => q.eq(q.field("clerkUserId"), identity.subject))
+    .first()
+
+  if (!me) {
+    const isOwner = restaurant.clerkUserId === identity.subject
+    if (!isOwner) throw new Error("Membre introuvable")
+    // Vérifier si créé entre-temps (race condition)
+    const existing = await ctx.db
+      .query("members")
+      .withIndex("by_clerkUserId", (q: any) => q.eq("clerkUserId", identity.subject))
+      .filter((q: any) => q.eq(q.field("restaurantId"), restaurantId))
+      .first()
+    if (existing) {
+      me = existing
+    } else {
+      const memberId = await ctx.db.insert("members", {
+        restaurantId,
+        clerkUserId: identity.subject,
+        name: identity.name ?? identity.email ?? "Owner",
+        email: identity.email ?? "",
+        role: "owner" as const,
+        status: "active" as const,
+        invitedAt: Date.now(),
+      })
+      me = await ctx.db.get(memberId)
+    }
+  }
+
+  if (!me) throw new Error("Membre introuvable")
+  return me
+}
+
 // Envoyer un message (broadcast si recipientId absent, sinon 1:1).
 export const send = mutation({
   args: {
@@ -37,40 +77,7 @@ export const send = mutation({
         throw new Error("Destinataire introuvable")
     }
 
-    let me = await ctx.db
-      .query("members")
-      .withIndex("by_restaurant", (q) => q.eq("restaurantId", restaurantId))
-      .filter((q) => q.eq(q.field("clerkUserId"), identity.subject))
-      .first()
-
-    // Owner pur (identifié par restaurants.clerkUserId, sans ligne members) :
-    // on lui crée une ligne `members` à la volée pour qu'il puisse envoyer.
-    if (!me) {
-      const isOwner = restaurant.clerkUserId === identity.subject
-      if (!isOwner) throw new Error("Membre introuvable")
-      // Vérifier si créé entre-temps (race condition)
-      const existing = await ctx.db
-        .query("members")
-        .withIndex("by_clerkUserId", (q) => q.eq("clerkUserId", identity.subject))
-        .filter((q) => q.eq(q.field("restaurantId"), restaurantId))
-        .first()
-      if (existing) {
-        me = existing
-      } else {
-        const memberId = await ctx.db.insert("members", {
-          restaurantId,
-          clerkUserId: identity.subject,
-          name: identity.name ?? identity.email ?? "Owner",
-          email: identity.email ?? "",
-          role: "owner" as const,
-          status: "active" as const,
-          invitedAt: Date.now(),
-        })
-        me = await ctx.db.get(memberId)
-      }
-    }
-
-    if (!me) throw new Error("Membre introuvable")
+    const me = await ensureMe(ctx, restaurantId, identity, restaurant)
 
     const threadId = recipientId
       ? [me._id, recipientId].sort().join("|")
@@ -86,6 +93,28 @@ export const send = mutation({
       recipientId,
       threadId,
       content: body,
+      createdAt: Date.now(),
+      readBy: [me._id], // l'expéditeur a déjà "lu" son propre message
+    })
+  },
+})
+
+// M6-B — Appel gérant : un serveur signale depuis la salle qu'une table a besoin
+// du gérant. Le contenu est normalisé côté serveur (pas fourni par le client) →
+// message broadcast visible par toute l'équipe (FloatingChat / ChatPage).
+export const callManager = mutation({
+  args: {
+    restaurantId: v.id("restaurants"),
+    tableNumber: v.number(),
+  },
+  handler: async (ctx, { restaurantId, tableNumber }) => {
+    const { identity, restaurant } = await requireRestaurantAccess(ctx, restaurantId)
+    const me = await ensureMe(ctx, restaurantId, identity, restaurant)
+    return ctx.db.insert("messages", {
+      restaurantId,
+      senderId: me._id,
+      threadId: "broadcast",
+      content: `🚨 Table ${tableNumber} — appel gérant`,
       createdAt: Date.now(),
       readBy: [me._id], // l'expéditeur a déjà "lu" son propre message
     })

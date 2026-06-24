@@ -5,7 +5,7 @@ import {
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import { toast } from 'sonner'
-import { UserPlus, X, Check, Power, Users, Star, Unlock, Download, Coins, Send, ChefHat } from 'lucide-react'
+import { UserPlus, X, Check, Power, Users, Star, Unlock, Download, Coins, Send, ChefHat, PhoneCall } from 'lucide-react'
 import { api } from '../../../convex/_generated/api'
 import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId } from '../context/RestaurantContext'
@@ -139,54 +139,67 @@ function DroppableTable({ tableId, children }: { tableId: Id<'tables'>; children
 // Ligne d'une table assignée à un serveur (sidebar « En service ») : nom, timer
 // d'inactivité, toggle alerte ⭐, et libération manuelle (dining/payment only).
 function AssignedTableRow({
-  table, now, onToggleAlert, onRelease,
+  table, now, onToggleAlert, onRelease, onCallManager,
 }: {
   table: Doc<'tables'>
   now: number
   onToggleAlert: () => void
   onRelease: () => void
+  onCallManager: () => void
 }) {
   const elapsedMin = table.sittingStartedAt != null
     ? Math.floor((now - table.sittingStartedAt) / 60000)
     : null
   const showTimer = elapsedMin != null && elapsedMin >= 30
   const danger = elapsedMin != null && elapsedMin >= 60
-  const canRelease = table.status === 'dining' || table.status === 'payment'
+  // Une table active (en cours de repas ou de paiement) peut être libérée et
+  // peut déclencher un appel gérant ; pas une table libre/payée.
+  const isActive = table.status === 'dining' || table.status === 'payment'
 
   return (
-    <div className="flex items-center gap-1.5 pl-4 pr-1 py-1">
-      <span className="text-xs font-semibold text-mid shrink-0">{table.label ?? `T${table.number}`}</span>
-      {showTimer && (
-        <span
-          className={`text-[10px] font-bold leading-none px-1.5 py-0.5 rounded ${danger ? 'animate-pulse' : ''}`}
-          style={{
-            background: danger ? '#FEE2E2' : '#FFEDD5',
-            color: danger ? '#DC2626' : '#EA580C',
-          }}
-        >
-          {elapsedMin}min
-        </span>
-      )}
-      <div className="ml-auto flex items-center gap-0.5 shrink-0">
-        <button
-          onClick={onToggleAlert}
-          title={table.alert ? 'Retirer l\'alerte' : 'Marquer en alerte'}
-          className="flex items-center justify-center rounded-lg transition-colors hover:bg-brand-bg"
-          style={{ width: 26, height: 26 }}
-        >
-          <Star size={13} className={table.alert ? 'text-brand fill-brand' : 'text-muted'} />
-        </button>
-        {canRelease && (
+    <div className="pl-4 pr-1 py-1">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-semibold text-mid shrink-0">{table.label ?? `T${table.number}`}</span>
+        {showTimer && (
+          <span
+            className={`text-[10px] font-bold leading-none px-1.5 py-0.5 rounded ${danger ? 'animate-pulse' : ''}`}
+            style={{
+              background: danger ? '#FEE2E2' : '#FFEDD5',
+              color: danger ? '#DC2626' : '#EA580C',
+            }}
+          >
+            {elapsedMin}min
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-0.5 shrink-0">
           <button
-            onClick={onRelease}
-            title="Libérer la table"
-            className="flex items-center justify-center rounded-lg transition-colors hover:bg-red-50"
+            onClick={onToggleAlert}
+            title={table.alert ? 'Retirer l\'alerte' : 'Marquer en alerte'}
+            className="flex items-center justify-center rounded-lg transition-colors hover:bg-brand-bg"
             style={{ width: 26, height: 26 }}
           >
-            <Unlock size={13} className="text-red-500" />
+            <Star size={13} className={table.alert ? 'text-brand fill-brand' : 'text-muted'} />
           </button>
-        )}
+          {isActive && (
+            <button
+              onClick={onRelease}
+              title="Libérer la table"
+              className="flex items-center justify-center rounded-lg transition-colors hover:bg-red-50"
+              style={{ width: 26, height: 26 }}
+            >
+              <Unlock size={13} className="text-red-500" />
+            </button>
+          )}
+        </div>
       </div>
+      {isActive && (
+        <button
+          onClick={onCallManager}
+          className="mt-1 w-full flex items-center justify-center gap-1.5 text-[11px] text-muted hover:text-brand border border-dashed border-border rounded-md py-1 transition-colors"
+        >
+          <PhoneCall className="w-3 h-3" /> Appeler le gérant
+        </button>
+      )}
     </div>
   )
 }
@@ -223,6 +236,7 @@ export function SallePage() {
   const checkIn = useMutation(api.shifts.checkIn)
   const createShift = useMutation(api.shifts.create)
   const removeShift = useMutation(api.shifts.remove)
+  const callManager = useMutation(api.messages.callManager)
 
   const [activeZoneId, setActiveZoneId] = useState<Id<'zones'> | null>(null)
   const [dragName, setDragName] = useState<string | null>(null)
@@ -394,6 +408,19 @@ export function SallePage() {
     toast.success('Table libérée')
   }
 
+  // M6-B — Alerte le gérant en temps réel depuis une table : message broadcast
+  // (contenu normalisé côté serveur) → apparaît dans le chat de toute l'équipe.
+  async function handleCallManager(t: Doc<'tables'>) {
+    if (!restaurantId) return
+    try {
+      await callManager({ restaurantId, tableNumber: t.number })
+      toast.success('Gérant alerté')
+    } catch (err) {
+      console.error('[SallePage] callManager:', err)
+      toast.error("Échec de l'appel du gérant")
+    }
+  }
+
   return (
     <RestaurantLayout>
       <PageHeader
@@ -520,6 +547,7 @@ export function SallePage() {
                             now={now}
                             onToggleAlert={() => handleToggleAlert(t._id)}
                             onRelease={() => handleRelease(t)}
+                            onCallManager={() => handleCallManager(t)}
                           />
                         ))}
                       </div>

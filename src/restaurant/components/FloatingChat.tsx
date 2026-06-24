@@ -47,6 +47,11 @@ export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'>
   const me = members?.find(m => m.clerkUserId === user?.id) ?? null
 
   const totalUnread = convos?.reduce((s, c) => s + (c.unread ?? 0), 0) ?? 0
+  // M6-B — badge pulsant si un appel gérant non lu est le dernier message broadcast.
+  const broadcastConv = convos?.find(c => c.threadId === 'broadcast')
+  const managerCalled =
+    (broadcastConv?.unread ?? 0) > 0 &&
+    !!broadcastConv?.lastMsg.content.includes('appel gérant')
   // null tant que Convex n'a pas répondu → pas d'auto-open au 1er load (Bug A).
   const prevUnread = useRef<number | null>(null)
 
@@ -115,7 +120,7 @@ export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'>
         className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary shadow-xl flex items-center justify-center hover:scale-105 transition-transform">
         <MessageSquare size={22} className="text-primary-foreground"/>
         {totalUnread > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          <span className={`absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ${managerCalled ? 'animate-pulse' : ''}`}>
             {totalUnread > 9 ? '9+' : totalUnread}
           </span>
         )}
