@@ -1,5 +1,6 @@
 import { v } from "convex/values"
 import { internalMutation } from "./_generated/server"
+import { normalizePaymentMethod } from "./payments"
 
 export const seedLeComptoir = internalMutation({
   args: {},
@@ -79,13 +80,13 @@ export const seedLeComptoir = internalMutation({
     // Seed sample payments
     const samplePayments = [
       { tableNumber:7,  guests:2, subtotalCents:5700,  tipCents:570,  commissionCents:219, totalCents:6270,  paymentMethod:"card",     dateLabel:"11/05" },
-      { tableNumber:13, guests:5, subtotalCents:12920, tipCents:1280, commissionCents:497, totalCents:14200, paymentMethod:"applepay", dateLabel:"11/05" },
+      { tableNumber:13, guests:5, subtotalCents:12920, tipCents:1280, commissionCents:497, totalCents:14200, paymentMethod:"apple_pay", dateLabel:"11/05" },
       { tableNumber:2,  guests:2, subtotalCents:4380,  tipCents:440,  commissionCents:169, totalCents:4820,  paymentMethod:"card",     dateLabel:"10/05" },
       { tableNumber:5,  guests:4, subtotalCents:8140,  tipCents:810,  commissionCents:313, totalCents:8950,  paymentMethod:"card",     dateLabel:"10/05" },
-      { tableNumber:11, guests:2, subtotalCents:3420,  tipCents:340,  commissionCents:132, totalCents:3760,  paymentMethod:"googlepay",dateLabel:"10/05" },
+      { tableNumber:11, guests:2, subtotalCents:3420,  tipCents:340,  commissionCents:132, totalCents:3760,  paymentMethod:"google_pay",dateLabel:"10/05" },
       { tableNumber:6,  guests:3, subtotalCents:6590,  tipCents:650,  commissionCents:253, totalCents:7240,  paymentMethod:"card",     dateLabel:"09/05" },
       { tableNumber:1,  guests:2, subtotalCents:4670,  tipCents:460,  commissionCents:180, totalCents:5130,  paymentMethod:"card",     dateLabel:"09/05" },
-      { tableNumber:8,  guests:4, subtotalCents:8980,  tipCents:890,  commissionCents:345, totalCents:9870,  paymentMethod:"applepay", dateLabel:"08/05" },
+      { tableNumber:8,  guests:4, subtotalCents:8980,  tipCents:890,  commissionCents:345, totalCents:9870,  paymentMethod:"apple_pay", dateLabel:"08/05" },
     ]
 
     for (const p of samplePayments) {
@@ -100,7 +101,7 @@ export const seedLeComptoir = internalMutation({
           tipCents: p.tipCents,
           commissionCents: p.commissionCents,
           totalCents: p.totalCents,
-          paymentMethod: p.paymentMethod,
+          paymentMethod: normalizePaymentMethod(p.paymentMethod),
           status: "Encaissé",
           createdAt: Date.now(),
           dateLabel: p.dateLabel,
@@ -129,7 +130,7 @@ export const seedScenarioComplet = internalMutation({
 
     const now = Date.now()
     const DAY = 86400000
-    const methods = ["card", "card", "applepay", "googlepay"] as const
+    const methods = ["card", "card", "apple_pay", "google_pay"] as const
 
     const paymentRows: Array<{
       createdAt: number; tableNumber: number; guests: number

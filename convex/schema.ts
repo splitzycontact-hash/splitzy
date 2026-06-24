@@ -185,7 +185,16 @@ export default defineSchema({
     tipCents: v.number(),
     commissionCents: v.number(),
     totalCents: v.number(),
-    paymentMethod: v.string(),
+    // Famille de moyen de paiement (union). Valeurs brutes (visa/mastercard/amex/
+    // cb…) normalisées via payments.normalizePaymentMethod avant insertion ;
+    // données historiques rattrapées par la migration payments.normalizePaymentMethods.
+    paymentMethod: v.union(
+      v.literal("card"),
+      v.literal("apple_pay"),
+      v.literal("google_pay"),
+      v.literal("cash"),
+      v.literal("other"),
+    ),
     firstName: v.optional(v.string()),
     avatarIndex: v.optional(v.number()),
     // Coordonnées laissées sur /confirmation, backfillées via customers.saveContact(paymentId).

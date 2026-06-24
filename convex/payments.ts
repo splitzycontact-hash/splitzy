@@ -2,6 +2,20 @@ import { query, mutation, internalMutation, internalQuery } from "./_generated/s
 import { v } from "convex/values"
 import { requireRestaurantAccess } from "./authz"
 
+// Familles de moyens de paiement stockées dans payments.paymentMethod (schéma
+// en union). Le client envoie une valeur brute (marque de carte visa/mastercard/
+// amex, 'card', 'apple_pay', 'google_pay', ou 'cash' pour un règlement espèces) ;
+// on la ramène à l'une de ces 5 familles avant insertion.
+export type PaymentMethod = "card" | "apple_pay" | "google_pay" | "cash" | "other"
+export function normalizePaymentMethod(m: string | undefined): PaymentMethod {
+  const k = (m ?? "").toLowerCase()
+  if (k === "apple_pay") return "apple_pay"
+  if (k === "google_pay") return "google_pay"
+  if (k === "cash" || k === "especes" || k === "espèces") return "cash"
+  if (k === "visa" || k === "mastercard" || k === "amex" || k === "card" || k === "cb") return "card"
+  return k ? "other" : "card" // méthode vide (démo historique) → supposée carte
+}
+
 export const list = query({
   // `from`/`to` (ms epoch, optionnels) filtrent par createdAt sur [from, to).
   // Rétrocompat : sans ces args, retourne tous les paiements (comportement existant).
@@ -97,6 +111,7 @@ export const create = mutation({
     const ref = providerRef ?? crypto.randomUUID()
     const paymentId = await ctx.db.insert("payments", {
       ...paymentData,
+      paymentMethod: normalizePaymentMethod(args.paymentMethod),
       subtotalCents,
       tipCents: args.tipCents,
       commissionCents,
@@ -264,4 +279,57 @@ export const listAll = internalQuery({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) =>
     ctx.db.query("payments").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).collect(),
+})
+
+// Répartition du volume encaissé par moyen de paiement, sur la période demandée
+// ("today" | "week" | "month" — défaut : tout l'historique). Montants en cents,
+// regroupés par famille (carte/Apple Pay/Google Pay/espèces/autre).
+export const getPaymentMethodBreakdown = query({
+  args: { restaurantId: v.id("restaurants"), period: v.optional(v.string()) },
+  handler: async (ctx, { restaurantId, period }) => {
+    await requireRestaurantAccess(ctx, restaurantId)
+    const rows = await ctx.db
+      .query("payments")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId))
+      .collect()
+    const now = Date.now()
+    // Bornes en UTC (déterministe côté serveur Convex). L'UI affine si besoin.
+    const from =
+      period === "today" ? now - (now % 86400000) :
+      period === "week"  ? now - 7 * 86400000 :
+      period === "month" ? now - 30 * 86400000 : 0
+    const breakdown: Record<PaymentMethod, number> = {
+      card: 0, apple_pay: 0, google_pay: 0, cash: 0, other: 0,
+    }
+    for (const p of rows) {
+      if (p.status !== "Encaissé") continue
+      if (p.createdAt < from) continue
+      breakdown[normalizePaymentMethod(p.paymentMethod)] += p.subtotalCents
+    }
+    return breakdown
+  },
+})
+
+// Migration (CLI `npx convex run` uniquement) : ramène les valeurs brutes
+// existantes de payments.paymentMethod (visa/mastercard/amex/cb…) aux familles
+// du schéma en union. À exécuter AVANT de déployer le schéma en union, sinon la
+// validation Convex rejette les anciennes lignes. Idempotent — `before` retourne
+// le décompte des valeurs rencontrées pour vérification.
+export const normalizePaymentMethods = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("payments").collect()
+    const before: Record<string, number> = {}
+    let patched = 0
+    for (const p of rows) {
+      const raw = p.paymentMethod as string | undefined
+      before[raw ?? "(vide)"] = (before[raw ?? "(vide)"] ?? 0) + 1
+      const norm = normalizePaymentMethod(raw)
+      if (norm !== raw) {
+        await ctx.db.patch(p._id, { paymentMethod: norm })
+        patched++
+      }
+    }
+    return { total: rows.length, patched, before }
+  },
 })

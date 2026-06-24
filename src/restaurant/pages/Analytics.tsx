@@ -7,6 +7,7 @@ import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import { formatEur } from '../../utils/formatCurrency'
 import { Download, Printer, Calendar, TrendingUp, TrendingDown, Sparkles, ArrowRight, Star, Clock, UtensilsCrossed, Banknote } from 'lucide-react'
+import { PieChart, Pie, Cell } from 'recharts'
 
 type PeriodKey = 'today' | 'week' | 'month' | 'year' | 'custom'
 
@@ -43,9 +44,6 @@ function toPayBucket(m: string | undefined): PayBucket {
   if (k === 'visa' || k === 'mastercard' || k === 'amex' || k === 'card' || k === 'cb') return 'card'
   return k ? 'other' : 'card' // méthode vide (démo historique) → supposée carte
 }
-// Géométrie du donut SVG (rayon / circonférence pour le strokeDasharray)
-const DONUT_R = 52
-const DONUT_C = 2 * Math.PI * DONUT_R
 
 type ConvexPayment = {
   totalCents: number; tipCents: number; subtotalCents: number;
@@ -568,14 +566,6 @@ export function Analytics() {
       .sort((a, b) => b.cents - a.cents)
   })()
   const paymentTotalCents = paymentSplit.reduce((s, r) => s + r.cents, 0)
-  // Segments cumulatifs du donut. offset (-dashoffset) = début du segment, calculé
-  // depuis la somme des cents qui précèdent (pas de réassignation pendant le render).
-  const donutSegments = paymentSplit.map((r, i) => {
-    const before = paymentSplit.slice(0, i).reduce((s, x) => s + x.cents, 0)
-    const frac = paymentTotalCents > 0 ? r.cents / paymentTotalCents : 0
-    const beforeFrac = paymentTotalCents > 0 ? before / paymentTotalCents : 0
-    return { color: r.color, dash: frac * DONUT_C, offset: -beforeFrac * DONUT_C }
-  })
 
   // Temps moyen d'encaissement : amplitude des paiements d'une même table sur une journée
   const tableTimeAvg = (() => {
@@ -1160,24 +1150,28 @@ export function Analytics() {
           <div className="px-5 py-5">
             {paymentSplit.length > 0 ? (
               <div className="flex flex-col sm:flex-row items-center gap-6">
-                {/* Donut SVG (hand-rolled, cohérent avec les autres charts) */}
+                {/* Donut (recharts PieChart) */}
                 <div className="relative flex-shrink-0" style={{ width: 140, height: 140 }}>
-                  <svg viewBox="0 0 140 140" style={{ width: 140, height: 140, display: 'block' }}>
-                    <circle cx="70" cy="70" r={DONUT_R} fill="none" stroke="var(--ds-bg-subtle)" strokeWidth="18" />
-                    {donutSegments.map((seg, i) => (
-                      <circle
-                        key={i}
-                        cx="70" cy="70" r={DONUT_R}
-                        fill="none"
-                        stroke={seg.color}
-                        strokeWidth="18"
-                        strokeDasharray={`${seg.dash} ${DONUT_C - seg.dash}`}
-                        strokeDashoffset={seg.offset}
-                        transform="rotate(-90 70 70)"
-                        style={{ transition: 'stroke-dasharray .4s ease' }}
-                      />
-                    ))}
-                  </svg>
+                  <PieChart width={140} height={140}>
+                    <Pie
+                      data={paymentSplit}
+                      dataKey="cents"
+                      nameKey="label"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={44}
+                      outerRadius={68}
+                      paddingAngle={2}
+                      startAngle={90}
+                      endAngle={-270}
+                      stroke="none"
+                      isAnimationActive={false}
+                    >
+                      {paymentSplit.map(row => (
+                        <Cell key={row.bucket} fill={row.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="font-extrabold text-[18px] tabular-nums ds-text-primary leading-none">{formatEur(paymentTotalCents)}</span>
                     <span className="text-[10.5px] ds-text-tertiary mt-1">encaissé</span>
