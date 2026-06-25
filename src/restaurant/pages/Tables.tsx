@@ -13,6 +13,18 @@ import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
 import { formatEur } from '../../utils/formatCurrency'
 import { paidPct, perGuestCents, avgBasketCents, remainingCents } from '../lib/billing'
+import { Skeleton } from '../../components/ui/skeleton'
+import { useConfetti } from '../components/ui/Confetti'
+
+function TablesGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 p-6">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <Skeleton key={i} className="rounded-xl h-[110px]" />
+      ))}
+    </div>
+  )
+}
 
 type TableStatus = 'free' | 'dining' | 'payment' | 'paid'
 type FilterKey   = 'all' | TableStatus
@@ -113,8 +125,14 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
   const perGuest = perGuestCents(total, guests)
 
   return (
-    <article
-      className="flex flex-col rounded-[12px] overflow-hidden transition-all hover:-translate-y-px"
+    <m.article
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileHover={{ y: -3, boxShadow: '0 8px 24px rgba(0,0,0,0.10)' }}
+      whileTap={{ scale: 0.97 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className="flex flex-col rounded-[12px] overflow-hidden"
       style={{
         background: status === 'dining' || status === 'paid' ? '#18181B' : 'var(--ds-bg-surface)',
         border: `1px solid ${status === 'payment' ? '#F5DDB3' : status === 'paid' ? '#C6F0D2' : status === 'dining' ? '#27272A' : 'var(--ds-border)'}`,
@@ -295,7 +313,7 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
           Simuler commande
         </button>
       )}
-    </article>
+    </m.article>
   )
 }
 
@@ -309,6 +327,7 @@ export function Tables() {
   const [addModal, setAddModal]       = useState<TableData | null>(null)
   const [sendModal, setSendModal]     = useState<TableData | null>(null)
   const [sendLoading, setSendLoading] = useState(false)
+  const { fire, ConfettiCanvas } = useConfetti()
 
   const restaurantId = useRestaurantId()
   const rawTables   = useQuery(api.tables.list,              restaurantId ? { restaurantId } : 'skip')
@@ -492,11 +511,7 @@ export function Tables() {
         </div>
 
         {/* Loading */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#E8920A', borderTopColor: 'transparent' }} />
-          </div>
-        )}
+        {isLoading && <TablesGridSkeleton />}
 
         {/* Empty */}
         {!isLoading && filtered.length === 0 && (
@@ -511,19 +526,22 @@ export function Tables() {
         {/* Grid */}
         {!isLoading && filtered.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {filtered.map(table => (
-              <TableCard
-                key={table.id}
-                table={table}
-                onSimulate={() => { setSimTbl(table); setSimItems(generateOrder(menu)) }}
-                onView={() => setSelected(table)}
-                onAdd={() => setAddModal(table)}
-                onSend={() => setSendModal(table)}
-              />
-            ))}
+            <AnimatePresence>
+              {filtered.map(table => (
+                <TableCard
+                  key={table.id}
+                  table={table}
+                  onSimulate={() => { setSimTbl(table); setSimItems(generateOrder(menu)) }}
+                  onView={() => setSelected(table)}
+                  onAdd={() => setAddModal(table)}
+                  onSend={() => setSendModal(table)}
+                />
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </div>
+      <ConfettiCanvas />
 
       {/* Detail modal */}
       <AnimatePresence>
@@ -549,7 +567,7 @@ export function Tables() {
               </div>
               <div className="flex items-center gap-3 px-6 pb-5">
                 {liveSelected.status !== 'free' && liveSelected.convexId && (
-                  <button onClick={() => { resetToFree({ tableId: liveSelected.convexId as Id<'tables'> }).catch(() => {}); setSelected(null) }} className="flex-1 font-semibold text-sm rounded-xl py-2.5 border" style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}>Libérer la table</button>
+                  <button onClick={() => { resetToFree({ tableId: liveSelected.convexId as Id<'tables'> }).then(() => fire()).catch(() => {}); setSelected(null) }} className="flex-1 font-semibold text-sm rounded-xl py-2.5 border" style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}>Libérer la table</button>
                 )}
                 <button onClick={() => setSelected(null)} className="flex-1 font-semibold text-sm rounded-xl py-2.5" style={{ background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-secondary)' }}>Fermer</button>
               </div>

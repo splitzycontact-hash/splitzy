@@ -9,6 +9,7 @@ import { api } from '../../../convex/_generated/api'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
+import { Skeleton } from '../../components/ui/skeleton'
 
 // Libellés des compétences / postes — miroir de Paramètres → Équipe et Planning.
 const SKILL_LABEL: Record<string, string> = {
@@ -166,9 +167,10 @@ function Repertoire({
 }) {
   if (extras === undefined) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 py-20">
-        <Hourglass size={20} style={{ color: 'var(--ds-text-tertiary)' }} className="animate-pulse" />
-        <p className="text-[13px] ds-text-tertiary">Chargement…</p>
+      <div className="flex flex-col gap-3 py-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 rounded-xl" />
+        ))}
       </div>
     )
   }

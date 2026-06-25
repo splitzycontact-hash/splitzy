@@ -6,6 +6,7 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { toast } from 'sonner'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
+import { Skeleton } from '../../components/ui/skeleton'
 import { useRestaurantId, useRestaurant, useRestaurantRole } from '../context/RestaurantContext'
 import {
   Printer, Search, SlidersHorizontal, LayoutGrid, List,
@@ -910,7 +911,13 @@ export function Factures() {
           {gridView && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-5">
               {filteredRows.length === 0 ? (
-                <div className="col-span-3 py-10 text-center text-[13px] ds-text-tertiary">{isLoadingPayments ? 'Chargement des transactions…' : 'Aucune transaction.'}</div>
+                isLoadingPayments ? (
+                  <div className="col-span-3 flex flex-col gap-2">
+                    {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 rounded" />)}
+                  </div>
+                ) : (
+                  <div className="col-span-3 py-10 text-center text-[13px] ds-text-tertiary">Aucune transaction.</div>
+                )
               ) : filteredRows.map((row, i) => {
                 const ml = METHOD_LABELS[row.method]
                 return (
@@ -962,7 +969,13 @@ export function Factures() {
 
           {/* Grouped rows */}
           {Object.entries(grouped).length === 0 ? (
-            <div className="py-12 text-center text-[13px] ds-text-tertiary">{isLoadingPayments ? 'Chargement des transactions…' : 'Aucune transaction pour cette période.'}</div>
+            isLoadingPayments ? (
+              <div className="flex flex-col gap-2 p-5">
+                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 rounded" />)}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-[13px] ds-text-tertiary">Aucune transaction pour cette période.</div>
+            )
           ) : (
             Object.entries(grouped).map(([day, dayRows]) => {
               const dayTotal = dayRows.filter(r => r.status !== 'Remboursé').reduce((s, r) => s + r.amount, 0)

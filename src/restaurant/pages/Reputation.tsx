@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { m } from 'framer-motion'
 import { useQuery, useMutation, useAction } from 'convex/react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
@@ -6,6 +7,7 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId } from '../context/RestaurantContext'
+import { Skeleton } from '../../components/ui/skeleton'
 import { Star, Shield, MessageSquare, Sparkles, RefreshCw, Pencil } from 'lucide-react'
 
 function timeAgo(ts: number): string {
@@ -29,7 +31,30 @@ type Feedback = {
   managerReply?: string
 }
 
-function StarRating({ count, size = 13 }: { count: number; size?: number }) {
+function StarRating({ count, size = 13, cardIndex }: { count: number; size?: number; cardIndex?: number }) {
+  // cardIndex défini → étoiles animées en spring (stagger par carte + par étoile)
+  if (cardIndex !== undefined) {
+    return (
+      <span className="inline-flex gap-px">
+        {[0, 1, 2, 3, 4].map(i => (
+          <m.span
+            key={i}
+            className="inline-flex"
+            initial={{ scale: 0, rotate: -15 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: cardIndex * 0.04 + i * 0.06, type: 'spring', stiffness: 400, damping: 15 }}
+          >
+            <Star
+              size={size}
+              fill={i < count ? '#E8920A' : 'none'}
+              stroke={i < count ? '#E8920A' : 'var(--ds-border-strong)'}
+              strokeWidth={1.5}
+            />
+          </m.span>
+        ))}
+      </span>
+    )
+  }
   return (
     <span className="inline-flex gap-px">
       {[0, 1, 2, 3, 4].map(i => (
@@ -213,16 +238,24 @@ export function Reputation() {
 
           <div className="ds-panel">
             {loading ? (
-              <div className="py-12 text-center text-[13px] ds-text-tertiary">Chargement…</div>
+              <div className="flex flex-col gap-3 p-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-[80px] rounded-xl" />
+                ))}
+              </div>
             ) : filtered.length === 0 ? (
               <div className="py-12 text-center text-[13px] ds-text-tertiary">
                 {total === 0 ? 'Aucun feedback reçu pour le moment.' : 'Aucun feedback pour ce filtre.'}
               </div>
-            ) : filtered.map(fb => (
-              <div
+            ) : filtered.map((fb, index) => (
+              <m.div
                 key={fb._id}
                 className="grid gap-4 px-5 py-4 border-b last:border-b-0 items-start"
                 style={{ gridTemplateColumns: '72px 1fr', borderColor: 'var(--ds-border)' }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.04, duration: 0.25 }}
+                whileHover={{ y: -2, boxShadow: '0 6px 20px rgba(0,0,0,0.07)' }}
               >
                 {/* Rating */}
                 <div className="flex flex-col items-center gap-1">
@@ -235,7 +268,7 @@ export function Reputation() {
                   >
                     {fb.stars},0
                   </span>
-                  <StarRating count={fb.stars} size={11} />
+                  <StarRating count={fb.stars} size={11} cardIndex={index} />
                 </div>
 
                 {/* Body */}
@@ -337,7 +370,7 @@ export function Reputation() {
                     )}
                   </div>
                 </div>
-              </div>
+              </m.div>
             ))}
           </div>
 

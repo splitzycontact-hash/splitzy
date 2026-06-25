@@ -8,6 +8,7 @@ import type { Id } from '../../../convex/_generated/dataModel'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
+import { Skeleton } from '../../components/ui/skeleton'
 
 // Libellés des compétences — miroir de la liste Paramètres → Équipe, dupliqué ici
 // volontairement pour ne pas coupler Planning à Settings (page non modifiée).
@@ -501,9 +502,8 @@ function WeekGrid({
 
       {/* États plein-largeur : chargement / vide */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-16">
-          <Clock size={20} style={{ color: 'var(--ds-text-tertiary)' }} className="animate-pulse" />
-          <p className="text-[13px] ds-text-tertiary">Chargement…</p>
+        <div className="px-5 py-4">
+          <Skeleton className="h-[200px] rounded-xl" />
         </div>
       ) : extras.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">

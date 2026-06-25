@@ -245,6 +245,7 @@ function LayoutInner({ children }: { children: ReactNode }) {
   const { theme } = useTheme()
   const print = usePrintState()
   const restaurantId = useRestaurantId()
+  const location = useLocation()
 
   return (
     <PrintProvider onOpen={print.openSelector}>
@@ -255,7 +256,18 @@ function LayoutInner({ children }: { children: ReactNode }) {
       >
         <Sidebar />
         <div className="flex-1 overflow-y-auto min-w-0 pb-16 md:pb-0">
-          {children}
+          <AnimatePresence mode="wait">
+            <m.main
+              key={location.pathname}
+              className="flex-1 min-w-0"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              {children}
+            </m.main>
+          </AnimatePresence>
         </div>
         <MobileBottomNav />
         {restaurantId && <FloatingChat restaurantId={restaurantId} />}

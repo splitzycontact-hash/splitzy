@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { m, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -6,8 +7,35 @@ import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import { formatEur } from '../../utils/formatCurrency'
+import { NumberTicker } from '../components/ui/NumberTicker'
+import { Skeleton } from '../../components/ui/skeleton'
 import { Download, Printer, Calendar, TrendingUp, TrendingDown, Sparkles, ArrowRight, Star, Clock, UtensilsCrossed, Banknote, CalendarClock, Archive, AlertTriangle } from 'lucide-react'
 import { PieChart, Pie, Cell } from 'recharts'
+
+// ── Skeletons (loading states) ──────────────────────────────────
+function MetricSkeleton() {
+  return (
+    <div className="ds-panel p-4 flex flex-col gap-2">
+      <Skeleton className="h-2.5 w-16" />
+      <Skeleton className="h-7 w-24" />
+      <Skeleton className="h-2.5 w-12" />
+    </div>
+  )
+}
+
+function ChartSkeleton() {
+  return (
+    <div className="relative h-[260px] p-5">
+      <div className="absolute left-5 top-5 bottom-10 w-px" style={{ background: 'var(--ds-border)' }} />
+      <div className="absolute left-5 bottom-10 right-5 h-px" style={{ background: 'var(--ds-border)' }} />
+      <div className="absolute left-8 right-5 bottom-10 top-5 flex items-end gap-2">
+        {[60, 80, 45, 90, 70, 55, 85].map((h, i) => (
+          <Skeleton key={i} className="flex-1 rounded-t-md" style={{ height: `${h}%` }} />
+        ))}
+      </div>
+    </div>
+  )
+}
 
 type PeriodKey = 'today' | 'week' | 'month' | 'year' | 'custom'
 
@@ -740,6 +768,19 @@ export function Analytics() {
         </div>
 
         {/* KPI strip */}
+        <AnimatePresence mode="wait">
+        <m.div
+          key={`metrics-${period}`}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.18 }}
+        >
+        {rawPayments === undefined ? (
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3.5">
+            {Array.from({ length: 4 }).map((_, i) => <MetricSkeleton key={i} />)}
+          </div>
+        ) : (
         <div
           className="grid grid-cols-2 xl:grid-cols-3 border rounded-[12px] overflow-hidden"
           style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
@@ -748,6 +789,7 @@ export function Analytics() {
             {
               label: 'CA encaissé', accent: true,
               value: formatEur(weekTotal),
+              tick: { value: weekTotal / 100, decimalPlaces: 2, suffix: '€' },
               delta: caDelta !== null ? `${caDelta > 0 ? '+' : ''}${caDelta.toFixed(1)}%` : '—',
               up: caDelta !== null ? caDelta >= 0 : true,
               vs: prevWeekTotal > 0 ? `vs. ${formatEur(prevWeekTotal)}` : '',
@@ -757,6 +799,7 @@ export function Analytics() {
             {
               label: 'Tickets payés', accent: false,
               value: String(totalTickets),
+              tick: { value: totalTickets, decimalPlaces: 0, suffix: '' },
               delta: ticketsDelta !== null ? `${ticketsDelta > 0 ? '+' : ''}${ticketsDelta} tickets` : '—',
               up: ticketsDelta !== null ? ticketsDelta >= 0 : true,
               vs: prevTotalTickets > 0 ? `vs. ${prevTotalTickets}` : '',
@@ -766,6 +809,7 @@ export function Analytics() {
             {
               label: 'Panier moyen', accent: false,
               value: totalTickets > 0 ? `${avgBasket.toFixed(2).replace('.', ',')}€` : '—',
+              tick: totalTickets > 0 ? { value: avgBasket, decimalPlaces: 2, suffix: '€' } : undefined,
               delta: basketDelta !== null ? `${basketDelta > 0 ? '+' : ''}${basketDelta.toFixed(1)}%` : '—',
               up: basketDelta !== null ? basketDelta >= 0 : true,
               vs: prevAvgBasket > 0 ? `vs. ${prevAvgBasket.toFixed(2).replace('.', ',')}€` : '',
@@ -809,7 +853,9 @@ export function Analytics() {
                 className="font-extrabold tabular-nums leading-none tracking-[-0.035em] mt-auto"
                 style={{ fontSize: '28px', color: kpi.accent ? 'var(--ds-accent)' : 'var(--ds-text-primary)' }}
               >
-                {kpi.value}
+                {'tick' in kpi && kpi.tick
+                  ? <NumberTicker value={kpi.tick.value} decimalPlaces={kpi.tick.decimalPlaces} suffix={kpi.tick.suffix} />
+                  : kpi.value}
                 {'suffix' in kpi && kpi.suffix && (
                   <span className="text-[18px] font-semibold ds-text-secondary tracking-normal ml-0.5">{kpi.suffix}</span>
                 )}
@@ -832,8 +878,19 @@ export function Analytics() {
             </div>
           ))}
         </div>
+        )}
+        </m.div>
+        </AnimatePresence>
 
         {/* Main chart */}
+        <AnimatePresence mode="wait">
+        <m.div
+          key={`chart-${period}`}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.18 }}
+        >
         <div className="ds-panel">
           <div
             className="flex items-start justify-between px-5 py-4 border-b gap-3"
@@ -873,6 +930,7 @@ export function Analytics() {
               </div>
             </div>
           </div>
+          {rawPayments === undefined ? <ChartSkeleton /> : (
           <div className="p-5 pb-2" ref={chartRef}>
             <svg
               viewBox={`0 0 ${chartW} ${CHART_H}`}
@@ -987,7 +1045,10 @@ export function Analytics() {
               )}
             </svg>
           </div>
+          )}
         </div>
+        </m.div>
+        </AnimatePresence>
 
         {/* 2×2 grid */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
@@ -1124,7 +1185,7 @@ export function Analytics() {
                     {avgTipPct}%
                   </div>
                   <div className="text-[12px] ds-text-secondary mt-1.5 leading-[1.5]">
-                    {formatEur(tipsTotal)} collectés
+                    {tipsTotal > 0 ? <NumberTicker value={tipsTotal / 100} decimalPlaces={2} suffix="€" /> : formatEur(tipsTotal)} collectés
                     <br />
                     <span className="ds-text-tertiary">{tipVsBase > 0 ? '+' + tipVsBase + '%' : '—'} vs. avant Splitzy</span>
                   </div>

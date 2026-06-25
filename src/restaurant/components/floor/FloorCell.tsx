@@ -1,3 +1,5 @@
+import { m } from 'framer-motion'
+
 interface FloorCellProps {
   x: number
   y: number
@@ -10,11 +12,14 @@ interface FloorCellProps {
 export default function FloorCell({ x, y, onClick, dimmed }: FloorCellProps) {
   const interactive = !!onClick && !dimmed
   return (
-    <button
+    <m.button
       type="button"
       aria-label={`Cellule ${x + 1}, ${y + 1}`}
       onClick={interactive ? onClick : undefined}
       disabled={!interactive}
+      whileHover={interactive ? { scale: 1.02 } : undefined}
+      whileTap={interactive ? { scale: 0.96 } : undefined}
+      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
       className="w-full transition-colors"
       style={{
         aspectRatio: '1 / 1',

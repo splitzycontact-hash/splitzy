@@ -1,9 +1,15 @@
 import { useState, useEffect, useMemo } from 'react'
+import { m, AnimatePresence } from 'framer-motion'
 import { useQuery } from 'convex/react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
+import { BlurFade } from '../components/ui/BlurFade'
+import { NumberTicker } from '../components/ui/NumberTicker'
+import { BorderBeam } from '../components/ui/BorderBeam'
+import { AnimatedCircularProgress } from '../components/ui/AnimatedCircularProgress'
+import { Skeleton } from '../../components/ui/skeleton'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
 import { formatEur } from '../../utils/formatCurrency'
 import { deltaPct } from '../lib/billing'
@@ -17,9 +23,52 @@ type ConvexTable   = { number: number; status: string; amountCents?: number; pai
 type ConvexPayment = { tableNumber: number; totalCents: number; tipCents: number; subtotalCents: number; createdAt: number; dateLabel: string; status: string; guests: number }
 type ConvexFeedback = { stars: number; isNew?: boolean }
 
+// ── Skeletons (loading states) ──────────────────────────────────
+function KPICardSkeleton() {
+  return (
+    <div className="ds-panel flex flex-col gap-3 p-5 min-h-[132px]">
+      <Skeleton className="h-3 w-20" />
+      <Skeleton className="h-8 w-28 mt-auto" />
+      <Skeleton className="h-2.5 w-16" />
+    </div>
+  )
+}
+
+function TableGridSkeleton() {
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 gap-2.5">
+      {Array.from({ length: 10 }).map((_, i) => (
+        <Skeleton key={i} className="rounded-[10px] min-h-[80px]" />
+      ))}
+    </div>
+  )
+}
+
+function ActivitySkeleton() {
+  return (
+    <div className="flex flex-col">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3.5 py-2">
+          <Skeleton className="w-2 h-2 rounded-full" />
+          <Skeleton className="h-3 w-8" />
+          <Skeleton className="h-3 flex-1" />
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Panel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`ds-panel ${className}`}>{children}</div>
+    <m.div
+      className={`ds-panel ${className}`}
+      whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+    >
+      {children}
+    </m.div>
   )
 }
 
@@ -369,25 +418,44 @@ export function Overview() {
         live
       />
 
-      {alerts.length > 0 && (
-        <div className="mx-4 md:mx-9 mt-4 flex flex-col gap-2">
+      <div className={`mx-4 md:mx-9 flex flex-col gap-2 ${alerts.length > 0 ? 'mt-4' : ''}`}>
+        <AnimatePresence>
           {alerts.map(a => (
-            <div key={a.key} onClick={a.onClick}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium${a.onClick ? ' cursor-pointer hover:bg-red-100' : ''}`}>
-              <AlertTriangle size={16} className="shrink-0" />
-              {a.msg}
-            </div>
+            <m.div
+              key={a.key}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.22 }}
+              className="overflow-hidden"
+            >
+              <div onClick={a.onClick}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium${a.onClick ? ' cursor-pointer hover:bg-red-100' : ''}`}>
+                <AlertTriangle size={16} className="shrink-0" />
+                {a.msg}
+              </div>
+            </m.div>
           ))}
-        </div>
-      )}
+        </AnimatePresence>
+      </div>
 
       <div className="px-4 py-5 md:px-9 md:py-6 space-y-5">
 
         {/* ── KPI Row ── */}
+        <BlurFade delay={0}>
         <section className="grid grid-cols-2 xl:grid-cols-4 gap-3.5">
+        {stats === undefined ? (
+          <>{Array.from({ length: 4 }).map((_, i) => <KPICardSkeleton key={i} />)}</>
+        ) : (
+          <>
 
           {/* CA du jour */}
-          <div className="ds-panel flex flex-col gap-3 p-4 md:p-5 relative min-h-[132px]">
+          <m.div
+            className="ds-panel flex flex-col gap-3 p-4 md:p-5 relative min-h-[132px]"
+            whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
             <div className="flex items-center gap-[7px] text-[11px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">
               <Euro size={13} style={{ color: 'var(--ds-text-tertiary)' }} />
               CA du jour
@@ -397,7 +465,7 @@ export function Overview() {
                 className="font-extrabold tabular-nums leading-none tracking-[-0.035em]"
                 style={{ fontSize: '34px', color: 'var(--ds-accent)', fontFamily: 'Inter, sans-serif' }}
               >
-                {caTotal > 0 ? formatEur(caTotal) : '0€'}
+                {caTotal > 0 ? <NumberTicker value={caTotal / 100} decimalPlaces={2} suffix="€" /> : '0€'}
               </div>
             </div>
             <div className="flex items-center gap-1.5 text-[12px] ds-text-secondary">
@@ -428,23 +496,28 @@ export function Overview() {
                 strokeLinejoin="round"
               />
             </svg>
-          </div>
+          </m.div>
 
           {/* Tables actives */}
-          <div className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px]">
+          <m.div
+            className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px]"
+            whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
             <div className="flex items-center gap-[7px] text-[11px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">
               <Grid3x3 size={13} style={{ color: 'var(--ds-text-tertiary)' }} />
               Tables actives
             </div>
             <div className="flex items-baseline gap-2 mt-auto">
               {isLoading ? (
-                <div className="w-5 h-5 rounded-full border-2 border-[#E8920A] border-t-transparent animate-spin" />
+                <Skeleton className="h-8 w-16" />
               ) : (
                 <div
                   className="font-extrabold tabular-nums leading-none tracking-[-0.035em]"
                   style={{ fontSize: '34px', color: 'var(--ds-text-primary)', fontFamily: 'Inter, sans-serif' }}
                 >
-                  {activeTables}
+                  <NumberTicker value={activeTables} delay={0.05} />
                   <span className="text-[18px] font-semibold ds-text-tertiary ml-[-1px]">/{totalTables}</span>
                 </div>
               )}
@@ -461,10 +534,15 @@ export function Overview() {
                 <span>Toutes libres</span>
               )}
             </div>
-          </div>
+          </m.div>
 
           {/* Score Splitzy — dérivé des feedbacks réels ("—" si aucun) */}
-          <div className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px] relative overflow-hidden">
+          <m.div
+            className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px] relative overflow-hidden"
+            whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
             <div
               className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
               style={{ background: 'radial-gradient(circle, rgba(232,146,10,0.10), transparent 70%)' }}
@@ -474,24 +552,16 @@ export function Overview() {
               Score Splitzy
             </div>
             <div className="flex items-center gap-3.5 mt-auto">
-              {/* Mini gauge */}
-              <div className="relative w-[72px] h-[72px] flex-shrink-0">
-                <svg width="72" height="72" viewBox="0 0 72 72" style={{ transform: 'rotate(-135deg)', overflow: 'visible' }}>
-                  <circle cx="36" cy="36" r="28" fill="none" stroke="var(--ds-bg-subtle)" strokeWidth="6"
-                    strokeLinecap="round" strokeDasharray="132 176" strokeDashoffset="0" />
-                  <circle cx="36" cy="36" r="28" fill="none" stroke="#E8920A" strokeWidth="6"
-                    strokeLinecap="round" strokeDasharray={`${Math.round(((repScore ?? 0) / 100) * 132)} 176`} strokeDashoffset="0" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0">
-                  <div
-                    className="font-black leading-none tabular-nums tracking-[-0.04em]"
-                    style={{ fontSize: '20px', color: 'var(--ds-text-primary)', fontFamily: 'Inter, sans-serif' }}
-                  >
-                    {repScore ?? '—'}
-                  </div>
-                  <div className="text-[9.5px] font-semibold ds-text-tertiary mt-[2px]">/ 100</div>
+              {/* Mini gauge animée */}
+              <AnimatedCircularProgress value={repScore ?? 0}>
+                <div
+                  className="font-black leading-none tabular-nums tracking-[-0.04em]"
+                  style={{ fontSize: '20px', color: 'var(--ds-text-primary)', fontFamily: 'Inter, sans-serif' }}
+                >
+                  {repScore ?? '—'}
                 </div>
-              </div>
+                <div className="text-[9.5px] font-semibold ds-text-tertiary mt-[2px]">/ 100</div>
+              </AnimatedCircularProgress>
               <div className="flex flex-col gap-1 min-w-0 flex-1">
                 <div className="font-bold text-[13px] tracking-[-0.015em] ds-text-primary">
                   {repScore === null ? 'Aucun feedback' : repScore >= 80 ? 'Très bon' : repScore >= 60 ? 'Bon' : 'À surveiller'}
@@ -515,10 +585,15 @@ export function Overview() {
                 ))}
               </div>
             </div>
-          </div>
+          </m.div>
 
           {/* Pourboires */}
-          <div className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px]">
+          <m.div
+            className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px]"
+            whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
             <div className="flex items-center gap-[7px] text-[11px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">
               <HandCoins size={13} style={{ color: 'var(--ds-text-tertiary)' }} />
               Pourboires
@@ -528,7 +603,7 @@ export function Overview() {
                 className="font-extrabold tabular-nums leading-none tracking-[-0.035em]"
                 style={{ fontSize: '34px', color: 'var(--ds-success)', fontFamily: 'Inter, sans-serif' }}
               >
-                {formatEur(tipsTotal)}
+                {tipsTotal > 0 ? <NumberTicker value={tipsTotal / 100} decimalPlaces={2} suffix="€" delay={0.1} /> : '0€'}
               </div>
             </div>
             <div className="flex items-center gap-1.5 text-[12px] ds-text-secondary">
@@ -544,10 +619,14 @@ export function Overview() {
                 <span>Aucun pourboire</span>
               )}
             </div>
-          </div>
+          </m.div>
+          </>
+        )}
         </section>
+        </BlurFade>
 
         {/* ── Main grid ── */}
+        <BlurFade delay={0.07}>
         <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-3.5">
 
           {/* Tables live */}
@@ -561,9 +640,7 @@ export function Overview() {
             </PanelHeader>
             <div className="p-[18px] px-5">
               {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="w-5 h-5 rounded-full border-2 border-[#E8920A] border-t-transparent animate-spin" />
-                </div>
+                <TableGridSkeleton />
               ) : tables.length === 0 ? (
                 <div className="flex flex-col items-center py-8 gap-2 ds-text-tertiary text-sm">
                   <span className="text-2xl">🪑</span>
@@ -583,11 +660,8 @@ export function Overview() {
           <div className="flex flex-col gap-3.5">
 
             {/* Insights IA */}
-            <Panel className="relative">
-              <div
-                className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-[2px]"
-                style={{ background: 'var(--ds-accent)' }}
-              />
+            <Panel className="relative overflow-hidden">
+              <BorderBeam size={300} duration={8} delay={3} />
               <PanelHeader>
                 <PanelTitle>
                   <span
@@ -713,8 +787,10 @@ export function Overview() {
 
           </div>
         </section>
+        </BlurFade>
 
         {/* ── Activity ── */}
+        <BlurFade delay={0.14}>
         <Panel>
           <PanelHeader>
             <div>
@@ -724,10 +800,23 @@ export function Overview() {
             <PanelLink to="/restaurant/factures" label="Tout voir" />
           </PanelHeader>
           <div className="px-5 pt-1 pb-3">
-            {recentPayments.length > 0
-              ? recentPayments.slice(0, 6).map((p, i) => (
-                  <ActivityRow key={i} payment={p} isLast={i === Math.min(recentPayments.length, 6) - 1} />
-                ))
+            {rawPayments === undefined
+              ? <ActivitySkeleton />
+              : recentPayments.length > 0
+              ? (
+                <AnimatePresence>
+                  {recentPayments.slice(0, 6).map((p, i) => (
+                    <m.div
+                      key={`${p.tableNumber}-${p.createdAt}`}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05, duration: 0.22 }}
+                    >
+                      <ActivityRow payment={p} isLast={i === Math.min(recentPayments.length, 6) - 1} />
+                    </m.div>
+                  ))}
+                </AnimatePresence>
+              )
               : (
                 <div className="py-8 text-center text-[12.5px]" style={{ color: 'var(--ds-text-tertiary)' }}>
                   Aucune activité pour le moment — les paiements Splitzy apparaîtront ici en temps réel.
@@ -736,6 +825,7 @@ export function Overview() {
             }
           </div>
         </Panel>
+        </BlurFade>
 
       </div>
     </RestaurantLayout>

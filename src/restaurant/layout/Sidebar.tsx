@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { m } from 'framer-motion'
 import {
   LayoutDashboard, Grid3x3, Star, TrendingUp,
   Utensils, Users, Receipt, Plug, Settings, CalendarDays,
@@ -10,6 +11,7 @@ import { api } from '../../../convex/_generated/api'
 import { useRestaurant, useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
 import { useServiceStartTs } from '../hooks/useServiceStartTs'
 import { StandaloneThemeToggle } from '../components/StandaloneThemeToggle'
+import { BlurFade } from '../components/ui/BlurFade'
 import { ROLE_LABEL, type RestaurantRole } from '../lib/roles'
 
 const clerkReady = (() => {
@@ -57,9 +59,11 @@ function RoleBadge({ role }: { role: Exclude<RestaurantRole, 'owner'> }) {
 
 function SplitzyLogo() {
   return (
-    <div
+    <m.div
       className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
       style={{ background: '#1A1A1A' }}
+      whileHover={{ scale: 1.08, rotate: -3 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
     >
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
         <rect x="3" y="5.5" width="6" height="9" rx="1.4" fill="#FFFFFF"/>
@@ -71,7 +75,7 @@ function SplitzyLogo() {
         <rect x="12.4" y="9.1" width="3.2" height="0.9" rx="0.45" fill="#B8730A"/>
         <rect x="12.4" y="10.8" width="2" height="0.9" rx="0.45" fill="#B8730A"/>
       </svg>
-    </div>
+    </m.div>
   )
 }
 
@@ -92,40 +96,46 @@ function NavItem({
   to: string; exact?: boolean; icon: React.ElementType; label: string; count?: number; redCount?: number
 }) {
   return (
-    <NavLink
-      to={to}
-      end={exact}
-      className={({ isActive }) =>
-        `flex items-center gap-2.5 px-2.5 py-[7px] rounded-[7px] text-[13.5px] font-medium transition-colors w-full ${
-          isActive ? 'ds-bg-accent-soft ds-text-accent-strong font-semibold' : 'ds-text-secondary hover:ds-bg-subtle'
-        }`
-      }
-    >
+    <NavLink to={to} end={exact} className="block w-full">
       {({ isActive }) => (
-        <>
-          <Icon
-            size={16}
-            strokeWidth={1.8}
-            style={{ color: isActive ? 'var(--ds-accent)' : 'var(--ds-text-tertiary)', flexShrink: 0 }}
-          />
-          <span className="flex-1 truncate">{label}</span>
-          {redCount !== undefined && redCount > 0 && (
-            <span className="text-[11px] px-1.5 py-px rounded-full font-bold tabular-nums bg-[#EF4444] text-white">
-              {redCount}
-            </span>
+        <div
+          className={`relative flex items-center gap-2.5 px-2.5 py-[7px] rounded-[7px] text-[13.5px] font-medium transition-colors ${
+            isActive ? 'ds-text-accent-strong font-semibold' : 'ds-text-secondary hover:ds-bg-subtle'
+          }`}
+        >
+          {isActive && (
+            <m.div
+              layoutId="sidebar-active-bg"
+              className="absolute inset-0 rounded-[7px]"
+              style={{ background: 'var(--ds-accent-soft)' }}
+              transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+            />
           )}
-          {count !== undefined && count > 0 && (
-            <span
-              className="text-[11px] px-1.5 py-px rounded-full font-semibold tabular-nums"
-              style={{
-                background: isActive ? '#FFE2BB' : 'var(--ds-bg-subtle)',
-                color: isActive ? 'var(--ds-accent-strong)' : 'var(--ds-text-secondary)',
-              }}
-            >
-              {count}
-            </span>
-          )}
-        </>
+          <span className="relative z-10 flex items-center gap-2.5 flex-1 min-w-0">
+            <Icon
+              size={16}
+              strokeWidth={1.8}
+              style={{ color: isActive ? 'var(--ds-accent)' : 'var(--ds-text-tertiary)', flexShrink: 0 }}
+            />
+            <span className="flex-1 truncate">{label}</span>
+            {redCount !== undefined && redCount > 0 && (
+              <span className="text-[11px] px-1.5 py-px rounded-full font-bold tabular-nums bg-[#EF4444] text-white">
+                {redCount}
+              </span>
+            )}
+            {count !== undefined && count > 0 && (
+              <span
+                className="text-[11px] px-1.5 py-px rounded-full font-semibold tabular-nums"
+                style={{
+                  background: isActive ? '#FFE2BB' : 'var(--ds-bg-subtle)',
+                  color: isActive ? 'var(--ds-accent-strong)' : 'var(--ds-text-secondary)',
+                }}
+              >
+                {count}
+              </span>
+            )}
+          </span>
+        </div>
       )}
     </NavLink>
   )
@@ -168,6 +178,7 @@ function UserSection() {
 export function Sidebar() {
   const restaurant = useRestaurant()
   const restaurantId = useRestaurantId()
+  const navigate = useNavigate()
   const role = useRestaurantRole() ?? 'owner'
   const pilotageItems = PILOTAGE_ITEMS.filter(item => !item.roles || item.roles.includes(role))
   const restaurantItems = RESTAURANT_ITEMS.filter(item => !item.roles || item.roles.includes(role))
@@ -208,27 +219,31 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3.5 pb-2">
-        <NavSectionLabel label="Pilotage" />
-        <div className="flex flex-col gap-px">
-          {pilotageItems.map(item => (
-            <NavItem
-              key={item.to}
-              to={item.to}
-              exact={item.exact}
-              icon={item.icon}
-              label={item.label}
-              count={item.badge ? newFeedbackCount : undefined}
-              redCount={item.unreadBadge ? unread : undefined}
-            />
-          ))}
-        </div>
+        <BlurFade delay={0}>
+          <NavSectionLabel label="Pilotage" />
+          <m.div layout className="flex flex-col gap-px">
+            {pilotageItems.map(item => (
+              <NavItem
+                key={item.to}
+                to={item.to}
+                exact={item.exact}
+                icon={item.icon}
+                label={item.label}
+                count={item.badge ? newFeedbackCount : undefined}
+                redCount={item.unreadBadge ? unread : undefined}
+              />
+            ))}
+          </m.div>
+        </BlurFade>
 
-        <NavSectionLabel label="Restaurant" />
-        <div className="flex flex-col gap-px">
-          {restaurantItems.map(item => (
-            <NavItem key={item.to} to={item.to} icon={item.icon} label={item.label} />
-          ))}
-        </div>
+        <BlurFade delay={0.06}>
+          <NavSectionLabel label="Restaurant" />
+          <m.div layout className="flex flex-col gap-px">
+            {restaurantItems.map(item => (
+              <NavItem key={item.to} to={item.to} icon={item.icon} label={item.label} />
+            ))}
+          </m.div>
+        </BlurFade>
       </nav>
 
       {/* Bottom */}
@@ -240,8 +255,10 @@ export function Sidebar() {
         {(() => {
           const isPro = restaurant?.plan === 'pro'
           return (
-            <div
+            <m.div
               className="rounded-[10px] px-3 py-3 relative overflow-hidden"
+              whileHover={{ scale: 1.01 }}
+              transition={{ duration: 0.15 }}
               style={{
                 background: isPro
                   ? 'linear-gradient(180deg, #1A1A1A 0%, #0A0A0A 100%)'
@@ -266,17 +283,38 @@ export function Sidebar() {
                 }
               </div>
               {!isPro && (
-                <div className="flex items-center gap-1 mt-2.5 text-[11.5px] font-semibold" style={{ color: '#C77A08' }}>
-                  Passer au Pro
-                  <ArrowUpRight size={12} />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/restaurant/settings?section=plan')}
+                  className="relative overflow-hidden rounded-[6px] px-2.5 py-[5px] mt-2.5 w-full"
+                  style={{ background: 'linear-gradient(90deg, #E8920A, #F5A030)' }}
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-1 text-[11.5px] font-semibold" style={{ color: '#fff' }}>
+                    Passer au Pro
+                    <ArrowUpRight size={12} />
+                  </span>
+                  <m.div
+                    className="absolute inset-0 z-20 pointer-events-none"
+                    style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)' }}
+                    animate={{ x: ['-100%', '200%'] }}
+                    transition={{ repeat: Infinity, duration: 2, repeatDelay: 1.5, ease: 'easeInOut' }}
+                  />
+                </button>
               )}
               {isPro && (
-                <div className="flex items-center gap-1 mt-2.5 text-[11.5px] font-semibold" style={{ color: '#E8920A' }}>
-                  ✦ Insights IA actifs
+                <div className="relative overflow-hidden w-fit mt-2.5">
+                  <span className="relative z-10 flex items-center gap-1 text-[11.5px] font-semibold" style={{ color: '#E8920A' }}>
+                    ✦ Insights IA actifs
+                  </span>
+                  <m.div
+                    className="absolute inset-0 z-20 pointer-events-none"
+                    style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(232,146,10,0.3) 50%, transparent 100%)' }}
+                    animate={{ x: ['-100%', '200%'] }}
+                    transition={{ repeat: Infinity, duration: 2.5, repeatDelay: 3, ease: 'easeInOut' }}
+                  />
                 </div>
               )}
-            </div>
+            </m.div>
           )
         })()}
 

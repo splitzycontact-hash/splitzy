@@ -1,3 +1,4 @@
+import { m } from "framer-motion"
 import type { Doc, Id } from "../../../../convex/_generated/dataModel"
 import { SERVER_COLORS, STATUS_COLORS } from "./floorColors"
 
@@ -36,10 +37,13 @@ export default function TableChip({ table, roster, activeZoneId, selected, onTab
   const danger = elapsedMin != null && elapsedMin >= 60
 
   return (
-    <button
+    <m.button
       type="button"
       onClick={onTableClick}
       disabled={!onTableClick}
+      whileHover={onTableClick ? { scale: 1.03 } : undefined}
+      whileTap={onTableClick ? { scale: 0.96 } : undefined}
+      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
       className="flex flex-col items-start justify-center transition-opacity"
       style={{
         background: colors.bg,
@@ -50,6 +54,8 @@ export default function TableChip({ table, roster, activeZoneId, selected, onTab
         opacity: dimmed ? 0.28 : 1,
         cursor: onTableClick ? 'pointer' : 'default',
         boxShadow: selected ? '0 0 0 2px var(--ds-accent)' : undefined,
+        outline: selected ? '2px solid #E8920A' : 'none',
+        outlineOffset: '2px',
       }}
     >
       <span className="font-bold text-[13px] leading-none truncate max-w-[72px]">
@@ -79,6 +85,6 @@ export default function TableChip({ table, roster, activeZoneId, selected, onTab
           ⚡ QR
         </span>
       )}
-    </button>
+    </m.button>
   )
 }

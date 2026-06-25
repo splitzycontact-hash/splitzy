@@ -1,4 +1,5 @@
 import { Printer } from 'lucide-react'
+import { m } from 'framer-motion'
 import { usePrint } from '../context/PrintContext'
 import { StandaloneThemeToggle } from './StandaloneThemeToggle'
 import type { ReactNode } from 'react'
@@ -23,19 +24,24 @@ export function PageHeader({ title, subtitle, live = false, actions }: PageHeade
     >
       {/* Title block */}
       <div className="flex flex-col gap-1.5 min-w-0">
-        <h1
-          className="font-extrabold leading-[1.1] tracking-[-0.035em] text-[22px] md:text-[28px]"
-          style={{ color: 'var(--ds-text-primary)' }}
-        >
-          {title}
-        </h1>
+        <m.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+          <h1
+            className="font-extrabold leading-[1.1] tracking-[-0.035em] text-[22px] md:text-[28px]"
+            style={{ color: 'var(--ds-text-primary)' }}
+          >
+            {title}
+          </h1>
+        </m.div>
         {subtitle && (
-          <div
+          <m.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, delay: 0.08 }}
             className="flex items-center gap-2.5 text-[13.5px]"
             style={{ color: 'var(--ds-text-secondary)' }}
           >
             {subtitle}
-          </div>
+          </m.div>
         )}
       </div>
 
