@@ -13,8 +13,8 @@ export default function RestaurantRoot() {
     return (
       <ClerkProvider
         publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY!}
-        signInForceRedirectUrl="/restaurant/onboarding"
-        signUpForceRedirectUrl="/restaurant/onboarding"
+        signInForceRedirectUrl="/restaurant"
+        signUpForceRedirectUrl="/restaurant"
       >
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
           <RestaurantApp />
