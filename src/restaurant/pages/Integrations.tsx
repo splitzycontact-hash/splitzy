@@ -84,7 +84,7 @@ export function Integrations() {
         }
       />
 
-      <div className="px-9 py-6 space-y-5">
+      <div className="px-4 py-5 md:px-9 md:py-6 space-y-5">
 
         {/* Network status hero */}
         <div className="ds-panel">

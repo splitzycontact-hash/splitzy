@@ -169,14 +169,14 @@ function ActivityRow({ payment, isLast }: { payment: ConvexPayment; isLast: bool
       <span className="font-semibold text-[11.5px] px-[7px] py-[3px] rounded-[5px] text-center tabular-nums" style={{ background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-primary)' }}>
         T{payment.tableNumber}
       </span>
-      <span style={{ color: 'var(--ds-text-primary)', fontWeight: 500 }}>
+      <span className="block truncate min-w-0" style={{ color: 'var(--ds-text-primary)', fontWeight: 500 }}>
         Paiement encaissé{' '}
-        <span style={{ color: 'var(--ds-text-tertiary)', fontWeight: 400 }}>· {payment.guests} conv. · part. par article</span>
+        <span className="hidden sm:inline" style={{ color: 'var(--ds-text-tertiary)', fontWeight: 400 }}>· {payment.guests} conv. · part. par article</span>
       </span>
-      <span className="font-bold tabular-nums" style={{ color: 'var(--ds-success-strong)', fontSize: '13px' }}>
+      <span className="font-bold tabular-nums whitespace-nowrap" style={{ color: 'var(--ds-success-strong)', fontSize: '13px' }}>
         +{formatEur(payment.totalCents)}
       </span>
-      <span className="text-[11.5px] tabular-nums" style={{ color: 'var(--ds-text-tertiary)', fontFamily: 'monospace' }}>
+      <span className="text-[11.5px] tabular-nums whitespace-nowrap" style={{ color: 'var(--ds-text-tertiary)', fontFamily: 'monospace' }}>
         {payment.dateLabel}
       </span>
     </div>
@@ -370,7 +370,7 @@ export function Overview() {
       />
 
       {alerts.length > 0 && (
-        <div className="mx-9 mt-4 flex flex-col gap-2">
+        <div className="mx-4 md:mx-9 mt-4 flex flex-col gap-2">
           {alerts.map(a => (
             <div key={a.key} onClick={a.onClick}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium${a.onClick ? ' cursor-pointer hover:bg-red-100' : ''}`}>
@@ -381,13 +381,13 @@ export function Overview() {
         </div>
       )}
 
-      <div className="px-9 py-6 space-y-5">
+      <div className="px-4 py-5 md:px-9 md:py-6 space-y-5">
 
         {/* ── KPI Row ── */}
         <section className="grid grid-cols-2 xl:grid-cols-4 gap-3.5">
 
           {/* CA du jour */}
-          <div className="ds-panel flex flex-col gap-3 p-5 relative min-h-[132px]">
+          <div className="ds-panel flex flex-col gap-3 p-4 md:p-5 relative min-h-[132px]">
             <div className="flex items-center gap-[7px] text-[11px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">
               <Euro size={13} style={{ color: 'var(--ds-text-tertiary)' }} />
               CA du jour
@@ -431,7 +431,7 @@ export function Overview() {
           </div>
 
           {/* Tables actives */}
-          <div className="ds-panel flex flex-col gap-3 p-5 min-h-[132px]">
+          <div className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px]">
             <div className="flex items-center gap-[7px] text-[11px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">
               <Grid3x3 size={13} style={{ color: 'var(--ds-text-tertiary)' }} />
               Tables actives
@@ -464,7 +464,7 @@ export function Overview() {
           </div>
 
           {/* Score Splitzy — dérivé des feedbacks réels ("—" si aucun) */}
-          <div className="ds-panel flex flex-col gap-3 p-5 min-h-[132px] relative overflow-hidden">
+          <div className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px] relative overflow-hidden">
             <div
               className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
               style={{ background: 'radial-gradient(circle, rgba(232,146,10,0.10), transparent 70%)' }}
@@ -518,7 +518,7 @@ export function Overview() {
           </div>
 
           {/* Pourboires */}
-          <div className="ds-panel flex flex-col gap-3 p-5 min-h-[132px]">
+          <div className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px]">
             <div className="flex items-center gap-[7px] text-[11px] font-semibold uppercase tracking-[0.09em] ds-text-secondary">
               <HandCoins size={13} style={{ color: 'var(--ds-text-tertiary)' }} />
               Pourboires
@@ -570,7 +570,7 @@ export function Overview() {
                   <span>Aucune table configurée</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-4 xl:grid-cols-5 gap-2.5">
+                <div className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-5 gap-2.5">
                   {tables.map(t => (
                     <TableCardSmall key={t.number} table={t} />
                   ))}

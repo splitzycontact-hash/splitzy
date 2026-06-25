@@ -111,7 +111,7 @@ export default function FloorPlan({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${gridCols},1fr)`,
+            gridTemplateColumns: `repeat(${gridCols},minmax(40px,1fr))`,
             gridTemplateRows: `repeat(${gridRows},1fr)`,
             gap: 4,
           }}

@@ -229,8 +229,8 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
                   onChange={e => setPhone(e.target.value)}
                   placeholder="06 12 34 56 78"
                   type="tel"
-                  className="w-full mt-1.5 h-9 px-3 rounded-[8px] border outline-none focus:border-[#E8920A]"
-                  style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                  className="w-full mt-1.5 h-9 px-3 rounded-[8px] border outline-none focus:border-[#E8920A] text-base md:text-[13px]"
+                  style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                 />
               </label>
               <label className="block">
@@ -242,8 +242,8 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
                   onChange={e => setEmail(e.target.value)}
                   placeholder="client@email.com"
                   type="email"
-                  className="w-full mt-1.5 h-9 px-3 rounded-[8px] border outline-none focus:border-[#E8920A]"
-                  style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                  className="w-full mt-1.5 h-9 px-3 rounded-[8px] border outline-none focus:border-[#E8920A] text-base md:text-[13px]"
+                  style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                 />
               </label>
               <div className="flex items-center gap-3">
@@ -477,7 +477,7 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
                     value={msgSubject}
                     onChange={e => setMsgSubject(e.target.value)}
                     required
-                    className="w-full h-10 px-3 rounded-xl border text-[14px] outline-none focus:border-[#E8920A]"
+                    className="w-full h-10 px-3 rounded-xl border text-base md:text-[14px] outline-none focus:border-[#E8920A]"
                     style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                   />
                 </div>
@@ -488,7 +488,7 @@ function CustomerDrawer({ customer, restaurantId, tablePayments, tableFeedbacks,
                     onChange={e => setMsgBody(e.target.value)}
                     required
                     rows={5}
-                    className="w-full px-3 py-2.5 rounded-xl border text-[14px] outline-none resize-none leading-[1.6] focus:border-[#E8920A]"
+                    className="w-full px-3 py-2.5 rounded-xl border text-base md:text-[14px] outline-none resize-none leading-[1.6] focus:border-[#E8920A]"
                     style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                   />
                 </div>
@@ -784,7 +784,7 @@ export function Clients() {
         }
       />
 
-      <div className="px-9 py-6 space-y-5">
+      <div className="px-4 py-5 md:px-9 md:py-6 space-y-5">
 
         {/* KPI grid */}
         <section
@@ -846,8 +846,9 @@ export function Clients() {
 
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="overflow-x-auto hide-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 w-full sm:w-auto">
           <div
-            className="inline-flex rounded-[10px] p-[3px] gap-px border"
+            className="inline-flex flex-nowrap min-w-max rounded-[10px] p-[3px] gap-px border"
             style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
           >
             {FILTERS.map(({ key, label, count }) => (
@@ -866,8 +867,9 @@ export function Clients() {
               </button>
             ))}
           </div>
+          </div>
           <div
-            className="flex items-center gap-2 h-8 px-2.5 rounded-lg border w-64"
+            className="flex items-center gap-2 h-8 px-2.5 rounded-lg border w-full sm:w-64"
             style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
           >
             <Search size={13} style={{ color: 'var(--ds-text-tertiary)', flexShrink: 0 }} />
@@ -875,14 +877,16 @@ export function Clients() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Rechercher un client…"
-              className="flex-1 bg-transparent border-none outline-none min-w-0"
-              style={{ fontSize: '13px', color: 'var(--ds-text-primary)' }}
+              className="flex-1 bg-transparent border-none outline-none min-w-0 text-base md:text-[13px]"
+              style={{ color: 'var(--ds-text-primary)' }}
             />
           </div>
         </div>
 
         {/* Table */}
         <div className="ds-panel">
+          <div className="overflow-x-auto">
+          <div className="min-w-[840px]">
           {/* Header */}
           <div
             className="grid text-[10.5px] font-bold uppercase tracking-[0.07em] px-5 py-2.5"
@@ -974,6 +978,8 @@ export function Clients() {
               </div>
             ))
           )}
+          </div>
+          </div>
 
           {/* Footer (pas de pagination factice — tout est affiché) */}
           <div className="flex items-center justify-between px-5 py-3 border-t" style={{ borderColor: 'var(--ds-border)' }}>
@@ -1035,7 +1041,7 @@ export function Clients() {
                     value={subject}
                     onChange={e => setSubject(e.target.value)}
                     placeholder="Une offre rien que pour vous 🎁"
-                    className="w-full h-10 px-3 rounded-xl border text-[14px] outline-none focus:border-[#E8920A]"
+                    className="w-full h-10 px-3 rounded-xl border text-base md:text-[14px] outline-none focus:border-[#E8920A]"
                     style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                   />
                 </div>
@@ -1048,7 +1054,7 @@ export function Clients() {
                     onChange={e => setCampaignBody(e.target.value)}
                     rows={5}
                     placeholder={"Bonjour,\n\nCette semaine, profitez de…\n\nÀ très vite !"}
-                    className="w-full px-3 py-2.5 rounded-xl border text-[14px] outline-none resize-none leading-[1.6] focus:border-[#E8920A]"
+                    className="w-full px-3 py-2.5 rounded-xl border text-base md:text-[14px] outline-none resize-none leading-[1.6] focus:border-[#E8920A]"
                     style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                   />
                 </div>

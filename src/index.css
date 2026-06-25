@@ -109,6 +109,17 @@
   --ds-shadow-md: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
 }
 
+/* Mobile : iOS zoome au focus tout input < 16px. Plusieurs champs du dashboard
+   utilisent une taille 13px inline (desktop). On force 16px en dessous de 768px
+   uniquement — !important pour battre les styles inline, desktop intact. */
+@media (max-width: 767px) {
+  .restaurant-root input,
+  .restaurant-root select,
+  .restaurant-root textarea {
+    font-size: 16px !important;
+  }
+}
+
 .restaurant-root[data-theme="dark"] {
   --ds-bg-base: #09090B;
   --ds-bg-surface: #18181B;

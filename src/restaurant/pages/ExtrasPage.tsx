@@ -107,7 +107,7 @@ export function ExtrasPage() {
       />
 
       {/* Onglets Répertoire / Convocations */}
-      <div className="px-9 pt-6">
+      <div className="px-4 pt-5 md:px-9 md:pt-6">
         <div
           className="inline-flex rounded-[10px] p-[3px] gap-px border"
           style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
@@ -187,7 +187,7 @@ function Repertoire({
   }
 
   return (
-    <div className="px-9 py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="px-4 py-5 md:px-9 md:py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {extras.map((ex, idx) => {
         const av = AVATAR_COLORS[idx % AVATAR_COLORS.length]
         const initials = `${ex.firstName[0] ?? ''}${ex.lastName[0] ?? ''}`.toUpperCase() || '?'
@@ -295,7 +295,7 @@ function Convocations({
   }
 
   return (
-    <div className="px-9 py-6">
+    <div className="px-4 py-5 md:px-9 md:py-6">
       <div
         className="rounded-[12px] border overflow-hidden"
         style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
@@ -424,7 +424,7 @@ function ShiftDialog({
       onClick={e => { if (e.target === e.currentTarget && !sending) onClose() }}
     >
       <div
-        className="rounded-2xl overflow-hidden w-[480px] max-w-full max-h-[90vh] flex flex-col"
+        className="rounded-2xl overflow-hidden w-[480px] max-w-full max-h-[90dvh] flex flex-col"
         style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
@@ -434,7 +434,7 @@ function ShiftDialog({
           </div>
           <button onClick={onClose} disabled={sending} className="ds-text-tertiary hover:ds-text-primary disabled:opacity-50"><X size={16} /></button>
         </div>
-        <div className="px-6 py-5 space-y-4 overflow-y-auto">
+        <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div>
             <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Date du service</label>
             <input

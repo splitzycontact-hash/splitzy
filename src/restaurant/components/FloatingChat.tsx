@@ -117,7 +117,7 @@ export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'>
       {/* FAB */}
       <button
         onClick={() => setIsOpen(o => !o)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary shadow-xl flex items-center justify-center hover:scale-105 transition-transform">
+        className="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 z-40 w-14 h-14 rounded-full bg-primary shadow-xl flex items-center justify-center hover:scale-105 transition-transform">
         <MessageSquare size={22} className="text-primary-foreground"/>
         {totalUnread > 0 && (
           <span className={`absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ${managerCalled ? 'animate-pulse' : ''}`}>
@@ -128,7 +128,7 @@ export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'>
 
       {/* Panel */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-[360px] h-[520px] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="fixed bottom-[calc(140px+env(safe-area-inset-bottom))] md:bottom-24 right-4 md:right-6 z-50 w-[calc(100vw-2rem)] max-w-[360px] h-[68vh] max-h-[520px] md:h-[520px] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden">
           {/* Header */}
           <div
             className="px-3.5 py-3 border-b flex items-center gap-2 shrink-0"
@@ -241,7 +241,7 @@ export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'>
                   onChange={e => setDraft(e.target.value)}
                   onKeyDown={onKeyDown}
                   placeholder={`Message à ${threadTitle}…`}
-                  className="flex-1 resize-none rounded-[10px] border px-3 py-2 text-[14px] outline-none max-h-24"
+                  className="flex-1 resize-none rounded-[10px] border px-3 py-2 text-[16px] md:text-[14px] outline-none max-h-24"
                   style={{
                     background: 'var(--ds-bg-base)',
                     borderColor: 'var(--ds-border)',

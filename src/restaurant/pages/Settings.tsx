@@ -658,7 +658,7 @@ function PosSection({ tables, restaurantId }: { tables: TableRef[]; restaurantId
                         placeholder={f.placeholder}
                         value={fields[f.key] ?? ''}
                         onChange={e => setFields(prev => ({ ...prev, [f.key]: e.target.value }))}
-                        className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-dark placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand font-mono"
+                        className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm text-dark placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand font-mono"
                       />
                     </div>
                   ))}
@@ -903,12 +903,11 @@ function QRCodesSection({
                     type="text"
                     value={qrColor}
                     onChange={e => setQrColor(e.target.value)}
-                    className="w-28 rounded-lg border px-3 py-2 text-[13px] font-mono outline-none"
+                    className="w-28 rounded-lg border px-3 py-2 text-base md:text-[13px] font-mono outline-none"
                     style={{
                       background: 'var(--ds-bg-surface)',
                       borderColor: 'var(--ds-border)',
                       color: 'var(--ds-text-primary)',
-                      fontSize: '13px',
                     }}
                     maxLength={7}
                   />
@@ -1201,7 +1200,7 @@ function MenuSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                     type="text"
                     value={editing.name}
                     onChange={e => setEditing(prev => prev && ({ ...prev, name: e.target.value }))}
-                    className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                    className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
                   />
                 </div>
               </div>
@@ -1213,7 +1212,7 @@ function MenuSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                     step="0.5"
                     value={(editing.priceCents / 100).toFixed(2)}
                     onChange={e => setEditing(prev => prev && ({ ...prev, priceCents: Math.round(parseFloat(e.target.value) * 100) || 0 }))}
-                    className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                    className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
                   />
                 </div>
                 <div>
@@ -1221,7 +1220,7 @@ function MenuSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                   <select
                     value={editing.category}
                     onChange={e => setEditing(prev => prev && ({ ...prev, category: e.target.value }))}
-                    className="w-full border border-border rounded-lg px-2 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                    className="w-full border border-border rounded-lg px-2 py-2.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
                   >
                     {MENU_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
@@ -1234,7 +1233,7 @@ function MenuSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                   value={editing.description}
                   onChange={e => setEditing(prev => prev && ({ ...prev, description: e.target.value }))}
                   placeholder="Optionnel"
-                  className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
                 />
               </div>
             </div>
@@ -1276,7 +1275,7 @@ function MenuSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                     value={newItem.name}
                     onChange={e => handleNewNameChange(e.target.value)}
                     placeholder="Ex: Entrecôte Bordelaise"
-                    className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                    className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
                   />
                 </div>
               </div>
@@ -1289,7 +1288,7 @@ function MenuSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                     value={newItem.priceCents > 0 ? (newItem.priceCents / 100).toFixed(2) : ''}
                     onChange={e => setNewItem(prev => ({ ...prev, priceCents: Math.round(parseFloat(e.target.value) * 100) || 0 }))}
                     placeholder="0.00"
-                    className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                    className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
                   />
                 </div>
                 <div>
@@ -1297,7 +1296,7 @@ function MenuSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                   <select
                     value={newItem.category}
                     onChange={e => setNewItem(prev => ({ ...prev, category: e.target.value, emoji: assignEmoji(prev.name, e.target.value) }))}
-                    className="w-full border border-border rounded-lg px-2 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                    className="w-full border border-border rounded-lg px-2 py-2.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
                   >
                     {MENU_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
@@ -1310,7 +1309,7 @@ function MenuSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                   value={newItem.description}
                   onChange={e => setNewItem(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Optionnel"
-                  className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
                 />
               </div>
             </div>
@@ -1548,7 +1547,7 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
               value={billingForm.company}
               onChange={e => setBillingForm(p => ({ ...p, company: e.target.value }))}
               placeholder="Nom de votre société"
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+              className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
             />
           </div>
           <div className="col-span-2">
@@ -1558,7 +1557,7 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
               value={billingForm.address}
               onChange={e => setBillingForm(p => ({ ...p, address: e.target.value }))}
               placeholder="12 rue de la Paix, 75001 Paris"
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+              className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
             />
           </div>
           <div>
@@ -1568,7 +1567,7 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
               value={billingForm.vatNumber}
               onChange={e => setBillingForm(p => ({ ...p, vatNumber: e.target.value }))}
               placeholder="FR12345678901"
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+              className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
             />
           </div>
           <div>
@@ -1578,7 +1577,7 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
               value={billingForm.email}
               onChange={e => setBillingForm(p => ({ ...p, email: e.target.value }))}
               placeholder="compta@monrestaurant.fr"
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+              className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
             />
           </div>
         </div>
@@ -1640,7 +1639,7 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
                   value={ibanForm.holder}
                   onChange={e => setIbanForm(p => ({ ...p, holder: e.target.value }))}
                   placeholder="Nom complet ou raison sociale"
-                  className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                  className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                 />
               </div>
               <div>
@@ -1650,7 +1649,7 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
                   value={ibanForm.iban}
                   onChange={e => setIbanForm(p => ({ ...p, iban: e.target.value }))}
                   placeholder="FR76 3000 6000 0112 3456 7890 189"
-                  className="w-full border border-border rounded-lg px-3 py-2.5 text-sm text-dark font-mono focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                  className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm text-dark font-mono focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
                 />
                 <p className="text-[11px] text-muted mt-1">Format SEPA — France (FR), Belgique (BE), Suisse (CH)…</p>
               </div>
@@ -1847,7 +1846,7 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
                 value={deleteConfirm}
                 onChange={e => setDeleteConfirm(e.target.value)}
                 placeholder={restaurant?.name ?? ''}
-                className="w-full border border-red-200 rounded-lg px-3 py-2.5 text-sm text-dark focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full border border-red-200 rounded-lg px-3 py-2.5 text-base md:text-sm text-dark focus:outline-none focus:ring-2 focus:ring-red-300"
               />
             </div>
             <div className="flex gap-3">
@@ -2122,6 +2121,8 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
 
       {/* Members table — overflow visible pour que le menu "⋯" ne soit pas clippé par .ds-panel */}
       <div className="ds-panel" style={{ overflow: 'visible' }}>
+        <div className="overflow-x-auto md:overflow-x-visible">
+        <div className="min-w-[560px] md:min-w-0">
         {/* Header row */}
         <div
           className="grid gap-3.5 px-5 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.07em]"
@@ -2205,7 +2206,7 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                     {editingName?.id === member._id ? (
                       <input
                         autoFocus
-                        className="text-[13px] font-semibold bg-transparent border-b border-[var(--ds-accent)] outline-none w-full max-w-[160px] ds-text-primary"
+                        className="text-base md:text-[13px] font-semibold bg-transparent border-b border-[var(--ds-accent)] outline-none w-full max-w-[160px] ds-text-primary"
                         value={editingName.value}
                         maxLength={30}
                         onChange={e => setEditingName(s => s ? { ...s, value: e.target.value } : s)}
@@ -2348,6 +2349,8 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
             )
           })}
         </div>
+        </div>
+        </div>
 
         {pendingCount > 0 && (
           <div
@@ -2372,7 +2375,8 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
               Suivi des invitations envoyées par email.
             </div>
           </div>
-          <div>
+          <div className="overflow-x-auto">
+          <div className="min-w-[560px]">
             {invitations.map(inv => {
               const effectiveStatus: 'pending' | 'accepted' | 'expired' =
                 inv.status === 'accepted'
@@ -2425,6 +2429,7 @@ function TeamSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                 </div>
               )
             })}
+          </div>
           </div>
         </div>
       )}
@@ -2852,7 +2857,7 @@ function ExtrasSection({ restaurantId }: { restaurantId: Id<'restaurants'> | nul
           </button>
         </div>
       ) : (
-        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))' }}>
           {list.map(extra => {
             const initials = `${extra.firstName[0] ?? ''}${extra.lastName[0] ?? ''}`.toUpperCase()
             return (
@@ -3439,7 +3444,7 @@ function AccountSection({
             <input
               readOnly
               value={user?.emailAddresses[0]?.emailAddress ?? ''}
-              className="w-full rounded-lg border px-3 py-2 text-[13.5px] cursor-default"
+              className="w-full rounded-lg border px-3 py-2 text-base md:text-[13.5px] cursor-default"
               style={{ ...inputStyle, opacity: 0.7 }}
             />
           </div>
@@ -3879,7 +3884,7 @@ function TablesSection() {
                 onChange={e => setNewZoneName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleCreateZone() }}
                 placeholder="Terrasse"
-                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
+                className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-brand/30"
               />
             </div>
             <div>
@@ -4282,7 +4287,7 @@ export function Settings() {
   return (
     <RestaurantLayout>
       <PageHeader title="Paramètres" subtitle={<span>Gérez votre établissement</span>} />
-      <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6">
+      <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6">
         <div className="flex flex-col md:flex-row gap-5 min-h-full">
           {/* Sub-nav */}
           <aside className="w-full md:w-[224px] md:shrink-0">
@@ -4296,7 +4301,7 @@ export function Settings() {
               >
                 Paramètres
               </div>
-              <div className="flex overflow-x-auto md:block p-1.5 md:p-1.5 gap-1">
+              <div className="flex overflow-x-auto hide-scrollbar md:block p-1.5 md:p-1.5 gap-1">
                 {visibleNav.map(({ key, label, icon: Icon, pendingDot }) => {
                   const active = section === key
                   const pendingCount = pendingDot

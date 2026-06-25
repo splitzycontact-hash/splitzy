@@ -425,7 +425,7 @@ export function Tables() {
         live
       />
 
-      <div className="px-9 py-6 space-y-5">
+      <div className="px-4 py-5 md:px-9 md:py-6 space-y-5">
 
         {/* Stats strip */}
         <div
@@ -454,14 +454,14 @@ export function Tables() {
         {/* Filter bar */}
         <div className="flex items-center justify-between gap-3.5 flex-wrap">
           <div
-            className="inline-flex rounded-[10px] p-[3px] gap-px border"
+            className="flex md:inline-flex w-full md:w-auto overflow-x-auto rounded-[10px] p-[3px] gap-px border"
             style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
           >
             {FILTER_LABELS.map(({ key, label, count }) => (
               <button
                 key={key}
                 onClick={() => setFilter(key)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[13px] transition-colors"
+                className="inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[13px] whitespace-nowrap transition-colors"
                 style={{
                   background: filter === key
                     ? (key === 'payment' ? 'var(--ds-accent-soft)' : 'var(--ds-bg-subtle)')
@@ -478,15 +478,15 @@ export function Tables() {
             ))}
           </div>
           <div
-            className="inline-flex items-center gap-2 h-8 px-2.5 rounded-lg border"
-            style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)', width: '220px' }}
+            className="inline-flex items-center gap-2 h-9 md:h-8 px-2.5 rounded-lg border w-full md:w-[220px]"
+            style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
           >
             <Search size={13} style={{ color: 'var(--ds-text-tertiary)', flexShrink: 0 }} />
             <input
               type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Rechercher une table…"
-              className="flex-1 bg-transparent border-none outline-none text-[13px] min-w-0"
-              style={{ color: 'var(--ds-text-primary)', fontSize: '13px' }}
+              className="flex-1 bg-transparent border-none outline-none text-[16px] md:text-[13px] min-w-0"
+              style={{ color: 'var(--ds-text-primary)' }}
             />
           </div>
         </div>
@@ -848,7 +848,7 @@ function AddItemModal({ table, menu, menuLoading, onClose }: {
                 <input
                   type="text" value={search} onChange={e => setSearch(e.target.value)}
                   placeholder="Rechercher un article…"
-                  className="flex-1 bg-transparent border-none outline-none text-[13px] min-w-0"
+                  className="flex-1 bg-transparent border-none outline-none text-[16px] md:text-[13px] min-w-0"
                   style={{ color: 'var(--ds-text-primary)' }}
                 />
               </div>

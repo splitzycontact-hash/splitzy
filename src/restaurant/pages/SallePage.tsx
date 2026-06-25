@@ -520,9 +520,9 @@ export function SallePage() {
       />
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="px-9 py-6 flex flex-col lg:flex-row gap-5">
+        <div className="px-4 py-5 md:px-9 md:py-6 flex flex-col lg:flex-row gap-5">
           {/* Plan */}
-          <div className="flex-1 min-w-0 bg-white rounded-xl border border-border shadow-card p-6">
+          <div className="flex-1 min-w-0 bg-white rounded-xl border border-border shadow-card p-3 md:p-6 overflow-x-auto">
             {placedCount === 0 ? (
               <div className="text-sm text-muted py-12 text-center">
                 Aucune table positionnée. Placez vos tables dans Paramètres → Tables &amp; Plan.
@@ -547,7 +547,7 @@ export function SallePage() {
           </div>
 
           {/* Roster */}
-          <div className="w-full lg:w-72 shrink-0 bg-white rounded-xl border border-border shadow-card p-5">
+          <div className="w-full lg:w-72 shrink-0 bg-white rounded-xl border border-border shadow-card p-4 md:p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Users size={16} className="text-muted" />
@@ -659,7 +659,7 @@ export function SallePage() {
 
       {showRecap && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-lg mx-4 max-h-[88vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl p-5 md:p-8 w-full max-w-lg mx-4 max-h-[88vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-dark">Récap du service</h2>
               <button onClick={() => setShowRecap(false)}><X size={20} /></button>
@@ -794,7 +794,7 @@ export function SallePage() {
             </h3>
             <select value={closeReason}
               onChange={e => setCloseReason(e.target.value)}
-              className="w-full border border-border rounded-xl px-3 py-2 text-sm">
+              className="w-full border border-border rounded-xl px-3 py-2 text-[16px] md:text-sm">
               <option value="">Raison (optionnelle)</option>
               <option value="offert">Repas offert</option>
               <option value="erreur">Erreur de table</option>

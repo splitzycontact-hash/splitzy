@@ -426,7 +426,7 @@ function SplitzyInvoicesTab() {
   const pendingTTC = invoices.filter(i => i.status === 'En attente').reduce((s, i) => s + i.amountTTC, 0)
 
   return (
-    <div className="px-9 py-6 space-y-5">
+    <div className="px-4 py-5 md:px-9 md:py-6 space-y-5">
 
       {/* Info banner */}
       <div
@@ -481,6 +481,8 @@ function SplitzyInvoicesTab() {
 
       {/* Table */}
       <div className="ds-panel">
+        <div className="overflow-x-auto">
+        <div className="min-w-[880px]">
         {/* Header */}
         <div
           className="grid text-[10.5px] font-bold uppercase tracking-[0.07em] px-5 py-2.5"
@@ -549,6 +551,8 @@ function SplitzyInvoicesTab() {
             </div>
           </div>
         ))}
+        </div>
+        </div>
       </div>
 
       {/* Footer */}
@@ -664,7 +668,7 @@ export function Factures() {
       />
 
       {/* Tabs */}
-      <div className="px-9 pt-5">
+      <div className="px-4 pt-4 md:px-9 md:pt-5">
         <div
           className="inline-flex rounded-[10px] p-[3px] gap-px border"
           style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
@@ -689,7 +693,7 @@ export function Factures() {
       {activeTab === 'splitzy' && <SplitzyInvoicesTab />}
 
       {activeTab === 'transactions' && (
-      <div className="px-9 py-6 space-y-5">
+      <div className="px-4 py-5 md:px-9 md:py-6 space-y-5">
 
         {/* KPI row */}
         <section
@@ -792,8 +796,8 @@ export function Factures() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Rechercher par n° table, référence…"
-              className="flex-1 bg-transparent border-none outline-none min-w-0"
-              style={{ fontSize: '13px', color: 'var(--ds-text-primary)' }}
+              className="flex-1 bg-transparent border-none outline-none min-w-0 text-base md:text-[13px]"
+              style={{ color: 'var(--ds-text-primary)' }}
             />
           </div>
 
@@ -933,6 +937,8 @@ export function Factures() {
           )}
           {!gridView && (
           <>
+          <div className="overflow-x-auto">
+          <div className="min-w-[840px]">
           {/* Table header */}
           <div
             className="grid text-[10.5px] font-bold uppercase tracking-[0.07em] px-5 py-2.5"
@@ -1045,6 +1051,8 @@ export function Factures() {
               )
             })
           )}
+          </div>
+          </div>
 
           {/* Pagination */}
           <div
@@ -1085,15 +1093,15 @@ export function Factures() {
                     <input
                       type="text" inputMode="decimal" value={amountMin} onChange={e => setAmountMin(e.target.value)}
                       placeholder="Min (€)"
-                      className="flex-1 rounded-lg border px-3 py-2 outline-none text-[13px]"
-                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                      className="flex-1 rounded-lg border px-3 py-2 outline-none text-base md:text-[13px]"
+                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                     />
                     <span className="ds-text-tertiary text-sm">—</span>
                     <input
                       type="text" inputMode="decimal" value={amountMax} onChange={e => setAmountMax(e.target.value)}
                       placeholder="Max (€)"
-                      className="flex-1 rounded-lg border px-3 py-2 outline-none text-[13px]"
-                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                      className="flex-1 rounded-lg border px-3 py-2 outline-none text-base md:text-[13px]"
+                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                     />
                   </div>
                 </div>
@@ -1101,8 +1109,8 @@ export function Factures() {
                 <div>
                   <div className="text-[11.5px] font-semibold ds-text-secondary uppercase tracking-[0.06em] mb-2.5">Période personnalisée</div>
                   <div className="flex flex-col gap-2">
-                    <input type="date" className="rounded-lg border px-3 py-2 outline-none text-[13px]" style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }} />
-                    <input type="date" className="rounded-lg border px-3 py-2 outline-none text-[13px]" style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }} />
+                    <input type="date" className="rounded-lg border px-3 py-2 outline-none text-base md:text-[13px]" style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }} />
+                    <input type="date" className="rounded-lg border px-3 py-2 outline-none text-base md:text-[13px]" style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }} />
                   </div>
                 </div>
               </div>

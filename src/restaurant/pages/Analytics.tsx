@@ -629,19 +629,19 @@ export function Analytics() {
         }
       />
 
-      <div className="px-9 py-6 space-y-5">
+      <div className="px-4 py-5 md:px-9 md:py-6 space-y-5">
 
         {/* Period bar */}
         <div
-          className="flex items-center justify-between gap-4 px-4 py-2.5 rounded-[10px] border"
+          className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 px-4 py-2.5 rounded-[10px] border"
           style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
         >
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 overflow-x-auto -mx-1 px-1">
             {PERIODS.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setPeriod(key)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[13px] transition-colors"
+                className="flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[13px] whitespace-nowrap transition-colors"
                 style={{
                   background: period === key ? 'var(--ds-bg-subtle)' : 'none',
                   color: period === key ? 'var(--ds-text-primary)' : 'var(--ds-text-secondary)',
@@ -662,21 +662,21 @@ export function Analytics() {
 
         {period === 'custom' && (
           <div
-            className="flex items-center gap-3 px-4 py-2.5 rounded-[10px] border"
+            className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 rounded-[10px] border"
             style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
           >
             <Calendar size={13} style={{ color: 'var(--ds-text-tertiary)', flexShrink: 0 }} />
             <span className="text-[13px] ds-text-secondary">Du</span>
             <input
               type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
-              className="bg-transparent border-none outline-none text-[13px]"
-              style={{ color: 'var(--ds-text-primary)', fontSize: '13px' }}
+              className="bg-transparent border-none outline-none text-[16px] md:text-[13px]"
+              style={{ color: 'var(--ds-text-primary)' }}
             />
             <span className="text-[13px] ds-text-secondary">au</span>
             <input
               type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
-              className="bg-transparent border-none outline-none text-[13px]"
-              style={{ color: 'var(--ds-text-primary)', fontSize: '13px' }}
+              className="bg-transparent border-none outline-none text-[16px] md:text-[13px]"
+              style={{ color: 'var(--ds-text-primary)' }}
             />
           </div>
         )}
@@ -686,7 +686,7 @@ export function Analytics() {
           className="rounded-[12px] border overflow-hidden"
           style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
         >
-          <div className="flex items-center justify-between gap-4 px-5 py-3 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 px-5 py-3 border-b" style={{ borderColor: 'var(--ds-border)' }}>
             <div className="text-[13px] font-semibold ds-text-primary">Comparaison vs période précédente</div>
             <div className="flex items-center gap-1">
               {(['day', 'week', 'month'] as const).map(key => (

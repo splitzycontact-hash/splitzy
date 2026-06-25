@@ -15,7 +15,7 @@ export function PageHeader({ title, subtitle, live = false, actions }: PageHeade
 
   return (
     <header
-      className="flex items-start justify-between gap-6 px-9 pt-7 pb-6 shrink-0 border-b"
+      className="flex items-start justify-between gap-3 md:gap-6 px-4 pt-5 pb-4 md:px-9 md:pt-7 md:pb-6 shrink-0 border-b"
       style={{
         background: 'var(--ds-bg-surface)',
         borderColor: 'var(--ds-border)',
@@ -24,8 +24,8 @@ export function PageHeader({ title, subtitle, live = false, actions }: PageHeade
       {/* Title block */}
       <div className="flex flex-col gap-1.5 min-w-0">
         <h1
-          className="font-extrabold leading-[1.1] tracking-[-0.035em]"
-          style={{ fontSize: '28px', color: 'var(--ds-text-primary)' }}
+          className="font-extrabold leading-[1.1] tracking-[-0.035em] text-[22px] md:text-[28px]"
+          style={{ color: 'var(--ds-text-primary)' }}
         >
           {title}
         </h1>

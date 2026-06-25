@@ -811,7 +811,7 @@ export function MenuPage() {
         }
       />
 
-      <div className="px-9 py-6 space-y-5">
+      <div className="px-4 py-5 md:px-9 md:py-6 space-y-5">
 
         {/* Message affiché aux clients (écran de paiement QR) */}
         <div
@@ -829,8 +829,8 @@ export function MenuPage() {
             placeholder="Ex: Bonne soirée ! Profitez de -20% sur les desserts ce soir 🎉"
             maxLength={120}
             disabled={!restaurantId}
-            className="w-full rounded-lg border px-3 py-2 outline-none disabled:opacity-50"
-            style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+            className="w-full rounded-lg border px-3 py-2 outline-none disabled:opacity-50 text-base md:text-[13px]"
+            style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
           />
           <p className="text-[11px] ds-text-tertiary mt-1">Affiché sur l'écran de paiement QR client</p>
         </div>
@@ -846,8 +846,8 @@ export function MenuPage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Rechercher un plat, ingrédient…"
-              className="flex-1 bg-transparent border-none outline-none min-w-0"
-              style={{ fontSize: '13px', color: 'var(--ds-text-primary)' }}
+              className="flex-1 bg-transparent border-none outline-none min-w-0 text-base md:text-[13px]"
+              style={{ color: 'var(--ds-text-primary)' }}
             />
           </div>
           <div
@@ -955,7 +955,7 @@ export function MenuPage() {
             onClick={e => { if (e.target === e.currentTarget) setModalMode(null) }}
           >
             <m.div
-              className="rounded-2xl overflow-hidden w-[480px] max-w-full max-h-[90vh] flex flex-col"
+              className="rounded-2xl overflow-hidden w-[480px] max-w-full max-h-[90dvh] flex flex-col"
               style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
               initial={{ scale: 0.95, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 12 }} transition={{ type: 'spring', stiffness: 300, damping: 28 }}
@@ -993,8 +993,8 @@ export function MenuPage() {
                     <input
                       value={formName} onChange={e => onNameChange(e.target.value)}
                       placeholder="ex: Pad thaï crevettes"
-                      className="flex-1 rounded-lg border px-3 py-2 outline-none"
-                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                      className="flex-1 rounded-lg border px-3 py-2 outline-none text-base md:text-[13px]"
+                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                       autoFocus
                     />
                   </div>
@@ -1016,8 +1016,8 @@ export function MenuPage() {
                   <label className="block text-[11.5px] font-semibold ds-text-secondary mb-1.5 uppercase tracking-[0.06em]">Catégorie</label>
                   <select
                     value={formCategory} onChange={e => onCategoryChange(e.target.value)}
-                    className="w-full rounded-lg border px-3 py-2 outline-none"
-                    style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                    className="w-full rounded-lg border px-3 py-2 outline-none text-base md:text-[13px]"
+                    style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                   >
                     {CATEGORY_KEYS.map(k => (
                       <option key={k} value={k}>{displayCategory(k)}</option>
@@ -1026,14 +1026,14 @@ export function MenuPage() {
                 </div>
 
                 {/* Prix + Description */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11.5px] font-semibold ds-text-secondary mb-1.5 uppercase tracking-[0.06em]">Prix (€)</label>
                     <input
                       type="text" inputMode="decimal" value={formPrice} onChange={e => setFormPrice(e.target.value)}
                       placeholder="ex: 13,90"
-                      className="w-full rounded-lg border px-3 py-2 outline-none"
-                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                      className="w-full rounded-lg border px-3 py-2 outline-none text-base md:text-[13px]"
+                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                     />
                   </div>
                   <div>
@@ -1041,8 +1041,8 @@ export function MenuPage() {
                     <input
                       value={formDesc} onChange={e => setFormDesc(e.target.value)}
                       placeholder="Ingrédients, préparation…"
-                      className="w-full rounded-lg border px-3 py-2 outline-none"
-                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                      className="w-full rounded-lg border px-3 py-2 outline-none text-base md:text-[13px]"
+                      style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                     />
                   </div>
                 </div>
@@ -1079,8 +1079,8 @@ export function MenuPage() {
                   {/* Allergènes text */}
                   <input
                     placeholder="⚠️ Allergènes (texte libre : gluten, lactose…)"
-                    className="w-full mt-2 rounded-lg border px-3 py-2 outline-none"
-                    style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)', fontSize: '13px' }}
+                    className="w-full mt-2 rounded-lg border px-3 py-2 outline-none text-base md:text-[13px]"
+                    style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-primary)' }}
                   />
                 </div>
 

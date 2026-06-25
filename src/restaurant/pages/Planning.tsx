@@ -179,7 +179,7 @@ export function Planning() {
       />
 
       {/* Switcher Extras / Équipe */}
-      <div className="px-9 pt-6">
+      <div className="px-4 pt-5 md:px-9 md:pt-6">
         <div
           className="inline-flex rounded-[10px] p-[3px] gap-px border"
           style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
@@ -205,7 +205,7 @@ export function Planning() {
       </div>
 
       {view === 'extras' && (
-      <div className="px-9 py-6 space-y-5">
+      <div className="px-4 py-5 md:px-9 md:py-6 space-y-5">
         {/* Sélecteur de période */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div
@@ -279,7 +279,7 @@ export function Planning() {
       )}
 
       {view === 'equipe' && (
-        <div className="px-9 py-6">
+        <div className="px-4 py-5 md:px-9 md:py-6">
           <TeamWeek restaurantId={restaurantId} />
         </div>
       )}
@@ -772,14 +772,14 @@ function ConvokeModal({
       onClick={e => { if (e.target === e.currentTarget && !sending) onClose() }}
     >
       <div
-        className="rounded-2xl overflow-hidden w-[500px] max-w-full max-h-[90vh] flex flex-col"
+        className="rounded-2xl overflow-hidden w-[500px] max-w-full max-h-[90dvh] flex flex-col"
         style={{ background: 'var(--ds-bg-surface)', boxShadow: '0 8px 32px rgba(0,0,0,0.24)' }}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
           <div className="font-bold text-[15px] ds-text-primary">Nouvelle convocation</div>
           <button onClick={onClose} className="ds-text-tertiary hover:ds-text-primary"><X size={16} /></button>
         </div>
-        <div className="px-6 py-5 space-y-4 overflow-y-auto">
+        <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1 min-h-0">
           {/* Sélection de l'extra en premier */}
           <div>
             <label className="block text-[12px] font-semibold ds-text-primary mb-1.5">Extra à convoquer</label>

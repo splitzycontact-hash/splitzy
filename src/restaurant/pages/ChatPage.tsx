@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { useUser } from '@clerk/clerk-react'
-import { MessageSquare, Send, Users } from 'lucide-react'
+import { MessageSquare, Send, Users, ChevronLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -74,6 +74,8 @@ export function ChatPage() {
   const { user } = useUser()
   // null = broadcast ("Toute la salle"). Sinon, DM avec ce membre.
   const [selectedMemberId, setSelectedMemberId] = useState<Id<'members'> | null>(null)
+  // Mobile : panneau unique — false = liste des conversations, true = fil ouvert.
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -149,11 +151,14 @@ export function ChatPage() {
         subtitle={<span>Messagerie interne — diffusion à toute la salle ou messages privés</span>}
       />
 
-      <div className="flex h-[calc(100vh-140px)] m-9 mt-6 rounded-[14px] border overflow-hidden"
+      <div className="flex h-[calc(100dvh-150px)] md:h-[calc(100dvh-140px)] m-3 md:m-9 md:mt-6 rounded-[14px] border overflow-hidden"
         style={{ borderColor: 'var(--ds-border)', background: 'var(--ds-bg-surface)' }}
       >
         {/* Panneau gauche — broadcast + annuaire */}
-        <div className="w-64 shrink-0 border-r flex flex-col" style={{ borderColor: 'var(--ds-border)' }}>
+        <div
+          className={`${mobileThreadOpen ? 'hidden md:flex' : 'flex'} w-full md:w-64 shrink-0 border-r flex-col`}
+          style={{ borderColor: 'var(--ds-border)' }}
+        >
           <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-px">
             <ThreadRow
               label="Toute la salle"
@@ -162,7 +167,7 @@ export function ChatPage() {
               preview={convFor('broadcast')?.lastMsg.content}
               unread={convFor('broadcast')?.unread ?? 0}
               active={!selectedMemberId}
-              onClick={() => setSelectedMemberId(null)}
+              onClick={() => { setSelectedMemberId(null); setMobileThreadOpen(true) }}
             />
 
             <div className="px-1.5 pt-4 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] ds-text-tertiary">
@@ -180,7 +185,7 @@ export function ChatPage() {
                   preview={conv?.lastMsg.content}
                   unread={conv?.unread ?? 0}
                   active={selectedMemberId === m._id}
-                  onClick={() => setSelectedMemberId(m._id)}
+                  onClick={() => { setSelectedMemberId(m._id); setMobileThreadOpen(true) }}
                 />
               )
             })}
@@ -193,8 +198,15 @@ export function ChatPage() {
         </div>
 
         {/* Panneau droit — fil + composer */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="px-5 py-3.5 border-b flex items-center gap-2 shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
+        <div className={`${mobileThreadOpen ? 'flex' : 'hidden md:flex'} flex-1 flex-col min-w-0`}>
+          <div className="px-4 md:px-5 py-3 md:py-3.5 border-b flex items-center gap-2 shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
+            <button
+              onClick={() => setMobileThreadOpen(false)}
+              className="md:hidden -ml-1 p-1 rounded-md ds-text-secondary hover:ds-bg-subtle"
+              aria-label="Retour aux conversations"
+            >
+              <ChevronLeft size={20} />
+            </button>
             <MessageSquare size={16} style={{ color: 'var(--ds-text-tertiary)' }} />
             <span className="text-[14px] font-semibold ds-text-primary truncate">{threadTitle}</span>
           </div>
@@ -243,7 +255,7 @@ export function ChatPage() {
               onChange={e => setDraft(e.target.value)}
               onKeyDown={onKeyDown}
               placeholder={`Message à ${threadTitle}…  (Entrée pour envoyer, Maj+Entrée = retour à la ligne)`}
-              className="flex-1 resize-none rounded-[10px] border px-3 py-2 text-[14px] outline-none"
+              className="flex-1 resize-none rounded-[10px] border px-3 py-2 text-[16px] md:text-[14px] outline-none"
               style={{
                 background: 'var(--ds-bg-base)',
                 borderColor: 'var(--ds-border)',
@@ -253,7 +265,7 @@ export function ChatPage() {
             <button
               onClick={() => void handleSend()}
               disabled={!draft.trim()}
-              className="w-10 h-10 rounded-[10px] flex items-center justify-center text-white shrink-0 disabled:opacity-40 transition-opacity"
+              className="w-11 h-11 md:w-10 md:h-10 rounded-[10px] flex items-center justify-center text-white shrink-0 disabled:opacity-40 transition-opacity"
               style={{ background: '#3B82F6' }}
               aria-label="Envoyer"
             >

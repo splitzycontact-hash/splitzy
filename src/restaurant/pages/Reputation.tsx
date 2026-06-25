@@ -112,7 +112,7 @@ export function Reputation() {
         live
       />
 
-      <div className="px-9 py-6 space-y-5">
+      <div className="px-4 py-5 md:px-9 md:py-6 space-y-5">
 
         {/* KPI row */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
@@ -187,8 +187,9 @@ export function Reputation() {
               <p className="text-[13px] ds-text-secondary mt-0.5">Les retours envoyés depuis Splitzy après le paiement.</p>
             </div>
             {/* Filter tabs */}
+            <div className="overflow-x-auto hide-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 w-full sm:w-auto">
             <div
-              className="inline-flex rounded-[10px] p-[3px] gap-px border"
+              className="inline-flex flex-nowrap min-w-max rounded-[10px] p-[3px] gap-px border"
               style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)', boxShadow: 'var(--ds-shadow-sm)' }}
             >
               {FILTERS.map(({ key, label, count }) => (
@@ -206,6 +207,7 @@ export function Reputation() {
                   <span className="text-[11px] tabular-nums ds-text-tertiary">{count}</span>
                 </button>
               ))}
+            </div>
             </div>
           </div>
 
@@ -286,7 +288,7 @@ export function Reputation() {
                           value={replyText}
                           onChange={e => setReplyText(e.target.value)}
                           placeholder="Votre réponse au client…"
-                          className="w-full text-[13px] rounded-[8px] border px-3 py-2 resize-none leading-[1.4] outline-none"
+                          className="w-full text-base md:text-[13px] rounded-[8px] border px-3 py-2 resize-none leading-[1.4] outline-none"
                           style={{ borderColor: 'var(--ds-border)', background: 'var(--ds-bg-base)', color: 'var(--ds-text-primary)', minHeight: 60 }}
                         />
                         <div className="flex items-center gap-2">
