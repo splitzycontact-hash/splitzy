@@ -16,6 +16,7 @@ export function PageHeader({ title, subtitle, live = false, actions }: PageHeade
 
   return (
     <header
+      data-testid="page-header"
       className="flex items-start justify-between gap-3 md:gap-6 px-4 pt-5 pb-4 md:px-9 md:pt-7 md:pb-6 shrink-0 border-b"
       style={{
         background: 'var(--ds-bg-surface)',

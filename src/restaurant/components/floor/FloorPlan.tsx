@@ -109,6 +109,7 @@ export default function FloorPlan({
           onZoneChange={onZoneChange ?? (() => {})}
         />
         <div
+          data-testid="floor-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${gridCols},minmax(40px,1fr))`,

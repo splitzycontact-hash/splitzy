@@ -194,6 +194,7 @@ export function Sidebar() {
 
   return (
     <aside
+      data-testid="sidebar"
       className="w-[240px] h-full hidden md:flex flex-col shrink-0 border-r"
       style={{ background: 'var(--ds-bg-surface)', borderColor: 'var(--ds-border)' }}
     >

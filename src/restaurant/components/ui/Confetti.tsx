@@ -75,6 +75,7 @@ export function useConfetti() {
     () => (
       <canvas
         ref={canvasRef}
+        data-testid="confetti-canvas"
         className="fixed inset-0 pointer-events-none"
         style={{ zIndex: 9999 }}
         aria-hidden

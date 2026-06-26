@@ -24,3 +24,9 @@ dist-ssr
 *.sw?
 .vercel
 memory_*.md
+
+# Playwright E2E
+e2e/.auth/
+e2e/.env.test
+playwright-report/
+test-results/

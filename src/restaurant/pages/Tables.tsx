@@ -127,6 +127,8 @@ function TableCard({ table, onSimulate, onView, onAdd, onSend }: {
   return (
     <m.article
       layout
+      data-testid={`table-card-${id}`}
+      data-status={status}
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       whileHover={{ y: -3, boxShadow: '0 8px 24px rgba(0,0,0,0.10)' }}

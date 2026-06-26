@@ -451,6 +451,7 @@ export function Overview() {
 
           {/* CA du jour */}
           <m.div
+            data-testid="kpi-ca"
             className="ds-panel flex flex-col gap-3 p-4 md:p-5 relative min-h-[132px]"
             whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
             whileTap={{ scale: 0.98 }}
@@ -500,6 +501,7 @@ export function Overview() {
 
           {/* Tables actives */}
           <m.div
+            data-testid="kpi-tables"
             className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px]"
             whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
             whileTap={{ scale: 0.98 }}
@@ -538,6 +540,7 @@ export function Overview() {
 
           {/* Score Splitzy — dérivé des feedbacks réels ("—" si aucun) */}
           <m.div
+            data-testid="kpi-score"
             className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px] relative overflow-hidden"
             whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
             whileTap={{ scale: 0.98 }}
@@ -589,6 +592,7 @@ export function Overview() {
 
           {/* Pourboires */}
           <m.div
+            data-testid="kpi-tips"
             className="ds-panel flex flex-col gap-3 p-4 md:p-5 min-h-[132px]"
             whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
             whileTap={{ scale: 0.98 }}

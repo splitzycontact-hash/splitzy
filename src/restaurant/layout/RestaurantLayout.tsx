@@ -74,6 +74,7 @@ function MobileBottomNav() {
   return (
     <>
       <nav
+        data-testid="mobile-nav"
         className="md:hidden fixed bottom-0 left-0 right-0 z-30 flex items-stretch border-t"
         style={{
           background: 'var(--ds-bg-surface)',
