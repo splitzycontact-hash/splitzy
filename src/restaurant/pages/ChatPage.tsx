@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { useUser } from '@clerk/clerk-react'
 import { MessageSquare, Send, Users, ChevronLeft } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -219,58 +220,97 @@ export function ChatPage() {
                   : 'Aucun message — commencez la conversation !'}
               </div>
             )}
-            {messages?.map(msg => {
-              const mine = !!me && msg.senderId === me._id
-              const sender = memberById.get(msg.senderId)
-              const senderName = mine ? 'Vous' : sender ? nameOf(sender) : 'Membre'
-              return (
-                <div
-                  key={msg._id}
-                  className={`flex flex-col max-w-[75%] ${mine ? 'self-end items-end' : 'self-start items-start'}`}
-                >
-                  <div className="text-[10.5px] ds-text-tertiary mb-0.5 px-1">
-                    {senderName} · {hhmm(msg.createdAt)}
-                  </div>
-                  <div
-                    className="px-3 py-2 rounded-2xl text-[13.5px] leading-snug whitespace-pre-wrap break-words"
-                    style={
-                      mine
-                        ? { background: '#3B82F6', color: '#FFFFFF' }
-                        : { background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-primary)' }
-                    }
+            <AnimatePresence initial={false}>
+              {messages?.map(msg => {
+                const mine = !!me && msg.senderId === me._id
+                const sender = memberById.get(msg.senderId)
+                const senderName = mine ? 'Vous' : sender ? nameOf(sender) : 'Membre'
+                const senderIdx = otherMembers.findIndex(m => m._id === msg.senderId)
+                const avatarColor = AVATAR_COLORS[senderIdx >= 0 ? senderIdx % AVATAR_COLORS.length : 0]
+                const avatarInitial = sender ? initialOf(sender) : '?'
+                return (
+                  <motion.div
+                    key={msg._id}
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18, ease: 'easeOut' }}
+                    className={`flex items-end gap-2 ${mine ? 'self-end flex-row-reverse' : 'self-start'}`}
                   >
-                    {msg.content}
-                  </div>
+                    {!mine && (
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+                        style={{ background: avatarColor }}
+                      >
+                        {avatarInitial}
+                      </div>
+                    )}
+                    <div className={`flex flex-col max-w-[65%] ${mine ? 'items-end' : 'items-start'}`}>
+                      <div className="text-[10.5px] ds-text-tertiary mb-0.5 px-1">
+                        {senderName} · {hhmm(msg.createdAt)}
+                      </div>
+                      <div
+                        className="px-3 py-2 text-[13.5px] leading-snug whitespace-pre-wrap break-words"
+                        style={
+                          mine
+                            ? { background: '#3B82F6', color: '#FFFFFF', borderRadius: '18px 18px 4px 18px' }
+                            : { background: 'var(--ds-bg-subtle)', color: 'var(--ds-text-primary)', borderRadius: '18px 18px 18px 4px' }
+                        }
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
+            {messages === undefined && (
+              <div className="self-start flex items-end gap-2">
+                <div className="w-7 h-7 rounded-full flex-shrink-0" style={{ background: 'var(--ds-bg-subtle)' }} />
+                <div className="px-3 py-2.5 flex gap-1.5 items-center" style={{ background: 'var(--ds-bg-subtle)', borderRadius: '18px 18px 18px 4px' }}>
+                  {[0, 1, 2].map(i => (
+                    <motion.span
+                      key={i}
+                      className="w-1.5 h-1.5 rounded-full block"
+                      style={{ background: 'var(--ds-text-tertiary)' }}
+                      animate={{ y: [0, -5, 0] }}
+                      transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
+                    />
+                  ))}
                 </div>
-              )
-            })}
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
 
           {/* Composer */}
-          <div className="border-t px-4 py-3 flex items-end gap-2 shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
-            <textarea
-              rows={2}
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              onKeyDown={onKeyDown}
-              placeholder={`Message à ${threadTitle}…  (Entrée pour envoyer, Maj+Entrée = retour à la ligne)`}
-              className="flex-1 resize-none rounded-[10px] border px-3 py-2 text-[16px] md:text-[14px] outline-none"
-              style={{
-                background: 'var(--ds-bg-base)',
-                borderColor: 'var(--ds-border)',
-                color: 'var(--ds-text-primary)',
-              }}
-            />
-            <button
-              onClick={() => void handleSend()}
-              disabled={!draft.trim()}
-              className="w-11 h-11 md:w-10 md:h-10 rounded-[10px] flex items-center justify-center text-white shrink-0 disabled:opacity-40 transition-opacity"
-              style={{ background: '#3B82F6' }}
-              aria-label="Envoyer"
+          <div className="border-t px-4 py-3 shrink-0" style={{ borderColor: 'var(--ds-border)' }}>
+            <div
+              className="flex items-center gap-2 rounded-full px-4 border transition-colors"
+              style={{ background: 'var(--ds-bg-base)', borderColor: 'var(--ds-border)' }}
             >
-              <Send size={16} />
-            </button>
+              <textarea
+                rows={1}
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder={`Message à ${threadTitle}…`}
+                className="flex-1 resize-none bg-transparent py-3 text-[14px] leading-snug outline-none"
+                style={{ color: 'var(--ds-text-primary)' }}
+              />
+              <motion.button
+                onClick={() => void handleSend()}
+                disabled={!draft.trim()}
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0 disabled:opacity-40 transition-opacity"
+                style={{ background: '#3B82F6' }}
+                aria-label="Envoyer"
+              >
+                <Send size={14} />
+              </motion.button>
+            </div>
           </div>
         </div>
       </div>
