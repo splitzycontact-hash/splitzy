@@ -225,9 +225,7 @@ export function ChatPage() {
                 const mine = !!me && msg.senderId === me._id
                 const sender = memberById.get(msg.senderId)
                 const senderName = mine ? 'Vous' : sender ? nameOf(sender) : 'Membre'
-                const senderIdx = otherMembers.findIndex(m => m._id === msg.senderId)
-                const avatarColor = AVATAR_COLORS[senderIdx >= 0 ? senderIdx % AVATAR_COLORS.length : 0]
-                const avatarInitial = sender ? initialOf(sender) : '?'
+                const avatarSeed = sender ? nameOf(sender) : 'default'
                 return (
                   <motion.div
                     key={msg._id}
@@ -239,12 +237,12 @@ export function ChatPage() {
                     className={`flex items-end gap-2 ${mine ? 'self-end flex-row-reverse' : 'self-start'}`}
                   >
                     {!mine && (
-                      <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
-                        style={{ background: avatarColor }}
-                      >
-                        {avatarInitial}
-                      </div>
+                      <img
+                        src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(avatarSeed)}`}
+                        className="w-7 h-7 rounded-full flex-shrink-0"
+                        style={{ background: 'var(--ds-bg-subtle)' }}
+                        alt={senderName}
+                      />
                     )}
                     <div className={`flex flex-col max-w-[65%] ${mine ? 'items-end' : 'items-start'}`}>
                       <div className="text-[10.5px] ds-text-tertiary mb-0.5 px-1">
