@@ -3505,7 +3505,7 @@ function AccountSection({
                   style={{ transform: active ? 'scale(1.1)' : undefined }}
                 >
                   <img
-                    src={`https://api.dicebear.com/9.x/adventurer-neutral/svg?seed=${encodeURIComponent(seed)}`}
+                    src={`https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=${encodeURIComponent(seed)}`}
                     className="w-14 h-14 rounded-full"
                     style={{
                       background: 'var(--ds-bg-subtle)',
