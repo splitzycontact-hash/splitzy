@@ -12,6 +12,12 @@ test.describe('Tables — gestion (owner)', () => {
 
   test.beforeEach(async ({ page }) => {
     await gotoPage(page, '/tables', /Tables live/)
+    // Attendre que Convex ait résolu la liste des tables avant chaque test —
+    // le h1 apparaît avant la réponse de la query, ce qui causait des faux skips.
+    await expect(
+      page.locator('[data-testid^="table-card-"]').first()
+        .or(page.getByText('Aucune table configurée')),
+    ).toBeVisible({ timeout: 12_000 })
   })
 
   test('Scénario 1 — la grille de tables (ou l\'état vide) est visible', async ({ page }) => {
@@ -27,27 +33,51 @@ test.describe('Tables — gestion (owner)', () => {
     test.skip((await openBtn.count()) === 0, 'Aucune table libre dans ce service.')
     await openBtn.click()
     await expect(page.getByText(/Ajouter un article — Table/)).toBeVisible()
-    await page.getByRole('button', { name: 'Fermer' }).click()
+    await page.getByRole('button', { name: 'Annuler' }).click()
   })
 
-  test('Scénario 3 — simuler une commande affiche un total', async ({ page }) => {
-    const simBtn = page.getByRole('button', { name: /Simuler commande/ }).first()
+  test('Scénario 3 — simuler une commande affiche un total ou un état vide', async ({ page }) => {
+    const simBtn = page.locator('button').filter({ hasText: 'Simuler commande' }).first()
     test.skip((await simBtn.count()) === 0, 'Aucun bouton Simuler (rôle viewer ?).')
     await simBtn.click()
     await expect(page.getByText(/Simuler — Table/)).toBeVisible()
-    // Menu présent → total ; menu vide (resto neuf, pas de sync Square) → message.
+    // Menu réel → Total ; menu vide (resto neuf, pas de sync Square) → "Aucun article".
     const total = page.getByText('Total', { exact: true })
     const noItems = page.getByText(/Aucun article/)
     await expect(total.or(noItems).first()).toBeVisible()
     await page.getByRole('button', { name: 'Annuler' }).click()
   })
 
-  test('Scénario 4 — la modale détail propose de libérer la table (confettis montés)', async ({ page }) => {
-    const card = page.locator('[data-testid^="table-card-"]:not([data-status="free"])').first()
-    test.skip((await card.count()) === 0, 'Aucune table active à clôturer.')
+  test('Scénario 4 — la modale détail propose de libérer une table active', async ({ page }) => {
+    let card = page.locator('[data-testid^="table-card-"]:not([data-status="free"])').first()
+
+    if ((await card.count()) === 0) {
+      // Aucune table active → en créer une via "Ouvrir" + ajout d'un article.
+      // AddItemModal utilise DEMO_MENU comme fallback si le resto n'a pas de menu,
+      // donc ce scénario fonctionne même sur un restaurant de test vierge.
+      const openBtn = page.getByRole('button', { name: 'Ouvrir' }).first()
+      test.skip((await openBtn.count()) === 0, 'Aucune table libre ni active disponible.')
+
+      await openBtn.click()
+      await expect(page.getByText(/Ajouter un article — Table/)).toBeVisible()
+
+      // Cliquer sur le premier article (aria-label="Ajouter <nom>")
+      await page.locator('button[aria-label^="Ajouter"]').first().click()
+
+      // Confirmer ("Ajouter N article(s) · XX,XX €")
+      await page.locator('button').filter({ hasText: /Ajouter \d+ article/ }).click()
+
+      // Attendre que la table passe en "dining"
+      card = page.locator('[data-testid^="table-card-"]:not([data-status="free"])').first()
+      await expect(card).toBeVisible({ timeout: 15_000 })
+    }
+
+    // Ouvrir le détail et vérifier "Libérer la table" + canvas confetti
     await card.getByRole('button', { name: 'Voir' }).click()
     await expect(page.getByRole('button', { name: 'Libérer la table' })).toBeVisible()
-    // Le canvas confetti est monté dans la page (déclenché au reset).
     await expect(page.getByTestId('confetti-canvas')).toBeAttached()
+
+    // Nettoyage : remettre la table à l'état libre pour ne pas polluer les runs suivants
+    await page.getByRole('button', { name: 'Libérer la table' }).click()
   })
 })
