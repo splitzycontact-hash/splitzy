@@ -222,7 +222,7 @@ export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'>
                       >
                         {!mine && (
                           <img
-                            src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(avatarSeed)}`}
+                            src={`https://api.dicebear.com/9.x/adventurer-neutral/svg?seed=${encodeURIComponent(avatarSeed)}`}
                             className="w-6 h-6 rounded-full flex-shrink-0"
                             style={{ background: 'var(--ds-bg-subtle)' }}
                             alt={senderName}

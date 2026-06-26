@@ -238,7 +238,7 @@ export function ChatPage() {
                   >
                     {!mine && (
                       <img
-                        src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(avatarSeed)}`}
+                        src={`https://api.dicebear.com/9.x/adventurer-neutral/svg?seed=${encodeURIComponent(avatarSeed)}`}
                         className="w-7 h-7 rounded-full flex-shrink-0"
                         style={{ background: 'var(--ds-bg-subtle)' }}
                         alt={senderName}
