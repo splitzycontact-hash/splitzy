@@ -225,7 +225,7 @@ export function ChatPage() {
                 const mine = !!me && msg.senderId === me._id
                 const sender = memberById.get(msg.senderId)
                 const senderName = mine ? 'Vous' : sender ? nameOf(sender) : 'Membre'
-                const avatarSeed = sender ? (sender.avatarSeed ?? nameOf(sender)) : 'default'
+                const avatarSeed = sender ? (sender.avatarSeed ?? '👤') : '👤'
                 return (
                   <motion.div
                     key={msg._id}
@@ -237,12 +237,13 @@ export function ChatPage() {
                     className={`flex items-end gap-2 ${mine ? 'self-end flex-row-reverse' : 'self-start'}`}
                   >
                     {!mine && (
-                      <img
-                        src={`https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=${encodeURIComponent(avatarSeed)}`}
-                        className="w-7 h-7 rounded-full flex-shrink-0"
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-base flex-shrink-0"
                         style={{ background: 'var(--ds-bg-subtle)' }}
-                        alt={senderName}
-                      />
+                        aria-label={senderName}
+                      >
+                        {avatarSeed}
+                      </div>
                     )}
                     <div className={`flex flex-col max-w-[65%] ${mine ? 'items-end' : 'items-start'}`}>
                       <div className="text-[10.5px] ds-text-tertiary mb-0.5 px-1">

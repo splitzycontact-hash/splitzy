@@ -3494,26 +3494,26 @@ function AccountSection({
         </div>
         <div className="px-5 py-5">
           <div className="flex flex-wrap gap-3">
-            {['Zara','Milo','Luna','Sage','Echo','Felix','Nova','Storm'].map(seed => {
-              const active = (selectedSeed ?? me?.avatarSeed) === seed
+            {['🦊','🐼','🐸','🦁','🦋','🐨','🦉','🐬','🐯','🦄','🐻','🦅'].map(emoji => {
+              const active = (selectedSeed ?? me?.avatarSeed) === emoji
               return (
                 <button
-                  key={seed}
-                  onClick={() => void handleSelectAvatar(seed)}
-                  aria-label={`Avatar ${seed}`}
+                  key={emoji}
+                  onClick={() => void handleSelectAvatar(emoji)}
+                  aria-label={`Avatar ${emoji}`}
                   className="relative transition-transform hover:scale-110 focus:outline-none"
                   style={{ transform: active ? 'scale(1.1)' : undefined }}
                 >
-                  <img
-                    src={`https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=${encodeURIComponent(seed)}`}
-                    className="w-14 h-14 rounded-full"
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center text-3xl"
                     style={{
                       background: 'var(--ds-bg-subtle)',
                       boxShadow: active ? '0 0 0 3px #E8920A' : '0 0 0 2px transparent',
                       transition: 'box-shadow 0.15s',
                     }}
-                    alt={seed}
-                  />
+                  >
+                    {emoji}
+                  </div>
                   {active && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center text-white"
                       style={{ background: '#E8920A', fontSize: '10px' }}>
