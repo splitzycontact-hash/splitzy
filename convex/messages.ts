@@ -79,6 +79,17 @@ export const send = mutation({
 
     const me = await ensureMe(ctx, restaurantId, identity, restaurant)
 
+    // Rate limiting — max 30 messages par minute par membre.
+    const since = Date.now() - 60_000
+    const recent = await ctx.db
+      .query("messages")
+      .withIndex("by_restaurant_date", (q) => q.eq("restaurantId", restaurantId))
+      .filter((q) =>
+        q.and(q.eq(q.field("senderId"), me._id), q.gte(q.field("createdAt"), since)),
+      )
+      .take(31)
+    if (recent.length >= 30) throw new Error("Limite de débit atteinte — max 30 messages/minute")
+
     const threadId = recipientId
       ? [me._id, recipientId].sort().join("|")
       : "broadcast"
@@ -110,6 +121,22 @@ export const callManager = mutation({
   handler: async (ctx, { restaurantId, tableNumber }) => {
     const { identity, restaurant } = await requireRestaurantAccess(ctx, restaurantId)
     const me = await ensureMe(ctx, restaurantId, identity, restaurant)
+
+    // Rate limiting — max 3 appels gérant par minute par membre (anti-spam).
+    const since = Date.now() - 60_000
+    const recentCalls = await ctx.db
+      .query("messages")
+      .withIndex("by_restaurant_date", (q) => q.eq("restaurantId", restaurantId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("senderId"), me._id),
+          q.gte(q.field("createdAt"), since),
+          q.eq(q.field("threadId"), "broadcast"),
+        ),
+      )
+      .take(4)
+    if (recentCalls.length >= 3) throw new Error("Limite de débit atteinte — max 3 appels/minute")
+
     return ctx.db.insert("messages", {
       restaurantId,
       senderId: me._id,

@@ -15,43 +15,9 @@
     <meta name="description" content="Splitzy simplifie le partage d'addition au restaurant. Scannez le QR code, choisissez vos plats et payez votre part en quelques secondes. Zéro calcul, zéro friction." />
     <title>Splitzy</title>
 
-    <script>
-      (function () {
-        var m = location.pathname.match(/^\/t\/([^/]+)\/(\d+)/);
-        if (!m) return;
-        var slug = m[1];
-        var tableNumber = Number(m[2]);
-        if (!slug || !Number.isFinite(tableNumber)) return;
-
-        var base = '%VITE_CONVEX_URL%';
-        if (!base || base.indexOf('VITE_CONVEX_URL') !== -1) return;
-
-        var ctrl = ('AbortController' in window) ? new AbortController() : null;
-        if (ctrl) setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, 8000);
-
-        var t0 = Date.now();
-        window.__tableBootstrap = fetch(base + '/api/query', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Convex-Client': 'splitzy-bootstrap'
-          },
-          body: JSON.stringify({
-            path: 'restaurants:getTableContext',
-            format: 'json',
-            args: [{ slug: slug, tableNumber: tableNumber }]
-          }),
-          signal: ctrl ? ctrl.signal : undefined
-        })
-          .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (d) {
-            try { console.info('[bootstrap]', Date.now() - t0, 'ms'); } catch (e) {}
-            if (!d || d.status !== 'success') return null;
-            return d.value;
-          })
-          .catch(function () { return null; });
-      })();
-    </script>
+    <!-- Script externe pour éviter les inline scripts et permettre script-src 'self' dans le CSP.
+         Vite remplace %VITE_CONVEX_URL% dans les attributs data de index.html au build. -->
+    <script src="/bootstrap.js" data-convex-url="%VITE_CONVEX_URL%"></script>
   </head>
   <body>
     <div id="root"></div>
