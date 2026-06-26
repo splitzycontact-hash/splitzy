@@ -18,8 +18,16 @@ function OnboardingWithClerk() {
     api.restaurants.getByClerkId,
     isSignedIn && user ? {} : 'skip',
   )
+  // Garde anti-onboarding accidentel : un invité déjà rattaché à un restaurant
+  // (ligne `members`) ne doit JAMAIS voir le formulaire de création — il est
+  // redirigé vers le dashboard. Sans ça, si l'acceptation d'invitation a échoué
+  // (token perdu), il pouvait créer un restaurant par erreur.
+  const memberRestaurant = useQuery(
+    api.restaurants.getByMembership,
+    isSignedIn && user ? {} : 'skip',
+  )
 
-  if (!isLoaded || (isSignedIn && restaurant === undefined)) {
+  if (!isLoaded || (isSignedIn && (restaurant === undefined || memberRestaurant === undefined))) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -29,6 +37,11 @@ function OnboardingWithClerk() {
 
   // Already has a restaurant → go to dashboard
   if (isSignedIn && restaurant) {
+    return <Navigate to="/restaurant" replace />
+  }
+
+  // Déjà membre d'un restaurant via invitation → dashboard (jamais l'onboarding)
+  if (isSignedIn && memberRestaurant) {
     return <Navigate to="/restaurant" replace />
   }
 

@@ -31,7 +31,8 @@ const clerkReady = (() => {
 // rediriger vers /restaurant ou /restaurant/onboarding (signUpForceRedirectUrl du
 // ClerkProvider) au lieu de /accept-invite, et ne préserve pas toujours le query
 // param `redirect` à travers le flow sign-up/verify. Le token, lui, survit en
-// sessionStorage (même onglet) → dès que l'utilisateur est connecté, on le ramène
+// localStorage (les redirections OAuth mobile purgent sessionStorage) → dès que
+// l'utilisateur est connecté, on le ramène
 // sur /accept-invite pour déclencher l'auto-acceptation (sinon : aucune ligne
 // `members` → getByMembership null → onboarding à tort).
 function PendingInviteWatcher() {
@@ -41,10 +42,10 @@ function PendingInviteWatcher() {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return
-    const pendingToken = sessionStorage.getItem('pendingInviteToken')
+    const pendingToken = localStorage.getItem('pendingInviteToken')
     if (!pendingToken) return
     // Consomme immédiatement le token pour éviter toute boucle de redirection.
-    sessionStorage.removeItem('pendingInviteToken')
+    localStorage.removeItem('pendingInviteToken')
     // Si Clerk nous a déjà amenés sur /accept-invite avec le bon token, on laisse
     // la page faire son auto-acceptation sans re-naviguer.
     const alreadyHere =

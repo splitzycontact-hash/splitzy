@@ -83,7 +83,7 @@ function AcceptInviteInner() {
   // Auto-acceptation : dès que l'invité est connecté ET que l'invitation est
   // valide (pending, non expirée), on appelle `accept` au montage — sans bouton.
   // C'est le chemin nominal après un retour de Clerk (cf. PendingInviteWatcher
-  // dans RestaurantApp qui ramène ici via le token stocké en sessionStorage).
+  // dans RestaurantApp qui ramène ici via le token stocké en localStorage).
   useEffect(() => {
     if (autoAcceptDone.current) return
     if (!authLoaded || !isSignedIn || !user || !token) return
@@ -230,10 +230,11 @@ function AcceptInviteInner() {
           <>
             <button
               onClick={() => {
-                // Stocke le token AVANT la redirection Clerk : il survit à tout le
-                // flow sign-up/verify (même onglet) même si Clerk ne préserve pas
-                // le query param `redirect`. Récupéré par PendingInviteWatcher.
-                if (token) sessionStorage.setItem('pendingInviteToken', token)
+                // Stocke le token AVANT la redirection Clerk : localStorage survit
+                // à tout le flow sign-up/verify ET aux redirections OAuth mobile (qui
+                // purgent sessionStorage), même si Clerk ne préserve pas le query
+                // param `redirect`. Récupéré par PendingInviteWatcher.
+                if (token) localStorage.setItem('pendingInviteToken', token)
                 navigate(signInHref)
               }}
               className="mt-3 inline-flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark transition-colors"
