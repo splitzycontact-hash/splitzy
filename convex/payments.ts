@@ -89,8 +89,8 @@ export const create = mutation({
     const subtotalCents = table.amountCents && table.amountCents > 0
       ? Math.min(args.subtotalCents, Math.max(0, table.amountCents - (table.paidCents ?? 0)))
       : args.subtotalCents
-    // 4) Recalculer commission (1,5%) et total côté serveur (ignorer les valeurs client).
-    const commissionCents = Math.round(subtotalCents * 0.015)
+    // 4) Pas de commission pour l'instant (Stripe abandonné). Total recalculé côté serveur.
+    const commissionCents = 0
     const totalCents = subtotalCents + args.tipCents
 
     const { paidItemNames, provider, providerRef, ...paymentData } = args

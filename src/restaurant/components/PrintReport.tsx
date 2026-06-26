@@ -209,7 +209,6 @@ function ReportContent({ range }: { range: ReportRange }) {
           <div style={{ display: 'flex', gap: 24, marginBottom: 32, padding: '12px 16px', background: '#f9fafb', borderRadius: 8, fontSize: 12 }}>
             <SummaryItem label="CA brut" value={formatEur(caPeriod)} color="#E8920A" />
             <SummaryItem label="Pourboires équipe" value={formatEur(tipsPeriod)} color="#16a34a" />
-            <SummaryItem label="Commission Splitzy (1,5%)" value={formatEur(periodComm)} color="#9ca3af" />
             <SummaryItem label="Net restaurateur" value={formatEur(caPeriod - periodComm)} color="#111827" />
           </div>
         </>

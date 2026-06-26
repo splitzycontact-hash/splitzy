@@ -4,10 +4,13 @@ export async function requireIdentity(ctx: any) {
   return identity
 }
 
+const MEMBER_ROLES = ["owner", "manager", "staff"] as const
+type MemberRole = typeof MEMBER_ROLES[number]
+
 export async function requireRestaurantAccess(
   ctx: any,
   restaurantId: any,
-  allowedRoles: string[] = ["owner", "manager", "staff"],
+  allowedRoles: MemberRole[] = ["owner", "manager", "staff"],
 ) {
   const identity = await requireIdentity(ctx)
   const restaurant = await ctx.db.get(restaurantId)

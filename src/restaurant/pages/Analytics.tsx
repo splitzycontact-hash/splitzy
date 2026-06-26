@@ -614,11 +614,9 @@ export function Analytics() {
   })()
   const avgTableMinDisplay = tableTimeAvg ?? avgTableMin
 
-  // Commission J+1 (1,5% sur le volume du jour) — net estimé reversé au restaurant
-  const commissionRate  = 0.015
+  // Net J+1 estimé reversé au restaurant (plus de commission)
   const todayVolume     = overview?.todayCA ?? 0
-  const commissionToday = Math.round(todayVolume * commissionRate)
-  const netToday        = todayVolume - commissionToday
+  const netToday        = todayVolume
 
   // — Comparaison N-1 (Analytics-B) : jour / semaine / mois via api.analytics.getKpiComparison —
   const KPI_TAB_META: Record<'day' | 'week' | 'month', { label: string; vs: string }> = {
@@ -1336,7 +1334,6 @@ export function Analytics() {
             {todayVolume > 0 ? (
               <span>
                 Virement prévu lundi · <strong className="ds-text-primary font-semibold">~{formatEur(netToday)}</strong> net
-                <span className="ds-text-tertiary"> (commission {formatEur(commissionToday)})</span>
               </span>
             ) : (
               <span>Aucun encaissement aujourd'hui — prochain virement après vos premiers paiements</span>

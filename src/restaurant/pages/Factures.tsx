@@ -30,8 +30,6 @@ type SplitzyInvoice = {
 const SPLITZY_COMPANY_CONFIG = {
   siret: 'En cours d\'immatriculation',  // ← remplacer dès réception du SIRET
   tvaNumber: '',                          // ← remplacer dès activation TVA
-  commissionRate: 0.015,
-  tvaRate: 0.20,
 }
 
 // Aucune facture émise pour l'instant (SIRET en cours). Quand Tiime sera
@@ -308,7 +306,7 @@ function Drawer({ row, restaurantId, restaurantName, onClose }: {
                 { k: 'Table', v: row.table, highlight: false },
                 { k: 'Convives', v: `${row.guests} personne${row.guests > 1 ? 's' : ''} · partage par article`, highlight: false },
                 { k: 'Méthode', v: meth.name, highlight: false },
-                { k: 'Commission Splitzy', v: `${fmt(row.fee)} € (1,5% + 0,15 €)`, highlight: false },
+                { k: 'Commission Splitzy', v: `${fmt(row.fee)} €`, highlight: false },
                 { k: 'Net pour le restaurant', v: `${fmt(row.amount - row.fee)} €`, highlight: true },
               ].map(r => (
                 <div key={r.k} className="flex items-center justify-between text-[13px]">
@@ -435,7 +433,7 @@ function SplitzyInvoicesTab() {
         style={{ background: 'var(--ds-accent-soft)', borderColor: '#F5DDB3', color: 'var(--ds-accent-strong)' }}
       >
         <Info size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-        <span>Vos factures de commission Splitzy (1,5% + TVA). SIRET : {SPLITZY_COMPANY_CONFIG.siret}</span>
+        <span>Vos factures de commission Splitzy. SIRET : {SPLITZY_COMPANY_CONFIG.siret}</span>
       </div>
 
       {/* KPI row */}
@@ -740,7 +738,6 @@ export function Factures() {
             <div className="font-extrabold tabular-nums leading-none tracking-[-0.025em] ds-text-primary" style={{ fontSize: '22px', fontFamily: 'Inter, sans-serif' }}>
               {fmt(commission)} €
             </div>
-            <div className="text-[11.5px] ds-text-tertiary">1,5% + 0,15 € / transaction</div>
           </div>
 
           {/* Net à recevoir — dark */}

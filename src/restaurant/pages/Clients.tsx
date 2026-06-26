@@ -640,7 +640,7 @@ export function Clients() {
       // Priorité CRM > paiement : la row CRM reflète la dernière édition gérant.
       const crmPhone = crmMatch[0]?.phone ?? ''
       const crmEmail = crmMatch[0]?.email?.toLowerCase() ?? ''
-      const isManualVip = crmMatch.some(r => (r as any).manualVip === true)
+      const isManualVip = crmMatch.some(r => r.manualVip === true)
       if (isManualVip) status = 'vip'
       const consentRow = crmMatch.find(r => r.marketingConsent === true && !!r.email)
 

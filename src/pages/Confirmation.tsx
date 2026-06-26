@@ -11,7 +11,7 @@ import { PrivacyFooterLink } from '../components/ui/PrivacyFooterLink'
 export function Confirmation() {
   const { state } = useSession()
   const navigate = useNavigate()
-  const { subtotal, tipAmount, splitzyFee, total } = useSessionCalcs()
+  const { subtotal, tipAmount, total } = useSessionCalcs()
 
   // CRM optionnel — coordonnées laissées par le client pour recevoir les offres
   const [phone, setPhone] = useState('')
@@ -148,14 +148,10 @@ export function Confirmation() {
           {[
             { l: 'Sous-total', v: formatEur(subtotal), c: '#52525B' },
             ...(tipAmount > 0 ? [{ l: `Pourboire (${state.tipPercent} %)`, v: `+${formatEur(tipAmount)}`, c: '#E8920A' }] : []),
-            { l: 'Commission Splitzy (1,5 %)', v: formatEur(splitzyFee), c: '#A1A1AA', note: 'payée par le restaurant' },
           ].map((row, idx) => (
             <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', gap: 8 }}>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <span style={{ fontSize: 13.5, color: row.c, fontWeight: 500 }}>{row.l}</span>
-                {row.note && (
-                  <div style={{ fontSize: 10, color: '#A1A1AA', fontStyle: 'italic', marginTop: 1 }}>{row.note}</div>
-                )}
               </div>
               <span style={{ fontSize: 13.5, color: row.c, fontWeight: row.l.startsWith('Pourboire') ? 700 : 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                 {row.v}

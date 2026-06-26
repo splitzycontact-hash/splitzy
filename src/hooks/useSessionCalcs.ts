@@ -40,7 +40,7 @@ export function useSessionCalcs() {
   }
 
   const tipAmount = Math.round(subtotal * state.tipPercent / 100)
-  const splitzyFee = Math.round(subtotal * 0.015)
+  const splitzyFee = 0
   const total = subtotal + tipAmount
 
   return {

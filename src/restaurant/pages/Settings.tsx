@@ -3323,8 +3323,7 @@ function AccountSection({
   const navigate = useNavigate()
   const deleteAll    = useMutation(api.restaurants.deleteAll)
   const syncMemberProfile = useMutation(api.members.syncMyProfile)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const setAvatarSeedMutation = useMutation((api.members as any).setAvatarSeed)
+  const setAvatarSeedMutation = useMutation(api.members.setAvatarSeed)
   const teamMembers = useQuery(api.members.getTeamMembers, restaurantId ? { restaurantId } : 'skip')
   const me = teamMembers?.find(m => m.clerkUserId === user?.id) ?? null
 
@@ -4143,7 +4142,7 @@ const INPUT_STYLE = {
 } as const
 
 function TipSettingsSection({ restaurant, restaurantId }: { restaurant: any; restaurantId: Id<'restaurants'> | null | undefined }) {
-  const updateTipSettings = useMutation((api.restaurants as any).updateTipSettings)
+  const updateTipSettings = useMutation(api.restaurants.updateTipSettings)
   const existing = restaurant?.tipSettings as
     | { mode: TipMode; kitchenSharePct?: number; roleCoefficients?: { owner?: number; manager?: number; staff?: number } }
     | undefined
@@ -4282,12 +4281,12 @@ export function Settings() {
   const restaurant = useRestaurant()
   const restaurantId = useRestaurantId()
   const updateRestaurant  = useMutation(api.restaurants.update)
-  const setLogoStorageId  = useMutation((api.restaurants as any).setLogoStorageId)
-  const generateUploadUrl = useAction((api.restaurants as any).generateUploadUrl)
+  const setLogoStorageId  = useMutation(api.restaurants.setLogoStorageId)
+  const generateUploadUrl = useAction(api.restaurants.generateUploadUrl)
   const logoUrl = useQuery(
-    (api.restaurants as any).getLogoUrl,
+    api.restaurants.getLogoUrl,
     restaurant?.logoStorageId ? { storageId: restaurant.logoStorageId } : 'skip'
-  ) as string | null | undefined
+  )
   const rawTables = useQuery(api.tables.list, restaurantId ? { restaurantId } : 'skip')
   const teamMembers = useQuery(api.members.getTeamMembers, restaurantId ? { restaurantId } : 'skip')
 
