@@ -82,6 +82,9 @@ export default defineSchema({
     // Renseigné quand le membre accepte son invitation depuis /restaurant/accept-invite
     // (identité Clerk de la personne qui a accepté). Voir convex/invitations.ts → accept.
     clerkUserId: v.optional(v.string()),
+    // Seed DiceBear choisi par le membre pour son avatar dans le chat d'équipe.
+    // Si absent, on utilise le prénom par défaut.
+    avatarSeed: v.optional(v.string()),
   }).index("by_restaurant", ["restaurantId"])
     .index("by_clerkUserId", ["clerkUserId"]),
 

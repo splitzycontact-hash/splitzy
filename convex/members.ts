@@ -61,6 +61,22 @@ export const syncMyProfile = mutation({
   },
 })
 
+// Enregistre le seed DiceBear choisi par le membre pour son avatar dans le chat.
+export const setAvatarSeed = mutation({
+  args: { seed: v.string() },
+  handler: async (ctx, { seed }) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return
+    const rows = await ctx.db
+      .query("members")
+      .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
+      .collect()
+    for (const row of rows) {
+      await ctx.db.patch(row._id, { avatarSeed: seed })
+    }
+  },
+})
+
 export const updateMemberRole = mutation({
   args: {
     memberId: v.id("members"),

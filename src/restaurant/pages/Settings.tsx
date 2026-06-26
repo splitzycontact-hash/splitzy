@@ -3323,6 +3323,10 @@ function AccountSection({
   const navigate = useNavigate()
   const deleteAll    = useMutation(api.restaurants.deleteAll)
   const syncMemberProfile = useMutation(api.members.syncMyProfile)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const setAvatarSeedMutation = useMutation((api.members as any).setAvatarSeed)
+  const teamMembers = useQuery(api.members.getTeamMembers, restaurantId ? { restaurantId } : 'skip')
+  const me = teamMembers?.find(m => m.clerkUserId === user?.id) ?? null
 
   const [deleteModal,    setDeleteModal]   = useState(false)
   const [deleteConfirm,  setDeleteConfirm] = useState('')
@@ -3334,12 +3338,19 @@ function AccountSection({
   const [lastName,       setLastName]      = useState('')
   const [savingProfile,  setSavingProfile] = useState(false)
   const [profileSaved,   setProfileSaved]  = useState(false)
+  const [selectedSeed,   setSelectedSeed]  = useState<string | null>(null)
+  const [avatarSaved,    setAvatarSaved]   = useState(false)
 
   useEffect(() => {
     if (!user) return
     setFirstName(user.firstName ?? '')
     setLastName(user.lastName ?? '')
   }, [user])
+
+  // Init le seed depuis Convex dès que la donnée arrive
+  useEffect(() => {
+    if (me?.avatarSeed != null && selectedSeed === null) setSelectedSeed(me.avatarSeed)
+  }, [me?.avatarSeed, selectedSeed])
 
   const profileDirty =
     !!user &&
@@ -3364,6 +3375,13 @@ function AccountSection({
     } finally {
       setSavingProfile(false)
     }
+  }
+
+  async function handleSelectAvatar(seed: string) {
+    setSelectedSeed(seed)
+    await setAvatarSeedMutation({ seed }).catch(() => {})
+    setAvatarSaved(true)
+    setTimeout(() => setAvatarSaved(false), 2000)
   }
 
   async function handleDelete() {
@@ -3463,6 +3481,54 @@ function AccountSection({
             Changer le mot de passe
             <ChevronRight size={12} style={{ color: 'var(--ds-text-tertiary)' }} />
           </button>
+        </div>
+      </div>
+
+      {/* Avatar chat */}
+      <div className="ds-panel">
+        <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
+          <div className="font-bold text-[13.5px] ds-text-primary">Avatar chat</div>
+          <div className="text-[12px] ds-text-tertiary mt-0.5">
+            Votre avatar dans le chat d'équipe — choisissez votre personnage
+          </div>
+        </div>
+        <div className="px-5 py-5">
+          <div className="flex flex-wrap gap-3">
+            {['Zara','Milo','Luna','Sage','Echo','Felix','Nova','Storm'].map(seed => {
+              const active = (selectedSeed ?? me?.avatarSeed) === seed
+              return (
+                <button
+                  key={seed}
+                  onClick={() => void handleSelectAvatar(seed)}
+                  aria-label={`Avatar ${seed}`}
+                  className="relative transition-transform hover:scale-110 focus:outline-none"
+                  style={{ transform: active ? 'scale(1.1)' : undefined }}
+                >
+                  <img
+                    src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}`}
+                    className="w-14 h-14 rounded-full"
+                    style={{
+                      background: 'var(--ds-bg-subtle)',
+                      boxShadow: active ? '0 0 0 3px #E8920A' : '0 0 0 2px transparent',
+                      transition: 'box-shadow 0.15s',
+                    }}
+                    alt={seed}
+                  />
+                  {active && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center text-white"
+                      style={{ background: '#E8920A', fontSize: '10px' }}>
+                      <Check size={11} />
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          {avatarSaved && (
+            <p className="text-[12px] mt-3" style={{ color: 'var(--ds-success)' }}>
+              Avatar enregistré ✓
+            </p>
+          )}
         </div>
       </div>
 

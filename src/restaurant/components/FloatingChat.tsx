@@ -209,7 +209,7 @@ export function FloatingChat({ restaurantId }: { restaurantId: Id<'restaurants'>
                     const mine = !!me && msg.senderId === me._id
                     const sender = memberById.get(msg.senderId)
                     const senderName = mine ? 'Vous' : sender ? nameOf(sender) : 'Membre'
-                    const avatarSeed = sender ? nameOf(sender) : 'default'
+                    const avatarSeed = sender ? (sender.avatarSeed ?? nameOf(sender)) : 'default'
                     return (
                       <motion.div
                         key={msg._id}
