@@ -1,0 +1,32 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Tous les lundis à 8h UTC (9h Paris).
+    - cron: "0 8 * * 1"
+
+jobs:
+  audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit — CRITICAL (bloquant)
+        run: npm audit --audit-level=critical
+
+      - name: Audit — HIGH (rapport uniquement, non bloquant)
+        # Non bloquant jusqu'à ce que vite6 + js-cookie soient bumps via Dependabot.
+        run: npm audit --audit-level=high || true

@@ -374,4 +374,12 @@ export default defineSchema({
   })
     .index("by_restaurant_thread", ["restaurantId", "threadId"])
     .index("by_restaurant_date", ["restaurantId", "createdAt"]),
+
+  // Rate limiting générique — une entrée par clé (ex. "campaign:restaurantId").
+  // Fenêtre glissante : count incrémenté dans la même fenêtre, reset au-delà.
+  rateLimits: defineTable({
+    key: v.string(),        // identifiant de la ressource protégée
+    count: v.number(),      // nombre de requêtes dans la fenêtre courante
+    windowStart: v.number(), // timestamp ms du début de la fenêtre
+  }).index("by_key", ["key"]),
 })

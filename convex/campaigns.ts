@@ -61,6 +61,13 @@ export const sendCampaign = action({
       throw new Error("Accès refusé")
     }
 
+    // Rate limit : max 3 campagnes par heure et par restaurant.
+    await ctx.runMutation(internal.rateLimits.checkAndIncrement, {
+      key: `campaign:${args.restaurantId}`,
+      limit: 3,
+      windowMs: 3_600_000,
+    })
+
     const apiKey = process.env.RESEND_API_KEY
     if (!apiKey) {
       console.error("[Campaign] RESEND_API_KEY not set")

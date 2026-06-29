@@ -448,4 +448,46 @@ http.route({
   }),
 })
 
+// ── CSP Violation Reporting ───────────────────────────────────────────────────
+// Reçoit les rapports de violation CSP envoyés par les navigateurs.
+// Supporte les deux formats :
+//   - report-uri (ancien, Chrome/Firefox) : POST JSON { "csp-report": { ... } }
+//   - Reporting API (nouveau, Chrome 69+)  : POST JSON array [{ "body": { ... } }]
+// Les violations sont loggées en console Convex (visibles dans le dashboard).
+// Pour les envoyer vers Sentry, remplacer le console.warn par un fetch Sentry DSN.
+http.route({
+  path: "/csp-report",
+  method: "POST",
+  handler: httpAction(async (_ctx, request) => {
+    try {
+      const body = await request.json()
+      // Normaliser les deux formats en un objet unique.
+      const report = Array.isArray(body)
+        ? body[0]?.body ?? body[0]
+        : body["csp-report"] ?? body
+      console.warn("[CSP Violation]", JSON.stringify(report))
+    } catch {
+      // Corps invalide — ignorer silencieusement.
+    }
+    return new Response(null, { status: 204 })
+  }),
+})
+
+// OPTIONS preflight pour /csp-report (Reporting API envoie un preflight CORS).
+http.route({
+  path: "/csp-report",
+  method: "OPTIONS",
+  handler: httpAction(async (_ctx, _request) => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "https://www.splitzy.fr",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "86400",
+      },
+    })
+  }),
+})
+
 export default http

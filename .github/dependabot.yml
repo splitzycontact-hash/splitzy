@@ -1,0 +1,24 @@
+version: 2
+updates:
+  # npm — splitzy-client (repo splitzy.git)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "splitzy-contact"
+    labels:
+      - "dependencies"
+      - "security"
+    ignore:
+      # Mises à jour majeures à valider manuellement (risque breaking).
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
