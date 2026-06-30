@@ -13,7 +13,7 @@
     "test:e2e:headed": "dotenv -e e2e/.env.test -- playwright test --headed"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.61.6",
+    "@clerk/clerk-react": "^5.61.8",
     "@dnd-kit/core": "^6.3.1",
     "@sentry/react": "^10.60.0",
     "convex": "^1.38.0",
