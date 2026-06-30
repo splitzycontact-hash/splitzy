@@ -448,6 +448,174 @@ http.route({
   }),
 })
 
+// ── Sentry Webhook → Telegram ─────────────────────────────────────────────────
+// Reçoit les alertes Sentry (nouvelles erreurs, résolutions) et les envoie
+// sur Telegram via le bot Hermes, avec stack trace enrichie via l'API Sentry.
+//
+// Env vars Convex requises :
+//   TELEGRAM_BOT_TOKEN    — token du bot (BotFather)
+//   TELEGRAM_CHAT_ID      — ton user ID Telegram
+//   SENTRY_WEBHOOK_SECRET — secret Sentry (optionnel, recommandé)
+//   SENTRY_AUTH_TOKEN     — token Internal Integration Sentry (pour stack trace)
+//
+// URL à configurer dans Sentry → Settings → Developer Settings → Splitzy Telegram Alerts :
+//   https://mellow-chinchilla-481.eu-west-1.convex.site/sentry-webhook
+
+function htmlEscapeTg(text: string): string {
+  return String(text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+}
+
+// Extrait les frames applicatives les plus pertinentes depuis un événement Sentry.
+function extractStackFrames(event: any): string {
+  const entries: any[] = event?.entries ?? []
+  for (const entry of entries) {
+    if (entry.type !== "exception") continue
+    const frames: any[] = entry.data?.values?.[0]?.stacktrace?.frames ?? []
+    // Garder uniquement les frames "in-app" (exclure react-dom, chunks, node_modules)
+    const appFrames = frames
+      .filter((f: any) =>
+        f.inApp !== false &&
+        !String(f.filename ?? "").includes("node_modules") &&
+        !String(f.filename ?? "").includes("react-dom") &&
+        !String(f.filename ?? "").includes("/chunk-") &&
+        !String(f.filename ?? "").includes("@sentry"),
+      )
+      .slice(-4)
+      .reverse()
+    if (!appFrames.length) return ""
+    const lines = appFrames.map((f: any) => {
+      const fn   = htmlEscapeTg(f.function ?? f.module ?? "?")
+      const file = htmlEscapeTg(String(f.filename ?? "").replace(/^.*\/src\//, "src/"))
+      const line = f.lineNo ? `:${f.lineNo}` : ""
+      return `  <code>${fn}()</code> ${file}${line}`
+    })
+    return "\n\n📍 <b>Stack :</b>\n" + lines.join("\n")
+  }
+  return ""
+}
+
+http.route({
+  path: "/sentry-webhook",
+  method: "POST",
+  handler: httpAction(async (_ctx, request) => {
+    const botToken    = process.env.TELEGRAM_BOT_TOKEN
+    const chatId      = process.env.TELEGRAM_CHAT_ID
+    const secret      = process.env.SENTRY_WEBHOOK_SECRET
+    const sentryToken = process.env.SENTRY_AUTH_TOKEN
+
+    const body = await request.text()
+
+    // Vérification signature Sentry si secret configuré.
+    if (secret) {
+      const provided = request.headers.get("sentry-hook-signature")
+      if (!provided) return unauthorized("Missing Sentry signature")
+      if (!(await verifyBodyHmac(secret, body, provided))) return unauthorized("Invalid Sentry signature")
+    }
+
+    if (!botToken || !chatId) {
+      console.error("[Sentry→Telegram] TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID manquants")
+      return new Response(null, { status: 200 })
+    }
+
+    let payload: any
+    try { payload = JSON.parse(body) } catch { return new Response("Bad JSON", { status: 400 }) }
+
+    const action = payload?.action as string
+    const issue  = payload?.data?.issue
+    if (!issue) return new Response(null, { status: 200 })
+
+    let message = ""
+
+    if (action === "created") {
+      const level = String(issue.level ?? "error")
+      const emoji = level === "fatal" ? "🔴" : level === "error" ? "🚨" : level === "warning" ? "⚠️" : "ℹ️"
+
+      // Titre enrichi depuis metadata (plus précis que issue.title)
+      const errorType  = issue.metadata?.type ?? ""
+      const errorValue = issue.metadata?.value ?? ""
+      const title = htmlEscapeTg(
+        errorType && errorValue ? `${errorType}: ${errorValue}` : (issue.title ?? "Erreur inconnue")
+      )
+
+      // Fichier source (metadata > culprit)
+      const srcFile = issue.metadata?.filename ?? issue.metadata?.module ?? issue.culprit ?? ""
+      const culprit = srcFile ? `\n📁 <code>${htmlEscapeTg(srcFile)}</code>` : ""
+
+      // Tags → environnement, browser, OS
+      const tags: Record<string, string> = {}
+      if (Array.isArray(issue.tags)) {
+        for (const t of issue.tags) { if (t?.key) tags[t.key] = t.value ?? "" }
+      }
+      const env     = tags["environment"] ?? tags["env"] ?? ""
+      const browser = tags["browser.name"] ?? tags["browser"] ?? ""
+      const os      = tags["os.name"] ?? tags["os"] ?? ""
+      const envLine = env ? `\n🌍 <code>${htmlEscapeTg(env)}</code>` : ""
+      const devLine = browser ? `\n🌐 ${htmlEscapeTg(browser)}${os ? ` · ${htmlEscapeTg(os)}` : ""}` : ""
+
+      const count = Number(issue.count ?? 1)
+      const users = Number(issue.userCount ?? 0)
+
+      // Stack trace + user via API Sentry (si token configuré)
+      let stackTrace = ""
+      let userLine   = ""
+      if (sentryToken && issue.id) {
+        try {
+          const resp = await fetch(
+            `https://sentry.io/api/0/issues/${issue.id}/events/latest/`,
+            { headers: { Authorization: `Bearer ${sentryToken}` } }
+          )
+          if (resp.ok) {
+            const event = await resp.json()
+            stackTrace = extractStackFrames(event)
+            const user = event?.user
+            if (user?.email) userLine = `\n👤 <code>${htmlEscapeTg(user.email)}</code>`
+            else if (user?.username) userLine = `\n👤 <code>${htmlEscapeTg(user.username)}</code>`
+            else if (user?.id) userLine = `\n👤 user <code>${htmlEscapeTg(String(user.id))}</code>`
+          }
+        } catch (e) {
+          console.warn("[Sentry→Telegram] Impossible de récupérer l'event:", e)
+        }
+      }
+
+      const link = issue.permalink ? `\n\n<a href="${issue.permalink}">🔗 Voir sur Sentry</a>` : ""
+
+      message = `${emoji} <b>Nouvelle erreur Splitzy</b>\n\n`
+              + `<b>${title}</b>${culprit}\n`
+              + `⚠️ Niveau : <code>${level}</code>\n`
+              + (count > 1 ? `🔁 ${count} occurrences\n` : "")
+              + (users > 0 ? `👤 ${users} utilisateur${users > 1 ? "s" : ""} affecté${users > 1 ? "s" : ""}\n` : "")
+              + envLine + devLine + userLine
+              + stackTrace
+              + link
+
+    } else if (action === "resolved") {
+      const title = htmlEscapeTg(issue.title ?? "Erreur")
+      const link  = issue.permalink ? ` <a href="${issue.permalink}">→</a>` : ""
+      message = `✅ <b>Erreur résolue</b>\n\n${title}${link}`
+
+    } else {
+      // assigned, archived, etc. → silencieux
+      return new Response(null, { status: 200 })
+    }
+
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }),
+    })
+
+    return new Response(null, { status: 200 })
+  }),
+})
+
 // ── CSP Violation Reporting ───────────────────────────────────────────────────
 // Reçoit les rapports de violation CSP envoyés par les navigateurs.
 // Supporte les deux formats :

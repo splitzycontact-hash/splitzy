@@ -28,6 +28,7 @@ import type * as messages from "../messages.js";
 import type * as payments from "../payments.js";
 import type * as planning from "../planning.js";
 import type * as posIntegrations from "../posIntegrations.js";
+import type * as rateLimits from "../rateLimits.js";
 import type * as restaurants from "../restaurants.js";
 import type * as seed from "../seed.js";
 import type * as shifts from "../shifts.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   payments: typeof payments;
   planning: typeof planning;
   posIntegrations: typeof posIntegrations;
+  rateLimits: typeof rateLimits;
   restaurants: typeof restaurants;
   seed: typeof seed;
   shifts: typeof shifts;
