@@ -1,6 +1,18 @@
 import { query, mutation, action, internalQuery } from "./_generated/server"
-import { v } from "convex/values"
+import { ConvexError, v } from "convex/values"
 import { requireRestaurantAccess, requireIdentity } from "./authz"
+import { isAdminAccess, resolveAdminUser } from "./lib"
+
+// ── Admin (app admin interne) — GOAL_ADMIN_06, additif ───────────────────────
+// Resolves the acting admin via Clerk identity OR the allowlisted authEmail
+// fallback (the admin app has no Clerk→Convex JWT, so identity is null there).
+async function requireAdmin(ctx: any, authEmail?: string) {
+  const user = await resolveAdminUser(ctx, authEmail);
+  if (!user || !["super_admin", "admin_support"].includes(user.role)) {
+    throw new ConvexError("Insufficient permissions");
+  }
+  return user;
+}
 
 export const getTableContext = query({
   args: { slug: v.string(), tableNumber: v.number() },
@@ -212,4 +224,108 @@ export const getLogoUrl = query({
 export const listAllIds = internalQuery({
   args: {},
   handler: async (ctx) => (await ctx.db.query("restaurants").collect()).map(r => r._id),
+})
+
+// ── Admin-only (admin app) — GOAL_ADMIN_06, additif ──────────────────────────
+// SECURITY (H2): renvoyait le doc COMPLET (clerkUserId, email, kycStatus, siret,
+// stripeAccountId…) à n'importe qui, sans auth. Désormais : admin OU membre/owner
+// du restaurant. Sinon null (jamais throw — règle des queries React).
+// Consommé par : admin RestaurantDetail (admin), dashboard owner (son resto),
+// flow impersonation (session admin → isAdminAccess passe).
+export const getById = query({
+  args: { restaurantId: v.id("restaurants") },
+  handler: async (ctx, args) => {
+    if (await isAdminAccess(ctx)) return ctx.db.get(args.restaurantId)
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+    const r = await ctx.db.get(args.restaurantId)
+    if (!r) return null
+    if (r.clerkUserId === identity.subject) return r
+    const members = await ctx.db
+      .query("members")
+      .withIndex("by_restaurant", q => q.eq("restaurantId", args.restaurantId))
+      .collect()
+    const isMember = members.some((m: any) => m.clerkUserId === identity.subject && m.status === "active")
+    return isMember ? r : null
+  },
+})
+
+export const listAll = query({
+  args: { authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx, args.authEmail))) return [];
+    return ctx.db.query("restaurants").collect();
+  },
+})
+
+// Correctif "table transactions vide en prod" (GOAL_ADMIN_06) : si le restaurant
+// n'a aucune transaction (PSP jamais branché), on retombe sur `payments` (ledger
+// réel) pour dater sa dernière activité — sinon lastActivityAt = date de création.
+export const listWithLastActivity = query({
+  args: { authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx, args.authEmail))) return [];
+    const restaurants = await ctx.db.query("restaurants").collect();
+    return Promise.all(restaurants.map(async (r) => {
+      const lastTx = await ctx.db.query("transactions")
+        .withIndex("by_restaurant", q => q.eq("restaurantId", r._id))
+        .order("desc").first();
+      if (lastTx) return { ...r, lastActivityAt: lastTx.succeededAt ?? r._creationTime };
+      const lastPayment = await ctx.db.query("payments")
+        .withIndex("by_restaurant", q => q.eq("restaurantId", r._id))
+        .order("desc").first();
+      return { ...r, lastActivityAt: lastPayment?.createdAt ?? r._creationTime };
+    }));
+  },
+})
+
+export const suspend = mutation({
+  args: { restaurantId: v.id("restaurants"), reason: v.string(), authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const actor = await requireAdmin(ctx, args.authEmail);
+    const restaurant = await ctx.db.get(args.restaurantId);
+    if (!restaurant) throw new ConvexError("Restaurant not found");
+    await ctx.db.patch(args.restaurantId, { status: "suspended", suspended: true });
+    await ctx.db.insert("auditLogs", {
+      actorId: actor._id,
+      action: "restaurant.suspended",
+      resourceType: "restaurant",
+      resourceId: args.restaurantId,
+      diff: { reason: args.reason, previousStatus: restaurant.status },
+    });
+    await ctx.db.insert("tickets", {
+      restaurantId: args.restaurantId,
+      subject: `Compte suspendu — ${restaurant.name}`,
+      status: "new",
+      priority: "high",
+      createdBy: actor._id,
+    });
+  },
+})
+
+export const unsuspend = mutation({
+  args: { restaurantId: v.id("restaurants"), authEmail: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const actor = await requireAdmin(ctx, args.authEmail);
+    await ctx.db.patch(args.restaurantId, { status: "active", suspended: false });
+    await ctx.db.insert("auditLogs", {
+      actorId: actor._id,
+      action: "restaurant.unsuspended",
+      resourceType: "restaurant",
+      resourceId: args.restaurantId,
+    });
+  },
+})
+
+// Retourne le restaurant du gérant connecté (lu depuis le JWT Clerk)
+export const getMyRestaurant = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+    return ctx.db
+      .query("restaurants")
+      .withIndex("by_clerk_user", q => q.eq("clerkUserId", identity.subject))
+      .first()
+  },
 })

@@ -382,4 +382,165 @@ export default defineSchema({
     count: v.number(),      // nombre de requêtes dans la fenêtre courante
     windowStart: v.number(), // timestamp ms du début de la fenêtre
   }).index("by_key", ["key"]),
+
+  // ---- Tables admin (portées depuis le monorepo Splitzy/ — GOAL_ADMIN_01) ----
+  // Ajouts purs : aucune table existante ci-dessus n'est modifiée. Alimentées et
+  // lues uniquement par l'app admin interne (convex/admin.ts, billing.ts, etc.).
+
+  users: defineTable({
+    clerkUserId: v.string(),
+    email: v.string(),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    avatarUrl: v.optional(v.string()),
+    role: v.union(
+      v.literal("super_admin"), v.literal("admin_support"),
+      v.literal("viewer"), v.literal("gerant")
+    ),
+    totpEnabled: v.optional(v.boolean()),
+  }).index("by_clerk_id", ["clerkUserId"])
+    .index("by_role", ["role"]),
+
+  bugs: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    severity: v.union(
+      v.literal("critical"), v.literal("high"), v.literal("medium"),
+      v.literal("low"), v.literal("info")
+    ),
+    status: v.union(
+      v.literal("open"), v.literal("investigating"),
+      v.literal("resolved"), v.literal("wontfix")
+    ),
+    restaurantId: v.optional(v.id("restaurants")),
+    assignedTo: v.optional(v.id("users")),
+    githubIssueUrl: v.optional(v.string()),
+    stackTrace: v.optional(v.string()),
+    isPinned: v.optional(v.boolean()),
+    resolvedAt: v.optional(v.number()),
+  }).index("by_status_severity", ["status", "severity"])
+    .index("by_restaurant", ["restaurantId"]),
+
+  disputes: defineTable({
+    transactionId: v.id("transactions"),
+    stripeDisputeId: v.optional(v.string()),
+    amountCents: v.number(),
+    reason: v.optional(v.string()),
+    status: v.string(),
+    evidenceDueBy: v.optional(v.number()),
+  }).index("by_transaction", ["transactionId"]),
+
+  subscriptions: defineTable({
+    restaurantId: v.id("restaurants"),
+    plan: v.union(v.literal("free"), v.literal("pro")),
+    status: v.union(
+      v.literal("active"), v.literal("past_due"),
+      v.literal("canceled"), v.literal("paused")
+    ),
+    amountCents: v.optional(v.number()),
+    stripeSubscriptionId: v.optional(v.string()),
+    currentPeriodStart: v.optional(v.number()),
+    currentPeriodEnd: v.optional(v.number()),
+    dunningAttempts: v.optional(v.number()),
+    nextAttemptAt: v.optional(v.number()),
+  }).index("by_restaurant", ["restaurantId"])
+    .index("by_status", ["status"]),
+
+  stripeWebhookEvents: defineTable({
+    eventId: v.string(),
+    processedAt: v.number(),
+    status: v.union(
+      v.literal("processed"), v.literal("failed"), v.literal("dead_letter")
+    ),
+    failureCount: v.optional(v.number()),
+  }).index("by_event_id", ["eventId"]),
+
+  tickets: defineTable({
+    restaurantId: v.optional(v.id("restaurants")),
+    subject: v.string(),
+    status: v.union(
+      v.literal("new"), v.literal("in_progress"),
+      v.literal("waiting_customer"), v.literal("resolved"), v.literal("closed")
+    ),
+    priority: v.union(
+      v.literal("low"), v.literal("normal"),
+      v.literal("high"), v.literal("urgent")
+    ),
+    assignedTo: v.optional(v.id("users")),
+    createdBy: v.optional(v.id("users")),
+    resolvedAt: v.optional(v.number()),
+  }).index("by_restaurant", ["restaurantId"])
+    .index("by_status", ["status"]),
+
+  ticketMessages: defineTable({
+    ticketId: v.id("tickets"),
+    authorId: v.optional(v.id("users")),
+    body: v.string(),
+    isInternal: v.optional(v.boolean()),
+  }).index("by_ticket", ["ticketId"]),
+
+  auditLogs: defineTable({
+    actorId: v.optional(v.id("users")),
+    actorLabel: v.optional(v.string()),
+    action: v.string(),
+    resourceType: v.string(),
+    resourceId: v.optional(v.string()),
+    isImpersonation: v.optional(v.boolean()),
+    diff: v.optional(v.any()),
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+  }).index("by_actor", ["actorId"])
+    .index("by_resource", ["resourceType", "resourceId"]),
+
+  featureFlags: defineTable({
+    key: v.string(),
+    description: v.optional(v.string()),
+    status: v.union(
+      v.literal("dev"), v.literal("beta"),
+      v.literal("active"), v.literal("disabled")
+    ),
+    rolloutType: v.union(
+      v.literal("boolean"), v.literal("percentage"), v.literal("allowlist")
+    ),
+    rolloutValue: v.optional(v.object({
+      percent: v.optional(v.number()),
+      restaurantIds: v.optional(v.array(v.string())),
+    })),
+  }).index("by_key", ["key"]),
+
+  restaurantNotes: defineTable({
+    restaurantId: v.id("restaurants"),
+    authorId: v.id("users"),
+    body: v.string(),
+  }).index("by_restaurant", ["restaurantId"]),
+
+  // Table VIDE en prod : aucun PSP réel n'écrit dedans (les vrais paiements vivent
+  // dans `payments`). Présente pour que les fonctions admin (transactions.ts,
+  // admin.ts) compilent et tournent — elles retombent sur `payments` si vide.
+  // GOAL_ADMIN_05. sessionId/dinerId réfèrent sessions/diners (tables du monorepo,
+  // absentes ici) : id-refs = string brandé, tolérées (jamais écrites).
+  transactions: defineTable({
+    restaurantId: v.id("restaurants"),
+    sessionId: v.id("sessions"),
+    dinerId: v.optional(v.id("diners")),
+    stripePaymentIntentId: v.optional(v.string()),
+    stripeChargeId: v.optional(v.string()),
+    amountCents: v.number(),
+    tipCents: v.optional(v.number()),
+    commissionCents: v.optional(v.number()),
+    status: v.union(
+      v.literal("pending"), v.literal("succeeded"),
+      v.literal("failed"), v.literal("refunded"), v.literal("disputed")
+    ),
+    failureCode: v.optional(v.string()),
+    paymentMethod: v.optional(v.string()),
+    cardLast4: v.optional(v.string()),
+    rawStripeEvent: v.optional(v.any()),
+    succeededAt: v.optional(v.number()),
+    ipAddress: v.optional(v.string()),
+  }).index("by_restaurant", ["restaurantId"])
+    .index("by_restaurant_date", ["restaurantId", "succeededAt"])
+    .index("by_session", ["sessionId"])
+    .index("by_stripe_pi", ["stripePaymentIntentId"])
+    .index("by_ip", ["ipAddress"]),
 })
