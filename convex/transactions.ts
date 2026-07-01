@@ -49,6 +49,7 @@ export const listByRestaurant = query({
       amountCents: p.totalCents, tipCents: p.tipCents, commissionCents: p.commissionCents,
       status: (p.status === "Encaissé" ? "succeeded" : p.status === "Remboursé" ? "refunded" : "pending"),
       paymentMethod: p.paymentMethod, succeededAt: p.createdAt,
+      stripePaymentIntentId: undefined, cardLast4: undefined,
     }));
   },
 });
