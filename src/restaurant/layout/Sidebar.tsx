@@ -3,7 +3,7 @@ import { m } from 'framer-motion'
 import {
   LayoutDashboard, Grid3x3, Star, TrendingUp,
   Utensils, Users, Receipt, Plug, Settings, CalendarDays,
-  ArrowUpRight, ChevronsUpDown, LayoutGrid, MessageSquare, UserPlus,
+  ArrowUpRight, ChevronsUpDown, LayoutGrid, MessageSquare, UserPlus, LifeBuoy,
 } from 'lucide-react'
 import { useUser, useClerk } from '@clerk/clerk-react'
 import { useQuery } from 'convex/react'
@@ -37,6 +37,7 @@ const RESTAURANT_ITEMS: { label: string; icon: React.ElementType; to: string; ro
   { label: 'Clients',       icon: Users,        to: '/restaurant/clients',      roles: ['owner', 'manager'] },
   { label: 'Planning',      icon: CalendarDays, to: '/restaurant/planning',     roles: ['owner', 'manager'] },
   { label: 'Extras',        icon: UserPlus,     to: '/restaurant/extras',       roles: ['owner', 'manager'] },
+  { label: 'Support',       icon: LifeBuoy,     to: '/restaurant/support'       },
   { label: 'Factures',      icon: Receipt,      to: '/restaurant/factures'      },
   { label: 'Intégrations',  icon: Plug,     to: '/restaurant/integrations', roles: ['owner'] },
   { label: 'Paramètres',    icon: Settings, to: '/restaurant/settings',     roles: ['owner', 'manager'] },

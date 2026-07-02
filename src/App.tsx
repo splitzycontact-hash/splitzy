@@ -38,6 +38,7 @@ const PressePage = lazy(() => import('./pages/marketing/PressePage').then(({ Pre
 const AidePage = lazy(() => import('./pages/marketing/AidePage').then(({ AidePage }) => ({ default: AidePage })))
 const SecuritePage = lazy(() => import('./pages/marketing/SecuritePage').then(({ SecuritePage }) => ({ default: SecuritePage })))
 const PrivacyPage = lazy(() => import('./pages/marketing/PrivacyPage').then(({ PrivacyPage }) => ({ default: PrivacyPage })))
+const LegalPage = lazy(() => import('./pages/marketing/LegalPage'))
 const Unsubscribe = lazy(() => import('./pages/Unsubscribe').then(({ Unsubscribe }) => ({ default: Unsubscribe })))
 const ExtraResponseConfirmation = lazy(() => import('./pages/ExtraResponseConfirmation').then(({ ExtraResponseConfirmation }) => ({ default: ExtraResponseConfirmation })))
 const BlogArticlePage = lazy(() => import('./pages/marketing/BlogArticlePage').then(({ BlogArticlePage }) => ({ default: BlogArticlePage })))
@@ -143,6 +144,7 @@ export default function App() {
             <Route path="/aide" element={<AidePage />} />
             <Route path="/securite" element={<SecuritePage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/legal" element={<LegalPage />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/extra-response-confirmation" element={<ExtraResponseConfirmation />} />
 

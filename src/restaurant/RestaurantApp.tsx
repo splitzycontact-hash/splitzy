@@ -20,6 +20,7 @@ import { ExtrasPage } from './pages/ExtrasPage'
 import { SallePage } from './pages/SallePage'
 import { Settings } from './pages/Settings'
 import { ChatPage } from './pages/ChatPage'
+import { SupportPage } from './pages/SupportPage'
 import { useChatNotifications } from './hooks/useChatNotifications'
 
 const clerkReady = (() => {
@@ -97,6 +98,7 @@ export function RestaurantApp() {
                       <Route path="/clients"      element={<RoleGuard allowed={['owner', 'manager']}><Clients /></RoleGuard>} />
                       <Route path="/planning"     element={<RoleGuard allowed={['owner', 'manager']}><Planning /></RoleGuard>} />
                       <Route path="/extras"       element={<RoleGuard allowed={['owner', 'manager']}><ExtrasPage /></RoleGuard>} />
+                      <Route path="/support"      element={<SupportPage />} />
                       <Route path="/settings"     element={<RoleGuard allowed={['owner', 'manager']}><Settings /></RoleGuard>} />
                       {/* Legacy redirect */}
                       <Route path="/feedbacks"    element={<Navigate to="/restaurant/reputation" replace />} />

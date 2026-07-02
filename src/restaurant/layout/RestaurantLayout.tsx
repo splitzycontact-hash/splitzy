@@ -5,7 +5,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Grid3x3, Star, TrendingUp,
   Receipt, Settings, Plus, X, LayoutGrid, MessageSquare,
-  Utensils, Users, CalendarDays, UserPlus, Plug,
+  Utensils, Users, CalendarDays, UserPlus, Plug, LifeBuoy,
 } from 'lucide-react'
 import { useQuery } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -45,6 +45,7 @@ const MOBILE_OVERFLOW: NavEntry[] = [
   { label: 'Clients',      icon: Users,         to: '/restaurant/clients',      roles: ['owner', 'manager'] },
   { label: 'Planning',     icon: CalendarDays,  to: '/restaurant/planning',     roles: ['owner', 'manager'] },
   { label: 'Extras',       icon: UserPlus,      to: '/restaurant/extras',       roles: ['owner', 'manager'] },
+  { label: 'Support',      icon: LifeBuoy,      to: '/restaurant/support' },
   { label: 'Factures',     icon: Receipt,       to: '/restaurant/factures' },
   { label: 'Intégrations', icon: Plug,          to: '/restaurant/integrations', roles: ['owner'] },
   { label: 'Réglages',     icon: Settings,      to: '/restaurant/settings',     roles: ['owner', 'manager'] },
