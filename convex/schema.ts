@@ -477,6 +477,7 @@ export default defineSchema({
     authorId: v.optional(v.id("users")),
     body: v.string(),
     isInternal: v.optional(v.boolean()),
+    isAdminReply: v.optional(v.boolean()),
   }).index("by_ticket", ["ticketId"]),
 
   auditLogs: defineTable({

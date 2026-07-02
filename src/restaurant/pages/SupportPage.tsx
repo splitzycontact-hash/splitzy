@@ -29,6 +29,7 @@ type TicketMessage = {
   authorId?: Id<'users'>
   body: string
   isInternal?: boolean
+  isAdminReply?: boolean
 }
 
 // Statuts backend → libellé FR + couleur + icône.
@@ -281,7 +282,7 @@ function ThreadView({
           </div>
         ) : (
           messages.map((msg, i) => {
-            const isGerant = msg.authorId != null && ticket.createdBy != null && msg.authorId === ticket.createdBy
+            const isGerant = !msg.isAdminReply
             return (
               <m.div
                 key={msg._id}

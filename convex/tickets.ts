@@ -55,6 +55,7 @@ export const reply = mutation({
       authorId: user._id,
       body: args.body,
       isInternal: args.isInternal,
+      isAdminReply: true,
     });
   },
 });
