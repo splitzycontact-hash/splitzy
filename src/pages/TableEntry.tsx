@@ -126,10 +126,11 @@ export function TableEntry() {
         })
       })
 
+      // Pas de `guests` ici : la capacité de la table n'est pas un nombre de
+      // convives — le vrai chiffre est dérivé des paiements (convex/payments.ts).
       void httpMutation('tables:updateStatus', {
         tableId: ctx.table!._id,
         status: 'dining',
-        guests: ctx.table!.capacity ?? 4,
         restaurantId: ctx.restaurant._id, // M2 : cross-check IDOR côté backend
       }).catch(err => console.error('[TableEntry] updateStatus failed', err))
 

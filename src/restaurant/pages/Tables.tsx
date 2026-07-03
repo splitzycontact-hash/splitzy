@@ -663,7 +663,7 @@ export function Tables() {
                     onClick={async () => {
                       setSendLoading(true)
                       try {
-                        await updateStatus({ tableId: sendModal.convexId as Id<'tables'>, status: 'payment', guests: sendModal.guests ?? 4, amountCents: sendModal.amountCents ?? 0 })
+                        await updateStatus({ tableId: sendModal.convexId as Id<'tables'>, status: 'payment', guests: sendModal.guests, amountCents: sendModal.amountCents ?? 0 })
                       } finally { setSendLoading(false); setSendModal(null) }
                     }}
                     disabled={sendLoading || !sendModal.amountCents}

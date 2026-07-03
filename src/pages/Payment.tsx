@@ -50,7 +50,9 @@ export function Payment() {
         restaurantId: state.convexRestaurantId,
         tableId: state.convexTableId,
         tableNumber: state.tableNumber,
-        guests: state.equalSplitCount ?? 1,
+        // Convives : signal fiable uniquement en partage équitable (stepper déclaré).
+        // En mode article, undefined — le backend dérive des payeurs distincts.
+        guests: state.splitMode === 'equal' ? state.equalSplitCount : undefined,
         subtotalCents: subtotal,
         tipCents: tipAmount,
         commissionCents: splitzyFee,

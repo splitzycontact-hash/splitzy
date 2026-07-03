@@ -1,4 +1,6 @@
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server"
+import type { MutationCtx } from "./_generated/server"
+import type { Doc } from "./_generated/dataModel"
 import { v } from "convex/values"
 import { requireRestaurantAccess } from "./authz"
 
@@ -62,7 +64,9 @@ export const create = mutation({
     restaurantId: v.id("restaurants"),
     tableId: v.id("tables"),
     tableNumber: v.number(),
-    guests: v.number(),
+    // Optionnel : envoyé uniquement en partage équitable (stepper déclaré).
+    // Absent (mode article) → défaut 1 à l'insert : un paiement = un payeur.
+    guests: v.optional(v.number()),
     subtotalCents: v.number(),
     tipCents: v.number(),
     commissionCents: v.number(),
@@ -111,6 +115,8 @@ export const create = mutation({
     const ref = providerRef ?? crypto.randomUUID()
     const paymentId = await ctx.db.insert("payments", {
       ...paymentData,
+      // Borné 1-99 (entrée anonyme, mêmes bornes que tables.addOrderItems).
+      guests: Math.max(1, Math.min(99, Math.floor(args.guests ?? 1))),
       paymentMethod: normalizePaymentMethod(args.paymentMethod),
       subtotalCents,
       tipCents: args.tipCents,
@@ -161,6 +167,13 @@ export const backfillDemoPending = internalMutation({
       ) {
         await ctx.db.patch(p.tableId, reconcileTablePatch(table, p.subtotalCents, p.tipCents, p.paidItemNames))
         reconciled++
+        // Convives réels — même logique que confirmPayment, uniquement pour
+        // les paiements réconciliés, après le patch argent.
+        const fresh = await ctx.db.get(p.tableId)
+        if (fresh) {
+          const guestsPatch = await computeGuestsPatch(ctx, fresh, p)
+          if (guestsPatch) await ctx.db.patch(p.tableId, guestsPatch)
+        }
       }
     }
     return { confirmed: targets.length, reconciled }
@@ -217,6 +230,43 @@ function reconcileTablePatch(
   return patch
 }
 
+// Convives réels, jamais inventés : après le patch argent (reconcileTablePatch,
+// intouché), remonte table.guests au meilleur signal disponible — le déclaré du
+// partage équitable (pmt.guests) ou le nombre de payeurs distincts
+// (firstName|avatarIndex) de la sitting courante. La sitting est isolée par
+// sittingStartedAt quand il existe (ouverture gérant), sinon par la même
+// reconstitution que Landing.tsx/Tables.tsx : paiements Encaissé du plus récent
+// au plus ancien, cumulés jusqu'à couvrir paidCents (approximation assumée).
+// Ne diminue JAMAIS la valeur en place (max). Retourne null si rien à patcher.
+async function computeGuestsPatch(
+  ctx: MutationCtx,
+  table: Doc<"tables">,
+  pmt: Doc<"payments">,
+): Promise<{ guests: number } | null> {
+  const rows = await ctx.db
+    .query("payments")
+    .withIndex("by_table", q => q.eq("tableId", pmt.tableId))
+    .order("desc")
+    .collect()
+  const paidCents = table.paidCents ?? 0
+  const payers = new Set<string>()
+  let acc = 0
+  for (const p of rows) {
+    if (p.status !== "Encaissé") continue
+    if (table.sittingStartedAt != null) {
+      if (p.createdAt < table.sittingStartedAt) continue
+    } else {
+      if (acc >= paidCents) break
+      acc += p.subtotalCents ?? 0
+    }
+    payers.add(`${p.firstName ?? ""}|${p.avatarIndex ?? ""}`)
+  }
+  const candidate = Math.max(pmt.guests ?? 0, payers.size)
+  const next = Math.max(table.guests ?? 0, candidate)
+  if (next <= 0 || next === (table.guests ?? 0)) return null
+  return { guests: next }
+}
+
 // SECURITY (Vuln 1) : seul point de passage à "Encaissé". Appelé EXCLUSIVEMENT
 // par http.ts après vérification de la signature du webhook PSP. internalMutation
 // = inatteignable depuis un client public.
@@ -242,6 +292,14 @@ export const confirmPayment = internalMutation({
     const table = await ctx.db.get(pmt.tableId)
     if (table) {
       await ctx.db.patch(pmt.tableId, reconcileTablePatch(table, pmt.subtotalCents, pmt.tipCents, pmt.paidItemNames))
+      // Convives réels — STRICTEMENT après le patch argent, table relue pour
+      // voir le paidCents crédité (les lectures voient les écritures de la
+      // même mutation).
+      const fresh = await ctx.db.get(pmt.tableId)
+      if (fresh) {
+        const guestsPatch = await computeGuestsPatch(ctx, fresh, pmt)
+        if (guestsPatch) await ctx.db.patch(pmt.tableId, guestsPatch)
+      }
     }
     return { ok: true }
   },
