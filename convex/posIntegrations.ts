@@ -102,10 +102,18 @@ export const updateTableFromPOS = internalMutation({
       .collect()
     const table = tables.find(t => t.number === tableNumber)
     if (table) {
-      await ctx.db.patch(table._id, {
+      const patch: Record<string, unknown> = {
         amountCents,
         status: amountCents > 0 ? "dining" : "free",
-      })
+      }
+      // Table libérée côté caisse : purge le compteur de convives et la date
+      // de sitting du service précédent — symétrique à resetToFree. La branche
+      // amountCents > 0 ne touche à rien (nettoyage déjà fait au passage free).
+      if (amountCents <= 0) {
+        patch.guests = undefined
+        patch.sittingStartedAt = undefined
+      }
+      await ctx.db.patch(table._id, patch)
     }
   },
 })

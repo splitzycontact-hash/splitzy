@@ -111,6 +111,14 @@ export const updateStatus = mutation({
     }
 
     const patch: Record<string, unknown> = { status }
+    // Nouvelle installation (free→dining, scan client ou staff) sans `guests`
+    // fourni : purge le compteur du service précédent et date la sitting,
+    // exactement comme addOrderItems pour son cas `opening`. Sans ça, le
+    // guests de la sitting précédente restait affiché (bug prod Table 4).
+    if (existing.status === "free" && status === "dining" && guests === undefined) {
+      patch.guests = undefined
+      patch.sittingStartedAt = Date.now()
+    }
     if (guests !== undefined) patch.guests = Math.max(0, guests)
 
     // M2 : amountCents (la note) n'est patché QUE pour un gérant authentifié — un
