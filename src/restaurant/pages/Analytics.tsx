@@ -523,6 +523,7 @@ export function Analytics() {
   const twPath = tipWkly.map((v, i) => (i ? 'L' : 'M') + (i / 11 * tipsW).toFixed(1) + ' ' + (57 - v / twMax * 48).toFixed(1)).join(' ')
 
   const tipVsBase = tipsTotal > 0 ? Math.round((parseFloat(avgTipPct) - 6.2) / 6.2 * 100) : 0
+  const tipPtsDelta = tipsTotal > 0 ? parseFloat(avgTipPct) - 6.2 : null
 
   // Date d'activation réelle = premier paiement encaissé (null si aucun)
   const firstPaymentAt = allEncaisse.length > 0
@@ -1164,10 +1165,10 @@ export function Analytics() {
                 <div className="text-[12px] ds-text-tertiary mt-0.5">Taux moyen · vs. moyenne du secteur (6,2%)</div>
               </div>
               <span className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: 'var(--ds-success-strong)' }}>
-                {tipsTotal > 0 ? (
+                {tipPtsDelta !== null ? (
                   <>
                     <TrendingUp size={9} />
-                    +2,3 pts
+                    {tipPtsDelta >= 0 ? '+' : ''}{tipPtsDelta.toFixed(1).replace('.', ',')} pts
                   </>
                 ) : '—'}
               </span>

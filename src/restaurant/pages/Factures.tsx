@@ -49,7 +49,7 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
 ]
 
 type RowStatus = 'Encaissé' | 'En attente' | 'Remboursé' | 'Partiel'
-type PayMethod = 'card' | 'apay' | 'gpay'
+type PayMethod = 'card' | 'apay' | 'gpay' | 'cash' | 'other'
 
 type LocalRow = {
   d: string; time: string; table: string; guests: number; method: PayMethod
@@ -60,9 +60,11 @@ type LocalRow = {
 }
 
 const METHOD_LABELS: Record<PayMethod, { ic: string; name: string; cls: string }> = {
-  apay: { ic: 'Pay', name: 'Apple Pay',  cls: '#1A1A1A' },
-  gpay: { ic: 'G',   name: 'Google Pay', cls: '#4285F4' },
-  card: { ic: 'CB',  name: 'Carte',      cls: '#52525B' },
+  apay:  { ic: 'Pay', name: 'Apple Pay',  cls: '#1A1A1A' },
+  gpay:  { ic: 'G',   name: 'Google Pay', cls: '#4285F4' },
+  card:  { ic: 'CB',  name: 'Carte',      cls: '#52525B' },
+  cash:  { ic: '€',   name: 'Espèces',    cls: '#16A34A' },
+  other: { ic: '?',   name: 'Autre',      cls: '#71717A' },
 }
 
 const STATUS_STYLE: Record<RowStatus, { bg: string; color: string }> = {
@@ -394,6 +396,8 @@ const METHOD_OPTS: { label: string; value: PayMethod }[] = [
   { label: 'Carte',       value: 'card' },
   { label: 'Apple Pay',   value: 'apay' },
   { label: 'Google Pay',  value: 'gpay' },
+  { label: 'Espèces',     value: 'cash' },
+  { label: 'Autre',       value: 'other' },
 ]
 
 const SPLITZY_STATUS_STYLE: Record<SplitzyInvoice['status'], { bg: string; color: string; Icon: typeof CheckCircle }> = {
@@ -568,7 +572,7 @@ export function Factures() {
   const [search, setSearch]             = useState('')
   const [drawerRow, setDrawerRow]       = useState<LocalRow | null>(null)
   const [activeStatuses, setActiveStatuses] = useState<Set<RowStatus>>(new Set(['Encaissé', 'En attente', 'Remboursé']))
-  const [activeMethods, setActiveMethods]   = useState<Set<PayMethod>>(new Set(['card', 'apay', 'gpay']))
+  const [activeMethods, setActiveMethods]   = useState<Set<PayMethod>>(new Set(['card', 'apay', 'gpay', 'cash', 'other']))
   const [openDropdown, setOpenDropdown] = useState<'status' | 'method' | null>(null)
   const [moreDrawer, setMoreDrawer]     = useState(false)
   const [gridView, setGridView]         = useState(false)
@@ -589,6 +593,10 @@ export function Factures() {
   const rawPayments = useQuery(api.payments.list, restaurantId ? { restaurantId } : 'skip')
 
   const isLoadingPayments = rawPayments === undefined
+  // Correspondance vers le vrai champ backend (payments.paymentMethod =
+  // 'card'|'apple_pay'|'google_pay'|'cash'|'other').
+  const toPayMethod = (m: string): PayMethod =>
+    m === 'apple_pay' ? 'apay' : m === 'google_pay' ? 'gpay' : m === 'cash' ? 'cash' : m === 'card' ? 'card' : 'other'
   // Données réelles uniquement — pas de lignes démo (faux chiffres en prod)
   const rows: LocalRow[] = (rawPayments != null)
     ? (rawPayments as ConvexPayment[]).map(p => ({
@@ -596,7 +604,7 @@ export function Factures() {
         time: new Date(p.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
         table: `T${p.tableNumber}`,
         guests: p.guests,
-        method: 'card' as PayMethod,
+        method: toPayMethod(p.paymentMethod),
         ref: `SPZ-${p._id.slice(-8).toUpperCase()}`,
         amount: p.totalCents / 100,
         tip: p.tipCents / 100,
