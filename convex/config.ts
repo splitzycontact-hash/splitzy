@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { isAdminAccess, resolveAdminUser } from "./lib";
+import { isAdminAccess, requireAdminRole } from "./lib";
 
 const DEFAULT_FLAGS = [
   { key: "TIPS_ENABLED", description: "Activer/désactiver les pourboires", on: true },
@@ -34,8 +34,7 @@ export const toggleFlag = mutation({
     value: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const actor = await resolveAdminUser(ctx, args.authEmail);
-    if (!actor) throw new ConvexError("Not authorized");
+    const actor = await requireAdminRole(ctx);
     const flag = await ctx.db.get(args.flagId);
     if (!flag) throw new ConvexError("Flag introuvable");
     await ctx.db.patch(args.flagId, { status: args.value ? "active" : "disabled" });
@@ -59,8 +58,7 @@ export const createFlag = mutation({
     enabledForAll: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const actor = await resolveAdminUser(ctx, args.authEmail);
-    if (!actor) throw new ConvexError("Not authorized");
+    const actor = await requireAdminRole(ctx);
     const key = args.key.trim();
     if (!key) throw new ConvexError("La clé est obligatoire");
     const existing = await ctx.db
@@ -88,9 +86,8 @@ export const createFlag = mutation({
 
 export const seedDefaultFlags = mutation({
   args: { authEmail: v.optional(v.string()) },
-  handler: async (ctx, args) => {
-    const actor = await resolveAdminUser(ctx, args.authEmail);
-    if (!actor) throw new ConvexError("Not authorized");
+  handler: async (ctx) => {
+    const actor = await requireAdminRole(ctx);
     const existing = await ctx.db.query("featureFlags").collect();
     const existingKeys = new Set(existing.map((f) => f.key));
     let created = 0;
@@ -159,8 +156,7 @@ export const saveGlobalConfig = mutation({
     maxTables: v.number(),
   },
   handler: async (ctx, args) => {
-    const actor = await resolveAdminUser(ctx, args.authEmail);
-    if (!actor) throw new ConvexError("Not authorized");
+    const actor = await requireAdminRole(ctx);
     const upsert = async (key: string, value: number, description: string) => {
       const existing = await ctx.db
         .query("featureFlags")

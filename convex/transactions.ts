@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { isAdminAccess } from "./lib";
+import { requireRestaurantAccess } from "./authz";
 
 export const listRecent = query({
   args: { limit: v.optional(v.number()), authEmail: v.optional(v.string()) },
@@ -37,6 +38,9 @@ export const listRecent = query({
 export const listByRestaurant = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx))) {
+      await requireRestaurantAccess(ctx, args.restaurantId);
+    }
     const txs = await ctx.db.query("transactions")
       .withIndex("by_restaurant", q => q.eq("restaurantId", args.restaurantId))
       .order("desc").take(200);
@@ -57,6 +61,9 @@ export const listByRestaurant = query({
 export const countRecentByRestaurant = query({
   args: { restaurantId: v.id("restaurants"), since: v.number() },
   handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx))) {
+      await requireRestaurantAccess(ctx, args.restaurantId);
+    }
     const txs = await ctx.db.query("transactions")
       .withIndex("by_restaurant", q => q.eq("restaurantId", args.restaurantId))
       .filter(q => q.gte(q.field("_creationTime"), args.since)).collect();
@@ -71,6 +78,7 @@ export const countRecentByRestaurant = query({
 export const countRecentByIp = query({
   args: { ipAddress: v.string(), since: v.number() },
   handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx))) throw new Error("Accès refusé");
     const txs = await ctx.db.query("transactions")
       .withIndex("by_ip", q => q.eq("ipAddress", args.ipAddress))
       .filter(q => q.gte(q.field("_creationTime"), args.since))
@@ -82,6 +90,9 @@ export const countRecentByIp = query({
 export const getOverviewStats = query({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, args) => {
+    if (!(await isAdminAccess(ctx))) {
+      await requireRestaurantAccess(ctx, args.restaurantId);
+    }
     const today = new Date(); today.setHours(0,0,0,0); const todayMs = today.getTime();
     const allTx = await ctx.db.query("transactions")
       .withIndex("by_restaurant", q => q.eq("restaurantId", args.restaurantId))

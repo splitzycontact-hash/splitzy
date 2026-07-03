@@ -39,3 +39,13 @@ export async function resolveAdminUser(ctx: any, _ignoredClientEmail?: string): 
   }
   return null;
 }
+
+// Nouveau : renvoie l'acteur SEULEMENT s'il a un rôle admin (super_admin/admin_support).
+// Contrairement à resolveAdminUser (vérité = présence), celle-ci vérifie le rôle.
+export async function requireAdminRole(ctx: any) {
+  const actor = await resolveAdminUser(ctx);
+  if (!actor || !["super_admin", "admin_support"].includes(actor.role)) {
+    throw new Error("Accès admin requis");
+  }
+  return actor;
+}
