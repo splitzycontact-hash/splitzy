@@ -316,6 +316,8 @@ function InsightsProLock() {
   )
 }
 
+const QR_INACTIVITY_THRESHOLD_MS = 18 * 60_000
+
 export function Overview() {
   const restaurantId = useRestaurantId()
   const restaurant   = useRestaurant()
@@ -373,14 +375,26 @@ export function Overview() {
   const lastOk = payments.filter(p => p.status === 'Encaissé')
     .sort((a, b) => b.createdAt - a.createdAt)[0]
   const qrInactive = tables.some(t => t.status === 'dining') &&
-    (!lastOk || now - lastOk.createdAt > 18 * 60_000)
+    (!lastOk || now - lastOk.createdAt > QR_INACTIVITY_THRESHOLD_MS)
+
+  const minutesSinceLastPayment = lastOk
+    ? Math.floor((now - lastOk.createdAt) / 60_000)
+    : null
+
+  const qrAlertMsg = minutesSinceLastPayment === null
+    ? 'Aucun paiement encaissé depuis l’ouverture — problème QR code ?'
+    : minutesSinceLastPayment >= 1440
+      ? `Aucun paiement depuis ${Math.floor(minutesSinceLastPayment / 1440)} j — problème QR code ?`
+      : minutesSinceLastPayment >= 60
+        ? `Aucun paiement depuis ${Math.floor(minutesSinceLastPayment / 60)} h — problème QR code ?`
+        : `Aucun paiement depuis ${minutesSinceLastPayment} min — problème QR code ?`
 
   const alerts: { key: string; msg: string; onClick?: () => void }[] = [
     ...stuckPayments.map(p => ({
       key: `stuck-${p.tableNumber}`,
       msg: `Table ${p.tableNumber} : paiement bloqué depuis ${Math.floor((now - p.createdAt) / 60_000)} min`,
     })),
-    ...(qrInactive ? [{ key: 'qr', msg: 'Aucun paiement depuis 18 min — problème QR code ?' }] : []),
+    ...(qrInactive ? [{ key: 'qr', msg: qrAlertMsg }] : []),
     ...(badNew.length > 0 ? [{
       key: 'feedback',
       msg: `${badNew.length} avis négatif${badNew.length > 1 ? 's' : ''} non traité${badNew.length > 1 ? 's' : ''}`,
