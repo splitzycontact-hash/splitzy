@@ -106,12 +106,17 @@ export const updateTableFromPOS = internalMutation({
         amountCents,
         status: amountCents > 0 ? "dining" : "free",
       }
-      // Table libérée côté caisse : purge le compteur de convives et la date
-      // de sitting du service précédent — symétrique à resetToFree. La branche
-      // amountCents > 0 ne touche à rien (nettoyage déjà fait au passage free).
+      // Table libérée côté caisse : purge le compteur de convives, la date de
+      // sitting et le déjà-payé du service précédent — symétrique à resetToFree.
+      // Sans la purge de paidCents, une nouvelle installation verrait son
+      // "restant dû" (payments.create) plafonné par les paiements du service
+      // précédent. La branche amountCents > 0 ne touche à rien (nettoyage déjà
+      // fait au passage free).
       if (amountCents <= 0) {
         patch.guests = undefined
         patch.sittingStartedAt = undefined
+        patch.paidCents = undefined
+        patch.paidTipCents = undefined
       }
       await ctx.db.patch(table._id, patch)
     }
