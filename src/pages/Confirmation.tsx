@@ -4,14 +4,20 @@ import { m } from 'framer-motion'
 import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
-import { useSessionCalcs } from '../hooks/useSessionCalcs'
 import { httpMutation } from '../utils/convexHttp'
 import { PrivacyFooterLink } from '../components/ui/PrivacyFooterLink'
 
 export function Confirmation() {
   const { state } = useSession()
   const navigate = useNavigate()
-  const { subtotal, tipAmount, total } = useSessionCalcs()
+  // Montants réellement payés, figés par SET_PAYMENT_DETAILS au moment du
+  // paiement — mêmes valeurs que le reçu PDF (generateInvoice.calcAmounts).
+  // Ne jamais recalculer via useSessionCalcs ici : le paiement vient
+  // d'incrémenter paidCents, donc en parts égales le recalcul re-diviserait
+  // le restant et afficherait 1/N de la part réellement payée.
+  const subtotal = state.paidSubtotalCents
+  const tipAmount = state.paidTipCents
+  const total = state.paidTotalCents
 
   // CRM optionnel — coordonnées laissées par le client pour recevoir les offres
   const [phone, setPhone] = useState('')
