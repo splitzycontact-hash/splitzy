@@ -18,6 +18,21 @@ export function normalizePaymentMethod(m: string | undefined): PaymentMethod {
   return k ? "other" : "card" // méthode vide (démo historique) → supposée carte
 }
 
+// DÉMO uniquement — n'affecte AUCUN restaurant réel. Vérifie le flag
+// "DEMO_AUTO_CONFIRM_PAYMENTS" (allowlist par restaurantId, cf. schema
+// featureFlags). Par défaut (flag absent) : renvoie toujours false, donc le
+// comportement SECURITY (Vuln 1 / H1) de `create` ci-dessous est intouché
+// pour tout restaurant qui n'est pas explicitement listé. Géré par l'outil
+// CLI `setDemoAutoConfirmRestaurants` en bas de ce fichier.
+async function isDemoAutoConfirmRestaurant(ctx: MutationCtx, restaurantId: string): Promise<boolean> {
+  const flag = await ctx.db
+    .query("featureFlags")
+    .withIndex("by_key", q => q.eq("key", "DEMO_AUTO_CONFIRM_PAYMENTS"))
+    .unique()
+  if (!flag || flag.status !== "active" || flag.rolloutType !== "allowlist") return false
+  return !!flag.rolloutValue?.restaurantIds?.includes(restaurantId)
+}
+
 export const list = query({
   // `from`/`to` (ms epoch, optionnels) filtrent par createdAt sur [from, to).
   // Rétrocompat : sans ces args, retourne tous les paiements (comportement existant).
@@ -135,7 +150,59 @@ export const create = mutation({
     if (table.status !== "paid") {
       await ctx.db.patch(args.tableId, { status: "payment" })
     }
+
+    // DÉMO uniquement (voir isDemoAutoConfirmRestaurant ci-dessus) : reproduit
+    // EXACTEMENT ce que fait confirmPayment (webhook PSP réel) / backfillDemoPending
+    // (outil CLI), simplement de façon synchrone ici pour une démo fluide sans
+    // PSP branché. Ne s'exécute que si ce restaurantId précis est dans l'allowlist
+    // du flag — tout autre restaurant retombe sur le comportement Vuln 1/H1 inchangé
+    // (paiement "En attente" jusqu'au vrai webhook).
+    if (await isDemoAutoConfirmRestaurant(ctx, args.restaurantId)) {
+      await ctx.db.patch(paymentId, { status: "Encaissé", provider: provider ?? "demo-auto" })
+      const tableAfter = await ctx.db.get(args.tableId)
+      if (tableAfter) {
+        await ctx.db.patch(args.tableId, reconcileTablePatch(tableAfter, subtotalCents, args.tipCents, paidItemNames))
+        const fresh = await ctx.db.get(args.tableId)
+        const pmt = await ctx.db.get(paymentId)
+        if (fresh && pmt) {
+          const guestsPatch = await computeGuestsPatch(ctx, fresh, pmt)
+          if (guestsPatch) await ctx.db.patch(args.tableId, guestsPatch)
+        }
+      }
+    }
+
     return paymentId
+  },
+})
+
+// Outil admin (CLI `npx convex run` uniquement) : active/désactive la démo
+// fluide (paiement confirmé instantanément, sans webhook PSP) pour une liste
+// précise de restaurantId. Passer un tableau vide désactive le flag pour tout
+// le monde. N'importe quel restaurant absent de la liste garde le comportement
+// sécurisé normal (Vuln 1 / H1) — voir isDemoAutoConfirmRestaurant.
+// Usage : npx convex run payments:setDemoAutoConfirmRestaurants '{"restaurantIds":["<id>"]}' --prod
+export const setDemoAutoConfirmRestaurants = internalMutation({
+  args: { restaurantIds: v.array(v.string()) },
+  handler: async (ctx, { restaurantIds }) => {
+    const existing = await ctx.db
+      .query("featureFlags")
+      .withIndex("by_key", q => q.eq("key", "DEMO_AUTO_CONFIRM_PAYMENTS"))
+      .unique()
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: restaurantIds.length > 0 ? "active" : "disabled",
+        rolloutType: "allowlist",
+        rolloutValue: { restaurantIds },
+      })
+      return existing._id
+    }
+    return ctx.db.insert("featureFlags", {
+      key: "DEMO_AUTO_CONFIRM_PAYMENTS",
+      description: "Démo sans PSP : confirme les paiements instantanément pour les restaurants listés (jamais les autres).",
+      status: restaurantIds.length > 0 ? "active" : "disabled",
+      rolloutType: "allowlist",
+      rolloutValue: { restaurantIds },
+    })
   },
 })
 

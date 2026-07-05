@@ -1,4 +1,4 @@
-import { query, mutation, action, internalQuery } from "./_generated/server"
+import { query, mutation, action, internalQuery, internalMutation } from "./_generated/server"
 import { ConvexError, v } from "convex/values"
 import { requireRestaurantAccess, requireIdentity } from "./authz"
 import { isAdminAccess, resolveAdminUser } from "./lib"
@@ -196,7 +196,39 @@ export const deleteAll = mutation({
     await deleteTable("payments",   "by_restaurant")
     await deleteTable("menuItems",  "by_restaurant")
     await deleteTable("tables",     "by_restaurant")
+    // Complété (nettoyage restaurant démo/test) : ces tables référencent aussi
+    // restaurantId mais n'étaient pas purgées — restes orphelins inoffensifs
+    // pour l'app (plus aucun restaurantId ne matche), mais pas un vrai nettoyage
+    // (CRM/staff/planning restaient en base indéfiniment). Additif uniquement :
+    // aucune des 4 lignes ci-dessus n'est modifiée.
+    await deleteTable("customers",             "by_restaurant")
+    await deleteTable("members",               "by_restaurant")
+    await deleteTable("restaurantInvitations", "by_restaurant")
+    await deleteTable("zones",                 "by_restaurant")
+    await deleteTable("shifts",                "by_restaurant")
+    await deleteTable("extras",                "by_restaurant")
+    await deleteTable("extraConvocations",     "by_restaurant")
+    await deleteTable("messages",              "by_restaurant_date")
+    await deleteTable("insights",              "by_restaurant")
+    // Volontairement PAS purgées : tickets/restaurantNotes/subscriptions/auditLogs
+    // (bookkeeping admin/support — hors périmètre d'une suppression déclenchée par
+    // l'owner du restaurant) et transactions (table vide en prod, cf. commentaire
+    // schema.ts — aucun vrai PSP n'y écrit).
     await ctx.db.delete(id)
+  },
+})
+
+// Outil admin (CLI `npx convex run` uniquement — internalMutation, jamais
+// appelable depuis l'app) : bascule un restaurant précis en plan "pro" pour
+// un test/démo. Ne réintroduit PAS la faille corrigée en SECURITY (M1) —
+// `restaurants.update` reste sans le champ `plan`, donc un gérant ne peut
+// toujours pas se l'auto-attribuer depuis le dashboard. Cet outil n'est
+// atteignable qu'avec les identifiants de déploiement Convex.
+// Usage : npx convex run restaurants:setPlanForTesting '{"id":"<id>","plan":"pro"}' --prod
+export const setPlanForTesting = internalMutation({
+  args: { id: v.id("restaurants"), plan: v.union(v.literal("free"), v.literal("pro")) },
+  handler: async (ctx, { id, plan }) => {
+    await ctx.db.patch(id, { plan })
   },
 })
 
