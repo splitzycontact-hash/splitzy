@@ -3,6 +3,7 @@ import { Navbar } from './Navbar'
 import { Hero } from './Hero'
 // import { Logos } from './Logos' // HIDDEN — fake client logos (0 clients)
 import { HowItWorks } from './HowItWorks'
+import { LogoMarquee } from './LogoMarquee'
 import { Features } from './Features'
 import { Stats } from './Stats'
 import { Solution } from './Solution'
@@ -24,6 +25,7 @@ export function Homepage() {
         <Hero />
         {/* <Logos /> */}
         <HowItWorks />
+        <LogoMarquee />
         <Features />
         <Stats />
         <Solution />

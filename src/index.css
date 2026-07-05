@@ -26,6 +26,13 @@
     justify-content: center;
     background: #F4F4F5;
   }
+
+  :root {
+    --cream: #FFFBF5;
+    --ink-950: #0A0A0A;
+    --orange-glow: rgba(232, 146, 10, 0.25);
+    --font-display: 'Syne', system-ui, sans-serif;
+  }
 }
 
 @media print {
@@ -81,6 +88,51 @@
 .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
 
 .marketing-site { width: 100%; min-height: 100vh; }
+
+@layer utilities {
+  /* Grain texture premium — mix-blend overlay sur dark sections */
+  .grain-overlay {
+    position: relative;
+    isolation: isolate;
+  }
+  .grain-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.055;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+    mix-blend-mode: overlay;
+  }
+
+  /* Headline font display */
+  .font-display { font-family: var(--font-display); }
+
+  /* Marquee animation */
+  @keyframes marquee-left {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  .animate-marquee { animation: marquee-left 28s linear infinite; }
+  .animate-marquee-slow { animation: marquee-left 45s linear infinite; }
+
+  /* Gradient orange glow blob */
+  .glow-blob {
+    background: radial-gradient(ellipse at center, var(--orange-glow) 0%, transparent 70%);
+    filter: blur(40px);
+  }
+
+  /* Section cream (light) */
+  .section-cream { background-color: var(--cream); }
+
+  /* Noise card dark */
+  .noise-card {
+    background: linear-gradient(135deg, #1a1006 0%, #0f0a03 100%);
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+}
 
 /* ══════════════════════════════════════════
    Restaurant Dashboard — Design System

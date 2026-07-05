@@ -45,7 +45,7 @@ function MagneticBtn({ children, href }: { children: React.ReactNode; href: stri
       animate={{ x: pos.x, y: pos.y }}
       transition={{ type: 'spring', stiffness: 180, damping: 18, mass: 0.5 }}
       className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl text-[15px] font-semibold text-white"
-      style={{ background: '#E8920A' }}
+      style={{ background: '#E8920A', boxShadow: '0 0 40px rgba(232,146,10,0.45), 0 8px 20px rgba(232,146,10,0.35)' }}
     >
       {children}
     </m.a>
@@ -70,18 +70,16 @@ export function CtaFinal() {
       />
 
       {/* Subtle radial glow */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(232,146,10,0.07) 0%, transparent 70%)',
-        }}
-      />
+      <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{
+        background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(232,146,10,0.12) 0%, transparent 65%)',
+      }} />
+      <div aria-hidden="true" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at center bottom, rgba(232,146,10,0.15) 0%, transparent 70%)' }} />
 
       <div className="relative max-w-[680px] mx-auto px-6">
         <h2
           id="cta-heading"
-          className="text-white text-balance"
+          className="text-white text-balance font-display"
           style={{ fontWeight: 900, fontSize: 'clamp(34px, 5.5vw, 52px)', lineHeight: 1.05, letterSpacing: '-0.04em' }}
         >
           <TextReveal>{'Votre prochaine'}</TextReveal>

@@ -69,7 +69,7 @@ function StepCard({ step, idx }: { step: StepData; idx: number }) {
             >
               <StepIcon size={22} stroke={1.7} />
             </div>
-            <span className="font-mono text-[12px] tracking-wider text-ink-200 font-medium">0{idx + 1}</span>
+            <span className="font-display text-orange-500 text-[12px] tracking-wider font-medium">0{idx + 1}</span>
           </div>
           <h3 className="text-[19px] md:text-[20px] font-semibold text-ink-900 leading-snug">{title}</h3>
           <p className="mt-2 text-[15px] leading-[1.6] text-ink-500">{desc}</p>
@@ -119,7 +119,7 @@ export function HowItWorks() {
           <m.h2
             id="hw-heading"
             variants={fadeInUp}
-            className="mt-5 text-[28px] md:text-[40px] font-bold text-ink-900 leading-[1.15] text-balance"
+            className="mt-5 text-[28px] md:text-[40px] font-bold text-ink-900 leading-[1.15] text-balance font-display"
           >
             En 3 étapes, c'est réglé.
           </m.h2>

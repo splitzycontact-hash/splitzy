@@ -66,7 +66,7 @@ export function Footer() {
           {/* Link cols — <Link to> pour navigation client-side sans rechargement */}
           {FOOTER_COLS.map((col) => (
             <div key={col.title} className="md:col-span-2">
-              <h4 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-white/40 mb-4">
+              <h4 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-white/40 mb-4 font-display">
                 {col.title}
               </h4>
               <ul className="space-y-2.5">
@@ -87,7 +87,7 @@ export function Footer() {
 
           {/* Contact col */}
           <div className="col-span-2 md:col-span-2">
-            <h4 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-white/40 mb-4">
+            <h4 className="text-[12px] font-semibold uppercase tracking-[0.1em] text-white/40 mb-4 font-display">
               On parle ?
             </h4>
             <a

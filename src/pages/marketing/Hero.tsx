@@ -136,19 +136,29 @@ export function Hero() {
   return (
     <section
       id="hero"
-      className="relative hero-dark pt-28 md:pt-32 pb-16 md:pb-24 overflow-hidden"
+      className="relative hero-dark grain-overlay pt-28 md:pt-32 pb-16 md:pb-24 overflow-hidden"
     >
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 hero-grid" />
 
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          className="absolute top-[-160px] left-1/2 -translate-x-1/2 w-[680px] h-[680px] rounded-full opacity-50 animate-glow"
-          style={{ background: 'radial-gradient(closest-side, rgba(232,146,10,0.32), transparent 70%)' }}
-        />
-        <div
-          className="absolute bottom-[-200px] right-[-100px] w-[480px] h-[480px] rounded-full opacity-40"
-          style={{ background: 'radial-gradient(closest-side, rgba(232,146,10,0.18), transparent 70%)' }}
-        />
+        {/* Rays diagonales SVG */}
+        <svg className="absolute inset-0 w-full h-full opacity-[0.045]" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="ray-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#E8920A" stopOpacity="1" />
+              <stop offset="100%" stopColor="#E8920A" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {[...Array(8)].map((_, i) => (
+            <line key={i} x1={`${-20 + i * 18}%`} y1="0%" x2={`${30 + i * 18}%`} y2="100%"
+              stroke="url(#ray-grad)" strokeWidth="1.5" />
+          ))}
+        </svg>
+        {/* Orange glow orb */}
+        <div className="absolute top-[-160px] left-1/2 -translate-x-1/2 w-[680px] h-[680px] rounded-full opacity-45 animate-glow"
+          style={{ background: 'radial-gradient(closest-side, rgba(232,146,10,0.30), transparent 70%)' }} />
+        <div className="absolute bottom-[-200px] right-[-100px] w-[480px] h-[480px] rounded-full opacity-30"
+          style={{ background: 'radial-gradient(closest-side, rgba(232,146,10,0.15), transparent 70%)' }} />
       </div>
 
       <div className="relative max-w-6xl mx-auto px-4 md:px-6">
@@ -160,7 +170,8 @@ export function Hero() {
         >
           <a
             href="#changelog"
-            className="inline-flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-[12.5px] font-medium text-white/80 hover:bg-white/[0.07] hover:border-white/20 transition-colors backdrop-blur-sm whitespace-nowrap"
+            className="inline-flex items-center gap-2 pl-1 pr-3 py-1 rounded-full text-[12.5px] font-medium text-white/80 hover:bg-white/[0.07] transition-colors backdrop-blur-sm whitespace-nowrap"
+            style={{ background: 'linear-gradient(#0A0A0A, #0A0A0A) padding-box, linear-gradient(135deg, rgba(232,146,10,0.6), rgba(255,255,255,0.08)) border-box', border: '1px solid transparent' }}
           >
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-600/20 text-orange-300 text-[11px] font-semibold uppercase tracking-wide">
               <IconSparkles size={11} stroke={2.2} />
@@ -173,7 +184,7 @@ export function Hero() {
 
         {/* H1 */}
         <m.div initial="hidden" animate="visible" custom={0.1} variants={fadeInUp}>
-          <h1 className="mt-6 md:mt-8 text-center text-[36px] md:text-[56px] leading-[1.05] font-bold text-white max-w-3xl mx-auto text-balance">
+          <h1 className="mt-6 md:mt-8 text-center text-[36px] md:text-[56px] leading-[1.05] font-bold text-white max-w-3xl mx-auto text-balance font-display">
             <span className="block">Fini les additions qui traînent.</span>
             <span className="block text-orange-500">Vos clients paient en 30 secondes.</span>
           </h1>
@@ -267,6 +278,23 @@ export function Hero() {
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse-dot mr-1" />
                     Table 12 — en train de payer
                   </p>
+                </div>
+              </div>
+            </m.div>
+
+            {/* Vitesse card — desktop only */}
+            <m.div
+              className="hidden md:block absolute -left-24 top-20 z-10"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0, transition: { duration: 0.5, delay: 1.4 } }}
+            >
+              <div className="flex items-center gap-3 bg-ink-800 rounded-2xl border border-white/10 px-4 py-3 shadow-2xl shadow-black/40 backdrop-blur-sm">
+                <div className="w-9 h-9 rounded-lg bg-orange-600/20 flex items-center justify-center">
+                  <span className="text-[18px]">⚡</span>
+                </div>
+                <div>
+                  <p className="text-[13px] font-semibold text-white font-display">30 secondes</p>
+                  <p className="text-[11px] text-white/50">Paiement moyen / table</p>
                 </div>
               </div>
             </m.div>

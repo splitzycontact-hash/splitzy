@@ -49,7 +49,7 @@ function StatBlock({
       className="py-10 md:py-14 text-center px-6 md:px-10"
     >
       <div
-        className="font-black tabular-nums leading-none"
+        className="font-black tabular-nums leading-none font-display"
         style={{ fontSize: 'clamp(52px, 6.5vw, 72px)', color: '#E8920A', letterSpacing: '-0.04em' }}
       >
         {prefix}{counted}{suffix}
@@ -118,7 +118,7 @@ export function Stats() {
         </m.span>
 
         <h2
-          className="text-balance"
+          className="text-balance font-display"
           style={{ fontWeight: 900, fontSize: 'clamp(30px, 5vw, 48px)', lineHeight: 1.05, letterSpacing: '-0.03em', color: '#0A0A0A' }}
         >
           <TextReveal>{'3 avis négatifs.'}</TextReveal>

@@ -37,6 +37,25 @@ function SmallCard({ Icon, title, desc }: {
   )
 }
 
+function DarkSmallCard({ Icon, title, desc }: {
+  Icon: React.ComponentType<{ size?: number; stroke?: number }>
+  title: string; desc: string
+}) {
+  return (
+    <m.div
+      variants={fadeInUp}
+      whileHover={{ y: -3, transition: { duration: 0.2 } }}
+      className="group relative noise-card rounded-2xl overflow-hidden transition-all duration-300 hover:border-orange-400/30 hover:shadow-xl hover:shadow-orange-600/10 p-6 md:p-7 h-full flex flex-col"
+    >
+      <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-orange-600/20 text-orange-400 mb-4">
+        <Icon size={20} stroke={1.7} />
+      </div>
+      <h3 className="text-[17px] md:text-[18px] font-semibold text-white leading-snug font-display">{title}</h3>
+      <p className="mt-2 text-[14px] leading-[1.55] text-white/50">{desc}</p>
+    </m.div>
+  )
+}
+
 function SmartSplitVisual() {
   return (
     <div className="relative h-full min-h-[260px] flex items-end">
@@ -143,7 +162,9 @@ function LargeCard({ Icon, title, desc, Visual }: {
         <h3 className="text-[20px] md:text-[22px] font-semibold text-ink-900 leading-snug">{title}</h3>
         <p className="mt-3 text-[15px] leading-[1.6] text-ink-500">{desc}</p>
       </div>
-      <div className="flex-1 border-t md:border-t-0 md:border-l border-ink-100">
+      <div className="flex-1 border-t md:border-t-0 md:border-l border-ink-100 relative overflow-hidden">
+        <div aria-hidden="true" className="absolute inset-0 pointer-events-none opacity-[0.035]"
+          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: '180px 180px' }} />
         <Visual />
       </div>
     </FeatureCard>
@@ -156,7 +177,7 @@ export function Features() {
   return (
     <section
       id="fonctionnalites"
-      className="relative py-16 md:py-24 bg-white"
+      className="relative py-16 md:py-24 section-cream"
       aria-labelledby="features-heading"
     >
       <div ref={ref} className="max-w-6xl mx-auto px-4 md:px-6">
@@ -168,14 +189,15 @@ export function Features() {
         >
           <m.span
             variants={fadeInUp}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-semibold uppercase tracking-[0.08em]"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.08em]"
+            style={{ background: 'linear-gradient(135deg, rgba(232,146,10,0.15), rgba(232,146,10,0.05))', color: '#E8920A', border: '1px solid rgba(232,146,10,0.25)' }}
           >
             Fonctionnalités
           </m.span>
           <m.h2
             id="features-heading"
             variants={fadeInUp}
-            className="mt-5 text-[28px] md:text-[40px] font-bold text-ink-900 leading-[1.15] text-balance max-w-2xl mx-auto"
+            className="mt-5 text-[28px] md:text-[40px] font-bold text-ink-900 leading-[1.15] text-balance max-w-2xl mx-auto font-display"
           >
             Tout ce dont votre restaurant a besoin.
           </m.h2>
@@ -203,7 +225,7 @@ export function Features() {
             className="flex flex-col gap-5 md:gap-6"
             variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
           >
-            <SmallCard Icon={IconQr} title="QR codes par table" desc="Générez autant de QR codes que de tables. Réutilisables, modifiables à tout moment." />
+            <DarkSmallCard Icon={IconQr} title="QR codes par table" desc="Générez autant de QR codes que de tables. Réutilisables, modifiables à tout moment." />
             <SmallCard Icon={IconChartBar} title="Dashboard en temps réel" desc="Suivez chaque transaction live. Export comptable en un clic." />
           </m.div>
 
@@ -212,7 +234,7 @@ export function Features() {
             variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
           >
             <SmallCard Icon={IconCloud} title="Sans application à télécharger" desc="100 % web. Vos clients scannent et c'est tout." />
-            <SmallCard Icon={IconBell} title="Notifications instantanées" desc="Soyez alerté dès qu'une table a fini de régler." />
+            <DarkSmallCard Icon={IconBell} title="Notifications instantanées" desc="Soyez alerté dès qu'une table a fini de régler." />
           </m.div>
           <LargeCard
             Icon={IconBolt}

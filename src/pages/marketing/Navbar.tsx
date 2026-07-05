@@ -15,7 +15,7 @@ export function SplitzyLogo({ className = '' }: { className?: string }) {
       className={`inline-flex items-center select-none ${className}`}
       aria-label="Splitzy — retour à l'accueil"
     >
-      <span className="text-[22px] font-black tracking-tight text-white">
+      <span className="text-[22px] font-black tracking-tight text-white font-display">
         Split<span style={{ color: '#E8920A' }}>zy</span>
       </span>
     </a>
@@ -55,11 +55,11 @@ export function Navbar() {
   return (
     <>
       <header
-        className={
-          'fixed top-0 inset-x-0 z-50 transition-all duration-300 ' +
-          (scrolled
-            ? 'bg-ink-900/80 backdrop-blur-md border-b border-white/10'
-            : 'bg-transparent border-b border-transparent')
+        className="fixed top-0 inset-x-0 z-50 transition-all duration-300"
+        style={
+          scrolled
+            ? { backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', background: 'rgba(10,10,10,0.75)', borderBottom: '1px solid rgba(255,255,255,0.06)' }
+            : { background: 'transparent', borderBottom: '1px solid transparent' }
         }
       >
         <div className="max-w-6xl mx-auto px-4 md:px-6">

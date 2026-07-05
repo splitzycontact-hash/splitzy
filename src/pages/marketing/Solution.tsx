@@ -327,7 +327,7 @@ export function Solution() {
             La solution
           </m.span>
           <h2
-            className="text-white text-balance"
+            className="text-white text-balance font-display"
             style={{ fontWeight: 900, fontSize: 'clamp(30px, 5vw, 48px)', lineHeight: 1.05, letterSpacing: '-0.03em' }}
           >
             <TextReveal line="Splitzy intercepte l'insatisfaction" baseDelay={0} />

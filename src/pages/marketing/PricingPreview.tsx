@@ -171,7 +171,7 @@ export function PricingPreview() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.45, delay: 0.08 }}
-            className="text-balance"
+            className="text-balance font-display"
             style={{ fontWeight: 900, fontSize: 'clamp(28px, 4.5vw, 48px)', lineHeight: 1.05, letterSpacing: '-0.03em', color: '#0A0A0A' }}
           >
             Simple. Transparent.
