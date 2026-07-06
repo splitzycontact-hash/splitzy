@@ -1,3 +1,7 @@
+// GOAL_PAIEMENTS_08 — écran « Mes articles » HISTORIQUE (3 onglets, sélection
+// locale sans réclamation serveur), copie conforme de la version déployée
+// avant le paiement fractionné. Rendu pour tout restaurant HORS allowlist du
+// flag NOUVEAU_PAIEMENT_FRACTIONNE — ne pas y ajouter de logique claims.
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
@@ -5,31 +9,9 @@ import { useSession } from '../context/SessionContext'
 import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
-import { httpMutation } from '../utils/convexHttp'
-import { ItemsLegacy } from './ItemsLegacy'
+import type { MenuItem } from '../context/types'
 
 type Category = 'entrees' | 'plats' | 'desserts' | 'boissons'
-
-// GOAL_PAIEMENTS_05 — vue par UNITÉ avec son état réel (grand livre) :
-// libre / réservée (hold d'un autre convive) / en paiement / payée, et son
-// argent (paidCents / prix). Plus de liste filtrée sur un booléen `paid`
-// global qui ment.
-type LiveHold = {
-  partId: string
-  claimedBy?: string
-  capacityCents: number
-  state: 'reclamee' | 'paiement_attente'
-  expiresAt?: number
-}
-type UnitView = {
-  id: string
-  lineId?: string        // absent sur les lignes legacy (non réclamables)
-  name: string
-  price: number          // prix de l'unité
-  remainingCents: number // prix − paidCents (argent encore dû)
-  availableCents: number // remaining − capacité tenue par les AUTRES convives
-  isPaid: boolean
-}
 
 const CATEGORY_LABELS: Record<Category, string> = {
   entrees: 'Entrées',
@@ -51,30 +33,11 @@ function StepBar({ current }: { current: number }) {
   )
 }
 
-// GOAL_PAIEMENTS_08 — rollout : le nouvel écran (réclamation de parts,
-// grisage temps réel) n'est rendu que si le restaurant est dans l'allowlist
-// du flag NOUVEAU_PAIEMENT_FRACTIONNE (évalué serveur par getTableContext,
-// stocké dans SessionState.newPaymentFlow). Sinon : écran historique
-// 3 onglets (ItemsLegacy), strictement inchangé.
-export function Items() {
-  const { state } = useSession()
-  return state.newPaymentFlow ? <ItemsNew /> : <ItemsLegacy />
-}
-
-function ItemsNew() {
+export function ItemsLegacy() {
   const { state, dispatch } = useSession()
   const navigate = useNavigate()
   const { subtotal, billCents, paidCents, remainingCents, isFullyPaid, liveTable } = useSessionCalcs()
   const [openCat, setOpenCat] = useState<Category | null>('plats')
-  // Nom de l'article dont la réclamation vient d'échouer (part prise entre-temps).
-  const [claimError, setClaimError] = useState<string | null>(null)
-  // Horloge de rendu (grisage des holds expirés) — rafraîchie périodiquement,
-  // jamais Date.now() direct dans le rendu (règle de pureté React).
-  const [nowMs, setNowMs] = useState(() => Date.now())
-  useEffect(() => {
-    const t = setInterval(() => setNowMs(Date.now()), 30_000)
-    return () => clearInterval(t)
-  }, [])
 
   // Spinner seulement si ni Convex ni cache ne sont disponibles.
   // Sur iOS Safari, liveTable peut rester undefined longtemps (WS lent).
@@ -136,48 +99,11 @@ function ItemsNew() {
   // Fallback sur le cache aussi si liveTable est défini mais orderItems absent.
   const sourceItems = liveTable?.orderItems ?? state.cachedOrderItems
 
-  // GOAL_PAIEMENTS_05 — toutes les unités, avec leur état (les payées restent
-  // visibles, grisées). Les parts que J'AI réclamées (partId dans ma sélection)
-  // ne comptent pas comme « tenues par un autre ».
-  const myPartIds = new Set(state.selectedItems.map(i => i.partId).filter(Boolean) as string[])
-  const units: UnitView[] = sourceItems.flatMap((item, idx) => {
-    const holds = (item as { holds?: LiveHold[] }).holds ?? []
-    if (item.lineId) {
-      // Unité moderne (qty 1, lineId) — état exact depuis le grand livre.
-      const total = item.qty * item.unitCents
-      const paidC = item.paidCents ?? (item.paid ? total : 0)
-      const heldByOthers = holds.reduce((s, h) => {
-        if (myPartIds.has(h.partId)) return s
-        const active = h.state === 'paiement_attente' || (h.expiresAt ?? 0) > nowMs
-        return active ? s + h.capacityCents : s
-      }, 0)
-      const remaining = Math.max(0, total - paidC)
-      return [{
-        id: item.lineId,
-        lineId: item.lineId,
-        name: item.name,
-        price: total,
-        remainingCents: remaining,
-        availableCents: Math.max(0, remaining - heldByOthers),
-        isPaid: total > 0 && paidC >= total,
-      }]
-    }
-    // Ligne legacy sans lineId : éclatement local par qty (comportement
-    // historique), sélectionnable mais non réclamable côté serveur.
-    return Array.from({ length: item.qty }, (_, qi) => ({
-      id: `order-${idx}-${qi}`,
-      name: item.name,
-      price: item.unitCents,
-      remainingCents: item.paid ? 0 : item.unitCents,
-      availableCents: item.paid ? 0 : item.unitCents,
-      isPaid: item.paid === true,
-    }))
-  })
-
-  const hasTableOrder = units.some(u => !u.isPaid)
+  const tableUnpaidItems = sourceItems.filter(i => !i.paid)
+  const hasTableOrder = tableUnpaidItems.length > 0
 
   if (!hasTableOrder) {
-    const allPaid = units.length > 0 && units.every(u => u.isPaid)
+    const allPaid = sourceItems.length > 0 && sourceItems.every(i => i.paid === true)
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -206,74 +132,26 @@ function ItemsNew() {
     )
   }
 
+  // Conversion orderItems → MenuItem (expansion par qty : 2×Pizza → 2 items séparés)
+  const menuItems: MenuItem[] = tableUnpaidItems.flatMap((item, idx) =>
+    Array.from({ length: item.qty }, (_, qi) => ({
+      id: `order-${idx}-${qi}`,
+      category: 'plats' as MenuItem['category'],
+      emoji: '',
+      name: item.name,
+      description: '',
+      price: item.unitCents,
+    }))
+  )
+
   const isSelected = (id: string) => state.selectedItems.some(i => i.menuItemId === id)
   const getSplitFactor = (id: string) => state.selectedItems.find(i => i.menuItemId === id)?.splitFactor ?? 1
   const selectedCount = state.selectedItems.length
 
-  // Catégorie unique (les orderItems POS n'ont pas de catégorie).
-  const categorized = ([['plats', units]] as [Category, UnitView[]][])
-    .map(([cat, items]) => ({ cat, items }))
-    .filter(g => g.items.length > 0)
-
-  // GOAL_PAIEMENTS_05 — réclamer = sélectionner (un seul geste). Le tap pose
-  // la part via claims:claimPart (HTTP direct, fiable iOS) ; la désélection
-  // EST le bouton « libérer ma part » (claims:releasePart). Le grisage des
-  // autres convives arrive en temps réel via la souscription tables.getOne.
-  // Optimiste : la sélection s'affiche tout de suite, et se retire d'elle-même
-  // si le serveur refuse (part plus disponible).
-  const handleToggleUnit = (unit: UnitView) => {
-    const sel = state.selectedItems.find(i => i.menuItemId === unit.id)
-    if (sel) {
-      dispatch({ type: 'TOGGLE_ITEM', payload: { itemId: unit.id, priceCents: sel.priceCents, name: unit.name, lineId: unit.lineId } })
-      if (sel.partId && sel.lineId && state.convexTableId) {
-        httpMutation('claims:releasePart', {
-          tableId: state.convexTableId, lineId: sel.lineId, partId: sel.partId,
-        }).catch(err => console.error('[Items] releasePart', err))
-      }
-      return
-    }
-    if (unit.isPaid || unit.availableCents <= 0) return
-    // La base payable = capacité disponible (unité entière si personne d'autre
-    // dessus ; la portion libre sinon — le pot d'un hold voisin reste à lui).
-    const base = unit.availableCents
-    dispatch({ type: 'TOGGLE_ITEM', payload: { itemId: unit.id, priceCents: base, name: unit.name, lineId: unit.lineId } })
-    setClaimError(null)
-    if (unit.lineId && state.convexTableId) {
-      httpMutation<{ partId: string }>('claims:claimPart', {
-        tableId: state.convexTableId, lineId: unit.lineId,
-        capacityCents: base, claimedBy: state.clientId,
-      })
-        .then(r => dispatch({ type: 'SET_ITEM_PART', payload: { itemId: unit.id, partId: r.partId } }))
-        .catch(err => {
-          console.error('[Items] claimPart', err)
-          setClaimError(unit.name)
-          dispatch({ type: 'TOGGLE_ITEM', payload: { itemId: unit.id, priceCents: base, name: unit.name, lineId: unit.lineId } })
-        })
-    }
-  }
-
-  // Changement de facteur ÷2/÷3/÷4 : réconcilier avec le serveur — relâcher
-  // l'ancienne part, réclamer la nouvelle capacité. En cas de refus (la
-  // capacité a été prise entre-temps), la sélection se retire proprement.
-  const handleFactor = (unit: UnitView, factor: 1 | 2 | 3 | 4) => {
-    const sel = state.selectedItems.find(i => i.menuItemId === unit.id)
-    if (!sel || sel.splitFactor === factor) return
-    dispatch({ type: 'SET_ITEM_SPLIT', payload: { itemId: unit.id, factor } })
-    if (sel.lineId && sel.partId && state.convexTableId) {
-      const tableId = state.convexTableId
-      const cap = Math.max(1, Math.round(sel.priceCents / factor))
-      httpMutation('claims:releasePart', { tableId, lineId: sel.lineId, partId: sel.partId })
-        .then(() => httpMutation<{ partId: string }>('claims:claimPart', {
-          tableId, lineId: sel.lineId, capacityCents: cap, claimedBy: state.clientId,
-        }))
-        .then(r => dispatch({ type: 'SET_ITEM_PART', payload: { itemId: unit.id, partId: r.partId } }))
-        .catch(err => {
-          console.error('[Items] réconciliation splitFactor', err)
-          setClaimError(unit.name)
-          dispatch({ type: 'TOGGLE_ITEM', payload: { itemId: unit.id, priceCents: sel.priceCents, name: unit.name, lineId: sel.lineId } })
-        })
-    }
-  }
+  const categorized = (['entrees', 'plats', 'desserts', 'boissons'] as Category[]).map(cat => ({
+    cat,
+    items: menuItems.filter(m => m.category === cat),
+  })).filter(g => g.items.length > 0)
 
   // En mode "parts égales", on divise le RESTANT à payer (et non le total)
   // pour que les paiements multiples sur une même table ne fassent pas
@@ -368,15 +246,6 @@ function ItemsNew() {
       {/* Mode content */}
       {state.splitMode === 'item' && (
         <div style={{ padding: '14px 20px 0', flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
-          {claimError && (
-            <div style={{
-              background: '#FEF2F2', border: '1px solid rgba(239,68,68,0.25)',
-              borderRadius: 12, padding: '10px 12px', marginBottom: 10,
-              fontSize: 12, color: '#B91C1C', fontWeight: 600,
-            }}>
-              « {claimError} » vient d'être pris par un autre convive — la liste est à jour.
-            </div>
-          )}
           {categorized.map(({ cat, items }) => {
             const open = openCat === cat
             return (
@@ -407,61 +276,41 @@ function ItemsNew() {
                     {items.map((it, idx) => {
                       const sel = isSelected(it.id)
                       const factor = getSplitFactor(it.id)
-                      const selItem = state.selectedItems.find(i => i.menuItemId === it.id)
-                      const selBase = selItem?.priceCents ?? it.availableCents
-                      // États d'unité (grand livre) : payée / réservée par un
-                      // autre / partiellement couverte / libre.
-                      const blocked = !sel && !it.isPaid && it.availableCents <= 0
-                      const partial = !it.isPaid && it.remainingCents > 0 && it.remainingCents < it.price
-                      const disabled = it.isPaid || blocked
                       return (
                         <div key={it.id} style={{
                           borderBottom: idx < items.length - 1 ? '1px solid #F1F1F2' : 'none',
-                          opacity: disabled ? 0.45 : 1,
                         }}>
                           <button
                             type="button"
-                            disabled={disabled}
-                            onClick={() => handleToggleUnit(it)}
+                            onClick={() => dispatch({ type: 'TOGGLE_ITEM', payload: { itemId: it.id, priceCents: it.price, name: it.name } })}
                             style={{
                               width: '100%', padding: '12px 16px', border: 0, background: 'transparent',
-                              display: 'flex', alignItems: 'center', gap: 12,
-                              cursor: disabled ? 'default' : 'pointer',
+                              display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
                             }}
                           >
                             <div style={{
                               width: 22, height: 22, borderRadius: 7,
                               border: `1.5px solid ${sel ? '#E8920A' : '#E4E4E7'}`,
-                              background: sel ? '#E8920A' : it.isPaid ? '#E4E4E7' : 'transparent',
+                              background: sel ? '#E8920A' : 'transparent',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               flexShrink: 0,
                             }}>
-                              {(sel || it.isPaid) && (
+                              {sel && (
                                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                  <path d="M2 6L5 9L10 3" stroke={it.isPaid && !sel ? '#9CA3AF' : 'white'} strokeWidth="1.8" strokeLinecap="round" />
+                                  <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
                                 </svg>
                               )}
                             </div>
                             <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                              <div style={{ fontSize: 14, fontWeight: 500, color: '#0A0A0A', textDecoration: it.isPaid ? 'line-through' : 'none' }}>
-                                {it.name}
+                              <div style={{ fontSize: 14, fontWeight: 500, color: '#0A0A0A' }}>
+                                {it.emoji ? `${it.emoji} ` : ''}{it.name}
                               </div>
-                              <div style={{ fontSize: 11.5, color: it.isPaid ? '#10B981' : blocked ? '#B45309' : sel ? '#E8920A' : '#52525B', marginTop: 1, fontWeight: 600 }}>
-                                {it.isPaid
-                                  ? 'Payé ✓'
-                                  : blocked
-                                    ? 'Réservé par un autre convive'
-                                    : sel
-                                      ? 'Réservé pour toi · désélectionne pour libérer'
-                                      : partial
-                                        ? `Reste ${formatEur(it.remainingCents)}${it.availableCents < it.remainingCents ? ` · dispo ${formatEur(it.availableCents)}` : ''}`
-                                        : it.availableCents < it.remainingCents
-                                          ? `Dispo ${formatEur(it.availableCents)} (part réservée ailleurs)`
-                                          : ''}
-                              </div>
+                              {it.description && (
+                                <div style={{ fontSize: 11.5, color: '#52525B', marginTop: 1 }}>{it.description}</div>
+                              )}
                             </div>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: sel ? '#E8920A' : '#0A0A0A', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', textDecoration: it.isPaid ? 'line-through' : 'none' }}>
-                              {formatEur(it.isPaid ? it.price : sel ? selBase : it.availableCents < it.remainingCents ? it.availableCents : it.price)}
+                            <div style={{ fontSize: 14, fontWeight: 700, color: sel ? '#E8920A' : '#0A0A0A', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                              {formatEur(it.price)}
                             </div>
                           </button>
                           {sel && (
@@ -474,7 +323,7 @@ function ItemsNew() {
                                     <button
                                       key={s}
                                       type="button"
-                                      onClick={() => handleFactor(it, s)}
+                                      onClick={() => dispatch({ type: 'SET_ITEM_SPLIT', payload: { itemId: it.id, factor: s } })}
                                       style={{
                                         height: 44, minWidth: 44, padding: '0 10px',
                                         borderRadius: 10,
@@ -491,7 +340,7 @@ function ItemsNew() {
                               </div>
                               <div style={{ flex: 1 }} />
                               <span style={{ fontSize: 12, color: '#E8920A', fontWeight: 700 }}>
-                                = {formatEur(Math.round(selBase / factor))}
+                                = {formatEur(Math.round(it.price / factor))}
                               </span>
                             </div>
                           )}

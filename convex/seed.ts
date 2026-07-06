@@ -1,6 +1,7 @@
 import { v } from "convex/values"
 import { internalMutation } from "./_generated/server"
 import { normalizePaymentMethod } from "./payments"
+import { makeUnits } from "./orderItemsFactory"
 
 export const seedLeComptoir = internalMutation({
   args: {},
@@ -363,12 +364,13 @@ export const seedAuditScenario = internalMutation({
     await ctx.db.patch(t1._id, {
       status: "dining", guests: 4, durationMinutes: 35,
       amountCents: 8600, paidCents: 0, paidTipCents: 0,
-      orderItems: [
+      // GOAL_PAIEMENTS_01 : unités créées par la fabrique (lineId, paidCents 0).
+      orderItems: makeUnits([
         { name: "Burger maison", qty: 2, unitCents: 1600 },
         { name: "Salade César", qty: 1, unitCents: 1400 },
         { name: "Limonade", qty: 4, unitCents: 400 },
         { name: "Tiramisu", qty: 2, unitCents: 1100 },
-      ],
+      ]),
       alert: false,
     })
 
@@ -376,10 +378,14 @@ export const seedAuditScenario = internalMutation({
     await ctx.db.patch(t2._id, {
       status: "payment", guests: 3, durationMinutes: 78,
       amountCents: 6300, paidCents: 4200, paidTipCents: 420,
+      // Scénario mi-sitting : les unités déjà réglées portent paid + paidCents,
+      // posés APRÈS la fabrique (une unité naît toujours libre et non payée).
       orderItems: [
-        { name: "Pizza margherita", qty: 2, unitCents: 1300, paid: true },
-        { name: "Pâtes truffe", qty: 1, unitCents: 1600, paid: true },
-        { name: "Vin rouge (verre)", qty: 3, unitCents: 700 },
+        ...makeUnits([
+          { name: "Pizza margherita", qty: 2, unitCents: 1300 },
+          { name: "Pâtes truffe", qty: 1, unitCents: 1600 },
+        ]).map(u => ({ ...u, paid: true, paidCents: u.unitCents })),
+        ...makeUnits([{ name: "Vin rouge (verre)", qty: 3, unitCents: 700 }]),
       ],
       alert: false,
     })

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { m } from 'framer-motion'
 import { useQuery } from 'convex/react'
@@ -7,9 +7,19 @@ import { pageVariants } from '../utils/animations'
 import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
 import { MOCK_CARDS } from '../data/session'
-import { httpMutation } from '../utils/convexHttp'
+import { httpMutation, convexErrorCode } from '../utils/convexHttp'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
+
+// Réponse du NOUVEAU contrat payments:create (GOAL_PAIEMENTS_03) : montants
+// validés côté serveur — la seule source de SET_PAYMENT_DETAILS.
+type CreateResult = {
+  paymentId: string
+  subtotalCents: number
+  tipCents: number
+  totalCents: number
+  idempotent: boolean
+}
 
 export function Payment() {
   const { state, dispatch } = useSession()
@@ -37,15 +47,41 @@ export function Payment() {
     ? state.selectedItems.filter(i => i.splitFactor === 1).map(i => i.name)
     : undefined
 
-  // Mutation Convex en HTTP direct (pas WebSocket). Sur iOS, useMutation()
-  // peut perdre la requête si le WS ne s'établit pas avant fermeture de l'onglet.
-  // httpMutation utilise fetch({ keepalive: true }) → garanti d'atteindre le serveur,
-  // donc le gérant voit le paiement en temps réel.
-  const handlePay = useCallback((method: string) => {
+  // GOAL_PAIEMENTS_05 — clé d'idempotence : générée quand les montants sont
+  // figés (arrivée sur cet écran), RÉUTILISÉE pour tout retry réseau du même
+  // paiement (anti-doublon), régénérée après un succès ou un rejet
+  // STATE_CHANGED (nouvel état = nouveau paiement).
+  const idemKeyRef = useRef<string>(crypto.randomUUID())
+  const [payError, setPayError] = useState<'state_changed' | 'network' | null>(null)
+
+  // GOAL_PAIEMENTS_05 — fin du fire-and-forget : on ATTEND la réponse de
+  // payments:create (nouveau contrat) avant d'afficher la confirmation, et on
+  // affiche les montants VALIDÉS par le serveur. Le transport reste
+  // httpMutation (fetch keepalive) pour la fiabilité iOS — on attend juste sa
+  // réponse. En cas de STATE_CHANGED : bandeau + état à jour, jamais une
+  // confirmation avec des montants faux.
+  const handlePay = useCallback(async (method: string) => {
     if (loading) return
     setLoading(method)
+    setPayError(null)
 
-    if (state.convexRestaurantId && state.convexTableId) {
+    // Chemin hors-Convex (démo locale sans table) : comportement historique.
+    if (!state.convexRestaurantId || !state.convexTableId) {
+      dispatch({ type: 'SET_PAYMENT_DETAILS', payload: {
+        method, ref: `SPZ-${Date.now()}-T${state.tableNumber}`, timestamp: Date.now(),
+        subtotalCents: subtotal, tipCents: tipAmount, totalCents: total,
+      } })
+      dispatch({ type: 'CONFIRM_PAYMENT' })
+      dispatch({ type: 'ADD_CACHED_PAID_CENTS', payload: subtotal })
+      navigate('/confirmation')
+      return
+    }
+
+    // GOAL_PAIEMENTS_08 — restaurant HORS allowlist NOUVEAU_PAIEMENT_FRACTIONNE :
+    // chemin legacy strictement identique à l'ancien client (fire-and-forget,
+    // pas d'idempotencyKey → contrat payments:create legacy côté serveur,
+    // plafonnement silencieux compris). Aucun changement visible.
+    if (!state.newPaymentFlow) {
       httpMutation<string | null>('payments:create', {
         restaurantId: state.convexRestaurantId,
         tableId: state.convexTableId,
@@ -66,24 +102,102 @@ export function Payment() {
         // backfiller phone/email sur CE paiement (regroupement client par contact).
         .then(id => { if (id) dispatch({ type: 'SET_LAST_PAYMENT_ID', payload: id }) })
         .catch(() => {})
+
+      dispatch({ type: 'SET_PAYMENT_DETAILS', payload: {
+        method,
+        ref: `SPZ-${Date.now()}-T${state.tableNumber}`,
+        timestamp: Date.now(),
+        subtotalCents: subtotal,
+        tipCents: tipAmount,
+        totalCents: total,
+      } })
+      dispatch({ type: 'CONFIRM_PAYMENT' })
+      dispatch({ type: 'ADD_CACHED_PAID_CENTS', payload: subtotal })
+      if (subtotal >= remainingCents && remainingCents > 0) {
+        dispatch({ type: 'MARK_CACHED_ITEMS_PAID' })
+      } else if (paidItemNames && paidItemNames.length > 0) {
+        dispatch({ type: 'MARK_SPECIFIC_ITEMS_PAID', payload: paidItemNames })
+      }
+      navigate('/confirmation')
+      return
     }
 
-    dispatch({ type: 'SET_PAYMENT_DETAILS', payload: {
-      method,
-      ref: `SPZ-${Date.now()}-T${state.tableNumber}`,
-      timestamp: Date.now(),
-      subtotalCents: subtotal,
-      tipCents: tipAmount,
-      totalCents: total,
-    } })
-    dispatch({ type: 'CONFIRM_PAYMENT' })
-    dispatch({ type: 'ADD_CACHED_PAID_CENTS', payload: subtotal })
-    if (subtotal >= remainingCents && remainingCents > 0) {
-      dispatch({ type: 'MARK_CACHED_ITEMS_PAID' })
-    } else if (paidItemNames && paidItemNames.length > 0) {
-      dispatch({ type: 'MARK_SPECIFIC_ITEMS_PAID', payload: paidItemNames })
+    // Mode par article : allocation explicite (si toutes les unités portent un
+    // lineId) + parts réclamées à geler. Les arrondis par article sont les
+    // MÊMES que ceux du sous-total (useSessionCalcs) → Σ allocation = subtotal.
+    const itemMode = state.splitMode === 'item'
+    const allAddressable = itemMode
+      && state.selectedItems.length > 0
+      && state.selectedItems.every(i => i.lineId)
+    const allocation = allAddressable
+      ? state.selectedItems.map(i => ({
+          lineId: i.lineId as string,
+          amountCents: Math.round(i.priceCents / i.splitFactor),
+        }))
+      : undefined
+    const parts = itemMode
+      ? state.selectedItems
+          .filter(i => i.lineId && i.partId)
+          .map(i => ({ lineId: i.lineId as string, partId: i.partId as string }))
+      : undefined
+
+    try {
+      const r = await httpMutation<CreateResult>('payments:create', {
+        restaurantId: state.convexRestaurantId,
+        tableId: state.convexTableId,
+        tableNumber: state.tableNumber,
+        // Convives : signal fiable uniquement en partage équitable (stepper déclaré).
+        // En mode article, undefined — le backend dérive des payeurs distincts.
+        guests: state.splitMode === 'equal' ? state.equalSplitCount : undefined,
+        subtotalCents: subtotal,
+        tipCents: tipAmount,
+        commissionCents: splitzyFee,
+        totalCents: total,
+        paymentMethod: method,
+        firstName: state.userName || undefined,
+        avatarIndex: state.userAvatarIndex,
+        paidItemNames: paidItemNames && paidItemNames.length > 0 ? paidItemNames : undefined,
+        idempotencyKey: idemKeyRef.current,
+        allocation,
+        parts: parts && parts.length > 0 ? parts : undefined,
+      })
+
+      // Succès : la clé a servi, la suivante concerne un AUTRE paiement.
+      idemKeyRef.current = crypto.randomUUID()
+      // Mémorise l'id du paiement → /confirmation le passe à saveContact pour
+      // backfiller phone/email sur CE paiement (regroupement client par contact).
+      dispatch({ type: 'SET_LAST_PAYMENT_ID', payload: r.paymentId })
+      dispatch({ type: 'SET_PAYMENT_DETAILS', payload: {
+        method,
+        ref: `SPZ-${Date.now()}-T${state.tableNumber}`,
+        timestamp: Date.now(),
+        // Montants SERVEUR — jamais les montants calculés localement.
+        subtotalCents: r.subtotalCents,
+        tipCents: r.tipCents,
+        totalCents: r.totalCents,
+      } })
+      dispatch({ type: 'CONFIRM_PAYMENT' })
+      dispatch({ type: 'ADD_CACHED_PAID_CENTS', payload: r.subtotalCents })
+      if (r.subtotalCents >= remainingCents && remainingCents > 0) {
+        dispatch({ type: 'MARK_CACHED_ITEMS_PAID' })
+      } else if (paidItemNames && paidItemNames.length > 0) {
+        dispatch({ type: 'MARK_SPECIFIC_ITEMS_PAID', payload: paidItemNames })
+      }
+      navigate('/confirmation')
+    } catch (err) {
+      console.error('[Payment] create', err)
+      if (convexErrorCode(err) === 'STATE_CHANGED') {
+        // L'état de la table a changé (part prise / déjà payée ailleurs) :
+        // on réaffiche l'état à jour — la souscription temps réel recharge les
+        // montants — et la prochaine tentative est un NOUVEAU paiement.
+        idemKeyRef.current = crypto.randomUUID()
+        setPayError('state_changed')
+      } else {
+        // Erreur réseau : MÊME clé pour le retry — le serveur dédoublonne.
+        setPayError('network')
+      }
+      setLoading(null)
     }
-    navigate('/confirmation')
   }, [loading, state, subtotal, tipAmount, splitzyFee, total, dispatch, navigate, remainingCents, paidItemNames])
 
   return (
@@ -132,6 +246,38 @@ export function Payment() {
           </div>
         </div>
       </div>
+
+      {/* GOAL_PAIEMENTS_05 — bandeau d'erreur explicite : jamais de navigation
+          vers une confirmation aux montants faux. */}
+      {payError && (
+        <div style={{
+          background: payError === 'state_changed' ? '#FEF2F2' : '#FFF4E5',
+          color: payError === 'state_changed' ? '#B91C1C' : '#92400E',
+          padding: '12px 20px', flexShrink: 0,
+          fontSize: 13, fontWeight: 600, lineHeight: 1.4,
+          borderBottom: `1px solid ${payError === 'state_changed' ? 'rgba(239,68,68,0.25)' : '#FDE68A'}`,
+        }}>
+          {payError === 'state_changed' ? (
+            <>
+              L'addition a changé (un autre convive a payé ou réservé une part).
+              Les montants affichés ont été mis à jour — revérifie ta part avant de payer.
+              <button
+                type="button"
+                onClick={() => navigate('/items')}
+                style={{
+                  display: 'block', marginTop: 8, padding: '8px 12px', minHeight: 44,
+                  border: 0, borderRadius: 10, background: '#B91C1C', color: '#fff',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Revoir les articles
+              </button>
+            </>
+          ) : (
+            'Connexion instable — réessaie. Ton paiement ne sera jamais compté deux fois.'
+          )}
+        </div>
+      )}
 
       {/* Bandeau message spécial du restaurant (plat du jour, info…) */}
       {specialMessage && (

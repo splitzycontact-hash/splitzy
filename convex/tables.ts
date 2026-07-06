@@ -1,6 +1,7 @@
-import { query, mutation, internalQuery } from "./_generated/server"
+import { query, mutation, internalQuery, internalMutation } from "./_generated/server"
 import { v } from "convex/values"
 import { requireRestaurantAccess } from "./authz"
+import { makeUnits, unitsTotalCents } from "./orderItemsFactory"
 
 export const createBulk = mutation({
   args: {
@@ -133,15 +134,13 @@ export const updateStatus = mutation({
         patch.paidTipCents = undefined
       }
     }
-    // SECURITY (Vuln 2) : mutation convive ANONYME. On borne/assainit les entrées
-    // pour qu'un appelant non authentifié ne puisse pas injecter des orderItems
-    // démesurés ou négatifs (nb d'items, longueur de nom, qty, prix plafonnés).
+    // SECURITY (Vuln 2) : mutation convive ANONYME. Les bornes (nb d'items,
+    // longueur de nom, qty, prix) sont appliquées par la fabrique, qui éclate
+    // aussi chaque ligne en unités qty 1 avec lineId neuf (GOAL_PAIEMENTS_01).
+    // Sémantique inchangée : orderItems fourni = remplacement complet de la
+    // commande (re-simulation dashboard) — les unités sont donc toutes neuves.
     if (orderItems !== undefined) {
-      patch.orderItems = orderItems.slice(0, 200).map(it => ({
-        name: String(it.name).slice(0, 120),
-        qty: Math.max(0, Math.min(999, Math.floor(it.qty))),
-        unitCents: Math.max(0, Math.min(100_000_000, Math.floor(it.unitCents))),
-      }))
+      patch.orderItems = makeUnits(orderItems)
     }
     await ctx.db.patch(tableId, patch)
   },
@@ -196,25 +195,17 @@ export const addOrderItems = mutation({
     if (table.status === "paid") {
       throw new Error("Table déjà réglée — libérez la table pour démarrer une nouvelle commande")
     }
-    // Mêmes bornes que updateStatus (Vuln 2) : nom 120 chars, qty 1-999,
-    // prix 0-1M€. Les lignes à qty nulle après floor sont ignorées.
-    const clean = items.slice(0, 200)
-      .map(it => ({
-        name: String(it.name).slice(0, 120),
-        qty: Math.max(0, Math.min(999, Math.floor(it.qty))),
-        unitCents: Math.max(0, Math.min(100_000_000, Math.floor(it.unitCents))),
-      }))
-      .filter(it => it.qty > 0)
-    if (clean.length === 0) throw new Error("Aucun article à ajouter")
+    // GOAL_PAIEMENTS_01 : les ajouts passent par la fabrique (bornes Vuln 2 +
+    // éclatement en unités qty 1 + lineId neuf). Plus AUCUN merge par nom :
+    // une recommande du même article obtient toujours une unité neuve — jamais
+    // un incrément de qty sur une unité existante (qui peut porter un hold ou
+    // du paidCents). addedCents est calculé sur les unités réellement produites.
+    const units = makeUnits(items)
+    if (units.length === 0) throw new Error("Aucun article à ajouter")
 
     const opening = table.status === "free"
-    const addedCents = clean.reduce((s, it) => s + it.qty * it.unitCents, 0)
-    const merged = (opening ? [] : (table.orderItems ?? [])).map(l => ({ ...l }))
-    for (const it of clean) {
-      const existing = merged.find(l => !l.paid && l.name === it.name && l.unitCents === it.unitCents)
-      if (existing) existing.qty = Math.min(999, existing.qty + it.qty)
-      else merged.push({ name: it.name, qty: it.qty, unitCents: it.unitCents })
-    }
+    const addedCents = unitsTotalCents(units)
+    const merged = [...(opening ? [] : (table.orderItems ?? [])), ...units]
 
     const patch: Record<string, unknown> = {
       orderItems: merged,
@@ -542,4 +533,48 @@ export const listAll = internalQuery({
   args: { restaurantId: v.id("restaurants") },
   handler: async (ctx, { restaurantId }) =>
     ctx.db.query("tables").withIndex("by_restaurant", q => q.eq("restaurantId", restaurantId)).collect(),
+})
+
+// GOAL_PAIEMENTS_01 — Backfill one-shot des lineId manquants (CLI uniquement :
+// npx convex run tables:backfillLineIds '{}'). Idempotent : une ligne portant
+// déjà un lineId n'est jamais retouchée. Pour chaque ligne legacy (sans lineId)
+// d'une sitting non libre : éclatement en qty unités de qty 1, lineId neuf,
+// paidCents = unitCents si paid: true (Σ = qty × unitCents — la dérive
+// historique est FIGÉE telle quelle, jamais réinventée), holds: []. Les
+// montants (amountCents, Σ qty×unitCents) sont invariants par l'éclatement.
+export const backfillLineIds = internalMutation({
+  args: { dryRun: v.optional(v.boolean()) },
+  handler: async (ctx, { dryRun }) => {
+    const all = await ctx.db.query("tables").collect()
+    let tablesPatched = 0
+    let unitsCreated = 0
+    for (const t of all) {
+      const lines = t.orderItems ?? []
+      if (lines.length === 0) continue
+      // Tables libres : lignes résiduelles purgées à la prochaine ouverture —
+      // inutile (et trompeur) de leur donner des lineId.
+      if (t.status === "free") continue
+      if (lines.every(l => l.lineId !== undefined)) continue // déjà migrée
+      const next: typeof lines = []
+      for (const l of lines) {
+        if (l.lineId !== undefined) { next.push(l); continue }
+        const qty = Math.max(1, Math.floor(l.qty))
+        for (let i = 0; i < qty; i++) {
+          next.push({
+            name: l.name,
+            qty: 1,
+            unitCents: l.unitCents,
+            paid: l.paid,
+            lineId: crypto.randomUUID(),
+            paidCents: l.paid ? l.unitCents : 0,
+            holds: [],
+          })
+          unitsCreated++
+        }
+      }
+      if (!dryRun) await ctx.db.patch(t._id, { orderItems: next })
+      tablesPatched++
+    }
+    return { tablesPatched, unitsCreated, dryRun: dryRun ?? false }
+  },
 })

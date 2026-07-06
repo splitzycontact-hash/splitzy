@@ -124,6 +124,23 @@ export default defineSchema({
       qty: v.number(),
       unitCents: v.number(),
       paid: v.optional(v.boolean()),
+      // GOAL_PAIEMENTS_01 (additif) — grand livre par unité. lineId : uuid par
+      // UNITÉ (les nouvelles lignes naissent qty 1 via orderItemsFactory ; les
+      // lignes legacy qty > 1 sans lineId restent valides jusqu'au backfill).
+      lineId: v.optional(v.string()),
+      // Centimes CONFIRMÉS affectés à l'unité (cumulatif, jamais décrémenté par
+      // le paiement — remplace à terme le rétrécissement de qty). N'est écrit
+      // qu'à la confirmation PSP, jamais par un hold.
+      paidCents: v.optional(v.number()),
+      // Holds PAR PART (plusieurs réclamants partiels possibles sur une même
+      // unité — splitFactor ÷2/÷3/÷4). Un hold ne touche JAMAIS paidCents.
+      holds: v.optional(v.array(v.object({
+        partId: v.string(),
+        claimedBy: v.optional(v.string()),
+        capacityCents: v.number(),
+        state: v.union(v.literal("reclamee"), v.literal("paiement_attente")),
+        expiresAt: v.optional(v.number()),
+      }))),
     }))),
     alert: v.optional(v.boolean()),
     // M5 — Salle interactive (actions manager). Tous optionnels → aucun document
@@ -214,7 +231,39 @@ export default defineSchema({
     provider: v.optional(v.string()),
     providerRef: v.optional(v.string()),
     paidItemNames: v.optional(v.array(v.string())),
-  }).index("by_restaurant", ["restaurantId"]).index("by_table", ["tableId"]).index("by_provider_ref", ["provider", "providerRef"]),
+    // GOAL_PAIEMENTS_01 (additif) — nouveau contrat de create (GOAL_03).
+    // idempotencyKey : clé client (uuid) — check-then-insert dans une seule
+    // mutation Convex (OCC) = équivalent ON CONFLICT DO NOTHING.
+    idempotencyKey: v.optional(v.string()),
+    // allocation : ventilation DEMANDÉE à la création (intention, audit).
+    // appliedAllocation : ventilation RÉELLE écrite à la confirmation (vérité
+    // comptable) — un rejeu de webhook ne re-ventile pas.
+    allocation: v.optional(v.array(v.object({
+      lineId: v.string(),
+      amountCents: v.number(),
+    }))),
+    appliedAllocation: v.optional(v.array(v.object({
+      lineId: v.string(),
+      amountCents: v.number(),
+    }))),
+    // Excédent confirmé non plaçable sur les lignes (table sur-payée, argent
+    // déjà prélevé) — tracé, jamais ajouté aux tips en silence, jamais perdu.
+    overflowCents: v.optional(v.number()),
+    // GOAL_PAIEMENTS_02 — parts gelées par CE paiement (reclamee →
+    // paiement_attente à la création). Sert aux filets de GOAL_04 : webhook
+    // d'échec et libération de secours retrouvent les parts à relâcher.
+    heldParts: v.optional(v.array(v.object({
+      lineId: v.string(),
+      partId: v.string(),
+    }))),
+    // GOAL_PAIEMENTS_04 — sitting d'origine du paiement (copiée de la table à
+    // la CRÉATION). Une confirmation bancaire tardive (webhook après clôture)
+    // se rattache à l'ancienne sitting via CE champ, jamais à celui de la
+    // table au moment où le webhook arrive — les chiffres du service suivant
+    // restent intacts.
+    sittingStartedAt: v.optional(v.number()),
+  }).index("by_restaurant", ["restaurantId"]).index("by_table", ["tableId"]).index("by_provider_ref", ["provider", "providerRef"])
+    .index("by_idempotency_key", ["idempotencyKey"]),
 
   feedbacks: defineTable({
     restaurantId: v.id("restaurants"),

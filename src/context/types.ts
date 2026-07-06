@@ -21,6 +21,11 @@ export interface SelectedItem {
   splitFactor: 1 | 2 | 3 | 4
   priceCents: number
   name: string
+  // GOAL_PAIEMENTS_05 — adressage serveur de l'unité (unités modernes avec
+  // lineId ; absent sur les lignes legacy, non réclamables) et part réclamée
+  // (posée par claims:claimPart au moment de la sélection).
+  lineId?: string
+  partId?: string
 }
 
 export type TipChoice = number | null // 0-30 as percentage, or null
@@ -30,6 +35,8 @@ export interface CachedOrderItem {
   qty: number
   unitCents: number
   paid?: boolean
+  lineId?: string
+  paidCents?: number
 }
 
 export interface SessionState {
@@ -62,6 +69,14 @@ export interface SessionState {
   paidTipCents: number
   paidTotalCents: number
   lastPaymentId: string // id du dernier paiement créé (payments:create) — lie le contact CRM au paiement
+  // GOAL_PAIEMENTS_05 — identifiant anonyme de CE convive (claimedBy des
+  // holds) : distingue « réservé pour moi » de « réservé par un autre ».
+  clientId: string
+  // GOAL_PAIEMENTS_08 — rollout : true si le restaurant est dans l'allowlist
+  // du flag NOUVEAU_PAIEMENT_FRACTIONNE (évalué serveur, transmis par
+  // getTableContext). false → écran historique 3 onglets + contrat
+  // payments:create legacy, strictement inchangés.
+  newPaymentFlow: boolean
 }
 
 export type SessionAction =
@@ -70,8 +85,9 @@ export type SessionAction =
   | { type: 'SET_SPLIT_MODE'; payload: 'item' | 'equal' | 'custom' }
   | { type: 'SET_EQUAL_SPLIT_COUNT'; payload: number }
   | { type: 'SET_CUSTOM_AMOUNT'; payload: number }
-  | { type: 'TOGGLE_ITEM'; payload: { itemId: string; priceCents: number; name: string } }
+  | { type: 'TOGGLE_ITEM'; payload: { itemId: string; priceCents: number; name: string; lineId?: string } }
   | { type: 'SET_ITEM_SPLIT'; payload: { itemId: string; factor: 1 | 2 | 3 | 4 } }
+  | { type: 'SET_ITEM_PART'; payload: { itemId: string; partId?: string } }
   | { type: 'SET_TIP_PERCENT'; payload: number }
   | { type: 'SET_SELECTED_CARD'; payload: string }
   | { type: 'CONFIRM_PAYMENT' }
@@ -81,7 +97,7 @@ export type SessionAction =
   | { type: 'TOGGLE_FEEDBACK_TAG'; payload: string }
   | { type: 'SET_FEEDBACK_TEXT'; payload: string }
   | { type: 'SEND_FEEDBACK' }
-  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number; cachedOrderItems?: CachedOrderItem[]; cachedPaidCents?: number } }
+  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number; cachedOrderItems?: CachedOrderItem[]; cachedPaidCents?: number; newPaymentFlow?: boolean } }
   | { type: 'ADD_CACHED_PAID_CENTS'; payload: number }
   | { type: 'MARK_CACHED_ITEMS_PAID' }
   | { type: 'MARK_SPECIFIC_ITEMS_PAID'; payload: string[] }

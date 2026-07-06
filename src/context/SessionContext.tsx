@@ -32,6 +32,12 @@ const initialState: SessionState = {
   paidTipCents: 0,
   paidTotalCents: 0,
   lastPaymentId: '',
+  // Identifiant anonyme de ce convive (claimedBy des holds). Par onglet — un
+  // hold expire en 5 min, inutile de le faire survivre à un reload.
+  clientId: crypto.randomUUID(),
+  // Rollout GOAL_PAIEMENTS_08 : ancien écran par défaut tant que
+  // getTableContext n'a pas confirmé l'allowlist.
+  newPaymentFlow: false,
 }
 
 function sessionReducer(state: SessionState, action: SessionAction): SessionState {
@@ -47,12 +53,12 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
     case 'SET_CUSTOM_AMOUNT':
       return { ...state, customAmount: action.payload }
     case 'TOGGLE_ITEM': {
-      const { itemId, priceCents, name } = action.payload
+      const { itemId, priceCents, name, lineId } = action.payload
       const exists = state.selectedItems.find(i => i.menuItemId === itemId)
       if (exists) {
         return { ...state, selectedItems: state.selectedItems.filter(i => i.menuItemId !== itemId) }
       }
-      return { ...state, selectedItems: [...state.selectedItems, { menuItemId: itemId, splitFactor: 1, priceCents, name }] }
+      return { ...state, selectedItems: [...state.selectedItems, { menuItemId: itemId, splitFactor: 1, priceCents, name, lineId }] }
     }
     case 'SET_ITEM_SPLIT': {
       return {
@@ -60,6 +66,16 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
         selectedItems: state.selectedItems.map(i =>
           i.menuItemId === action.payload.itemId
             ? { ...i, splitFactor: action.payload.factor }
+            : i
+        ),
+      }
+    }
+    case 'SET_ITEM_PART': {
+      return {
+        ...state,
+        selectedItems: state.selectedItems.map(i =>
+          i.menuItemId === action.payload.itemId
+            ? { ...i, partId: action.payload.partId }
             : i
         ),
       }
@@ -145,6 +161,10 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
         paidSubtotalCents: 0,
         paidTipCents: 0,
         paidTotalCents: 0,
+        // Même convive anonyme pour toute la vie de l'onglet.
+        clientId: state.clientId,
+        // Le flag de rollout est lié au restaurant, pas à la session convive.
+        newPaymentFlow: state.newPaymentFlow,
       }
     default:
       return state

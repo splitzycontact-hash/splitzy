@@ -117,6 +117,11 @@ export const updateTableFromPOS = internalMutation({
         patch.sittingStartedAt = undefined
         patch.paidCents = undefined
         patch.paidTipCents = undefined
+        // GOAL_PAIEMENTS_04 : la libération POS est une clôture de sitting —
+        // purge aussi les lignes (et donc TOUS les holds qu'elles portent),
+        // symétrique à resetToFree. Sans ça, un plat réclamé en fin de service
+        // apparaîtrait « pris » pour la tablée suivante.
+        patch.orderItems = undefined
       }
       await ctx.db.patch(table._id, patch)
     }

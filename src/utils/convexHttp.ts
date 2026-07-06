@@ -15,6 +15,29 @@ function getHttpUrl(): string {
   return url.replace(/^wss?:\/\//, 'https://')
 }
 
+// Erreur applicative Convex (ConvexError côté serveur). `data` porte le
+// payload structuré — ex. { code: "STATE_CHANGED", ... } du nouveau contrat
+// payments:create (GOAL_PAIEMENTS_03/05).
+export class ConvexHttpError extends Error {
+  data?: unknown
+  constructor(message: string, data?: unknown) {
+    super(message)
+    this.name = 'ConvexHttpError'
+    this.data = data
+  }
+}
+
+export function convexErrorCode(err: unknown): string | null {
+  if (err instanceof ConvexHttpError && err.data && typeof err.data === 'object') {
+    const code = (err.data as { code?: unknown }).code
+    if (typeof code === 'string') return code
+  }
+  // Fallback : le message contient le payload sérialisé (format Convex HTTP).
+  if (err instanceof Error && err.message.includes('STATE_CHANGED')) return 'STATE_CHANGED'
+  if (err instanceof Error && err.message.includes('CAPACITY_EXCEEDED')) return 'CAPACITY_EXCEEDED'
+  return null
+}
+
 export async function httpMutation<T = unknown>(path: string, args: object): Promise<T> {
   const res = await fetch(`${getHttpUrl()}/api/mutation`, {
     method: 'POST',
@@ -23,7 +46,9 @@ export async function httpMutation<T = unknown>(path: string, args: object): Pro
     keepalive: true,
   })
   if (!res.ok) throw new Error(`mutation ${path} HTTP ${res.status}`)
-  const data = await res.json() as { status: 'success'; value: T } | { status: 'error'; errorMessage: string }
-  if (data.status === 'error') throw new Error(data.errorMessage)
+  const data = await res.json() as
+    | { status: 'success'; value: T }
+    | { status: 'error'; errorMessage: string; errorData?: unknown }
+  if (data.status === 'error') throw new ConvexHttpError(data.errorMessage, data.errorData)
   return data.value
 }

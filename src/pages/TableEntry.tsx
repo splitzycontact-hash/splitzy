@@ -24,9 +24,14 @@ type HttpCtx = {
     number: number
     capacity?: number
     amountCents?: number
-    orderItems?: { name: string; qty: number; unitCents: number; paid?: boolean }[]
+    // lineId/paidCents (GOAL_PAIEMENTS_05) : transmis au cache pour que le
+    // mode « par article » puisse réclamer même avant l'établissement du WS.
+    orderItems?: { name: string; qty: number; unitCents: number; paid?: boolean; lineId?: string; paidCents?: number }[]
     paidCents?: number
   } | null
+  // GOAL_PAIEMENTS_08 — évalué serveur (allowlist NOUVEAU_PAIEMENT_FRACTIONNE).
+  // Absent (backend pas encore déployé) → false → ancien écran.
+  newPaymentFlow?: boolean
 } | null
 
 type LoadState =
@@ -122,6 +127,7 @@ export function TableEntry() {
             tableTotalCents: ctx.table!.amountCents ?? TABLE_TOTAL_CENTS,
             cachedOrderItems: ctx.table!.orderItems ?? [],
             cachedPaidCents: ctx.table!.paidCents ?? 0,
+            newPaymentFlow: ctx.newPaymentFlow === true,
           },
         })
       })

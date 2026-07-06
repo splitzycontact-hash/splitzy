@@ -29,7 +29,18 @@ export const getTableContext = query({
     delete safeRestaurant.siret
     delete safeRestaurant.stripeAccountId
     delete safeRestaurant.posProvider
-    return { restaurant: safeRestaurant, table }
+    // GOAL_PAIEMENTS_08 — rollout du nouvel écran de paiement fractionné :
+    // évalué CÔTÉ SERVEUR (allowlist par restaurantId, flag
+    // NOUVEAU_PAIEMENT_FRACTIONNE). Flag absent / disabled / restaurant hors
+    // allowlist → false → le client rend l'ancien écran 3 onglets, inchangé.
+    const flag = await ctx.db.query("featureFlags")
+      .withIndex("by_key", q => q.eq("key", "NOUVEAU_PAIEMENT_FRACTIONNE"))
+      .unique()
+    const newPaymentFlow = !!flag
+      && (flag.status === "active" || flag.status === "beta")
+      && flag.rolloutType === "allowlist"
+      && !!flag.rolloutValue?.restaurantIds?.includes(restaurant._id)
+    return { restaurant: safeRestaurant, table, newPaymentFlow }
   },
 })
 

@@ -80,7 +80,12 @@ export function generateInvoicePDF(state: SessionState) {
 
   y += 6
 
-  if (state.selectedItems.length > 0) {
+  // Décision D (GOAL_PAIEMENTS_05) : détail par plat UNIQUEMENT pour les
+  // paiements « par article » — le convive a réellement désigné ces plats
+  // (détail vrai ET signifiant). Parts égales / montant libre : « Part du
+  // repas » générique — la ventilation machine (plus grand reste) serait
+  // précise mais trompeuse sur ce que la personne a mangé.
+  if (state.splitMode === 'item' && state.selectedItems.length > 0) {
     // Articles réellement sélectionnés et payés par le convive.
     state.selectedItems.forEach(si => {
       const linePrice = Math.round(si.priceCents / si.splitFactor)
