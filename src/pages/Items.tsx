@@ -7,20 +7,15 @@ import { formatEur } from '../utils/formatCurrency'
 import { useSessionCalcs } from '../hooks/useSessionCalcs'
 import { httpMutation } from '../utils/convexHttp'
 import { ItemsLegacy } from './ItemsLegacy'
+import { computeLineStatus, type LineHold } from './lineStatus'
 
 type Category = 'entrees' | 'plats' | 'desserts' | 'boissons'
 
 // GOAL_PAIEMENTS_05 — vue par UNITÉ avec son état réel (grand livre) :
 // libre / réservée (hold d'un autre convive) / en paiement / payée, et son
 // argent (paidCents / prix). Plus de liste filtrée sur un booléen `paid`
-// global qui ment.
-type LiveHold = {
-  partId: string
-  claimedBy?: string
-  capacityCents: number
-  state: 'reclamee' | 'paiement_attente'
-  expiresAt?: number
-}
+// global qui ment. GOAL_PAIEMENTS_10 : la dérivation du libellé/montant à
+// l'état de repos vit dans lineStatus.ts (pure, testée E2E).
 type UnitView = {
   id: string
   lineId?: string        // absent sur les lignes legacy (non réclamables)
@@ -29,6 +24,8 @@ type UnitView = {
   remainingCents: number // prix − paidCents (argent encore dû)
   availableCents: number // remaining − capacité tenue par les AUTRES convives
   isPaid: boolean
+  restingLabel: string       // libellé hors sélection (lineStatus.ts)
+  restingAmountCents: number // montant colonne prix hors sélection
 }
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -141,25 +138,26 @@ function ItemsNew() {
   // ne comptent pas comme « tenues par un autre ».
   const myPartIds = new Set(state.selectedItems.map(i => i.partId).filter(Boolean) as string[])
   const units: UnitView[] = sourceItems.flatMap((item, idx) => {
-    const holds = (item as { holds?: LiveHold[] }).holds ?? []
     if (item.lineId) {
-      // Unité moderne (qty 1, lineId) — état exact depuis le grand livre.
-      const total = item.qty * item.unitCents
-      const paidC = item.paidCents ?? (item.paid ? total : 0)
-      const heldByOthers = holds.reduce((s, h) => {
-        if (myPartIds.has(h.partId)) return s
-        const active = h.state === 'paiement_attente' || (h.expiresAt ?? 0) > nowMs
-        return active ? s + h.capacityCents : s
-      }, 0)
-      const remaining = Math.max(0, total - paidC)
+      // Unité moderne (qty 1, lineId) — état exact depuis le grand livre,
+      // libellé de repos dérivé par lineStatus.ts (GOAL_PAIEMENTS_10).
+      const st = computeLineStatus(
+        {
+          qty: item.qty, unitCents: item.unitCents, paid: item.paid,
+          paidCents: item.paidCents, holds: (item as { holds?: LineHold[] }).holds,
+        },
+        { myPartIds, clientId: state.clientId, nowMs },
+      )
       return [{
         id: item.lineId,
         lineId: item.lineId,
         name: item.name,
-        price: total,
-        remainingCents: remaining,
-        availableCents: Math.max(0, remaining - heldByOthers),
-        isPaid: total > 0 && paidC >= total,
+        price: item.qty * item.unitCents,
+        remainingCents: st.remainingCents,
+        availableCents: st.availableCents,
+        isPaid: st.isPaid,
+        restingLabel: st.restingLabel,
+        restingAmountCents: st.restingAmountCents,
       }]
     }
     // Ligne legacy sans lineId : éclatement local par qty (comportement
@@ -171,6 +169,8 @@ function ItemsNew() {
       remainingCents: item.paid ? 0 : item.unitCents,
       availableCents: item.paid ? 0 : item.unitCents,
       isPaid: item.paid === true,
+      restingLabel: item.paid ? 'Payé ✓' : '',
+      restingAmountCents: item.unitCents,
     }))
   })
 
@@ -409,10 +409,10 @@ function ItemsNew() {
                       const factor = getSplitFactor(it.id)
                       const selItem = state.selectedItems.find(i => i.menuItemId === it.id)
                       const selBase = selItem?.priceCents ?? it.availableCents
-                      // États d'unité (grand livre) : payée / réservée par un
-                      // autre / partiellement couverte / libre.
+                      // États d'unité (grand livre) : payée / réservée (holds
+                      // actifs) / partiellement couverte / libre — libellé et
+                      // montant de repos dérivés par lineStatus.ts.
                       const blocked = !sel && !it.isPaid && it.availableCents <= 0
-                      const partial = !it.isPaid && it.remainingCents > 0 && it.remainingCents < it.price
                       const disabled = it.isPaid || blocked
                       return (
                         <div key={it.id} style={{
@@ -447,21 +447,13 @@ function ItemsNew() {
                                 {it.name}
                               </div>
                               <div style={{ fontSize: 11.5, color: it.isPaid ? '#10B981' : blocked ? '#B45309' : sel ? '#E8920A' : '#52525B', marginTop: 1, fontWeight: 600 }}>
-                                {it.isPaid
-                                  ? 'Payé ✓'
-                                  : blocked
-                                    ? 'Réservé par un autre convive'
-                                    : sel
-                                      ? 'Réservé pour toi · désélectionne pour libérer'
-                                      : partial
-                                        ? `Reste ${formatEur(it.remainingCents)}${it.availableCents < it.remainingCents ? ` · dispo ${formatEur(it.availableCents)}` : ''}`
-                                        : it.availableCents < it.remainingCents
-                                          ? `Dispo ${formatEur(it.availableCents)} (part réservée ailleurs)`
-                                          : ''}
+                                {sel && !it.isPaid
+                                  ? 'Réservé pour toi · désélectionne pour libérer'
+                                  : it.restingLabel}
                               </div>
                             </div>
                             <div style={{ fontSize: 14, fontWeight: 700, color: sel ? '#E8920A' : '#0A0A0A', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', textDecoration: it.isPaid ? 'line-through' : 'none' }}>
-                              {formatEur(it.isPaid ? it.price : sel ? selBase : it.availableCents < it.remainingCents ? it.availableCents : it.price)}
+                              {formatEur(it.isPaid ? it.price : sel ? selBase : it.restingAmountCents)}
                             </div>
                           </button>
                           {sel && (
