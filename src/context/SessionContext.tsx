@@ -38,6 +38,10 @@ const initialState: SessionState = {
   // Rollout GOAL_PAIEMENTS_08 : ancien écran par défaut tant que
   // getTableContext n'a pas confirmé l'allowlist.
   newPaymentFlow: false,
+  // Rollout GOAL_PAIEMENTS_12 : onglets libres par défaut tant que
+  // getTableContext n'a pas confirmé l'allowlist du verrou de mode.
+  verrouModePaiement: false,
+  cachedPaymentMode: null,
 }
 
 function sessionReducer(state: SessionState, action: SessionAction): SessionState {
@@ -140,6 +144,8 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
     }
     case 'SET_TABLE_CONTEXT':
       return { ...state, ...action.payload }
+    case 'SET_CACHED_PAYMENT_MODE':
+      return { ...state, cachedPaymentMode: action.payload }
     case 'RESET_SESSION':
       // Préserve le contexte de table pour que /welcome reflète l'état Convex
       // après "Bonne soirée". Seule l'action "Libérer la table" (gérant) doit
@@ -165,6 +171,10 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
         clientId: state.clientId,
         // Le flag de rollout est lié au restaurant, pas à la session convive.
         newPaymentFlow: state.newPaymentFlow,
+        // GOAL_PAIEMENTS_12 — le verrou est lié à la table/sitting, pas à la
+        // session convive : préservés comme cachedOrderItems/cachedPaidCents.
+        verrouModePaiement: state.verrouModePaiement,
+        cachedPaymentMode: state.cachedPaymentMode,
       }
     default:
       return state

@@ -49,10 +49,14 @@ export const getOne = query({
     // gridY, label, alert, sittingStartedAt, isVip (données internes gérant).
     // forcePaymentMode EST exposé : le convive en a besoin pour basculer en
     // écran paiement quand le manager déclenche tables.forcePayment (M5).
+    // paymentMode EST exposé (GOAL_PAIEMENTS_11) : le convive doit connaître le
+    // mode verrouillé pour la table (écran de choix / bascule réactive).
     const { _id, restaurantId, number, capacity, status, guests,
-            amountCents, paidCents, orderItems, paidTipCents, forcePaymentMode } = table
+            amountCents, paidCents, orderItems, paidTipCents, forcePaymentMode,
+            paymentMode } = table
     return { _id, restaurantId, number, capacity, status, guests,
-             amountCents, paidCents, orderItems, paidTipCents, forcePaymentMode }
+             amountCents, paidCents, orderItems, paidTipCents, forcePaymentMode,
+             paymentMode }
   },
 })
 
@@ -120,6 +124,13 @@ export const updateStatus = mutation({
       patch.guests = undefined
       patch.sittingStartedAt = Date.now()
     }
+    // GOAL_PAIEMENTS_11 — réouverture (free→dining, scan ou staff) : purge un
+    // verrou de mode périmé de la sitting précédente.
+    if (existing.status === "free" && status === "dining") {
+      patch.paymentMode = undefined
+      patch.paymentModeLockedAt = undefined
+      patch.paymentModeLockedBy = undefined
+    }
     if (guests !== undefined) patch.guests = Math.max(0, guests)
 
     // M2 : amountCents (la note) n'est patché QUE pour un gérant authentifié — un
@@ -161,6 +172,9 @@ export const resetToFree = mutation({
       paidCents: undefined,
       paidTipCents: undefined,
       sittingStartedAt: undefined,
+      paymentMode: undefined,
+      paymentModeLockedAt: undefined,
+      paymentModeLockedBy: undefined,
     })
   },
 })
@@ -175,9 +189,13 @@ export const resetToFree = mutation({
 //
 // Table libre → ouverture d'une nouvelle sitting : status "dining",
 // sittingStartedAt = maintenant, couverts si fournis, compteurs de paiement
-// remis à zéro. Table réglée → refus explicite : la sitting est close et les
-// paiements réconciliés ; rouvrir corromprait paidCents. Le gérant doit
-// libérer la table d'abord (nouvelle sitting propre).
+// remis à zéro.
+//
+// GOAL_PAIEMENTS_11 — table "paid" : la MÊME sitting continue (ex. dessert
+// commandé après qu'un convive parti ait soldé le total à cet instant).
+// On repasse status à "payment" en gardant paidCents/paidTipCents/orderItems
+// intacts : le grand livre reste juste (payé figé, reste = nouveaux articles).
+// L'ancien refus explicite obligeait à resetToFree, qui effaçait tout.
 export const addOrderItems = mutation({
   args: {
     tableId: v.id("tables"),
@@ -192,9 +210,6 @@ export const addOrderItems = mutation({
     const table = await ctx.db.get(tableId)
     if (!table) throw new Error("Table introuvable")
     await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
-    if (table.status === "paid") {
-      throw new Error("Table déjà réglée — libérez la table pour démarrer une nouvelle commande")
-    }
     // GOAL_PAIEMENTS_01 : les ajouts passent par la fabrique (bornes Vuln 2 +
     // éclatement en unités qty 1 + lineId neuf). Plus AUCUN merge par nom :
     // une recommande du même article obtient toujours une unité neuve — jamais
@@ -211,12 +226,23 @@ export const addOrderItems = mutation({
       orderItems: merged,
       amountCents: (opening ? 0 : (table.amountCents ?? 0)) + addedCents,
     }
+    // GOAL_PAIEMENTS_11 — dessert après solde : la table réglée repasse en
+    // "payment" (paidCents/paidTipCents intacts, seuls les nouveaux articles
+    // restent dus). Ni ouverture ni reset : la sitting continue.
+    if (table.status === "paid") {
+      patch.status = "payment"
+    }
     if (opening) {
       patch.status = "dining"
       patch.sittingStartedAt = Date.now()
       patch.paidCents = undefined
       patch.paidTipCents = undefined
       patch.alert = undefined
+      // GOAL_PAIEMENTS_11 — nouvelle sitting : jamais de verrou hérité, même si
+      // la table est passée "free" par un chemin qui ne purge pas (updateStatus).
+      patch.paymentMode = undefined
+      patch.paymentModeLockedAt = undefined
+      patch.paymentModeLockedBy = undefined
     }
     if (guests !== undefined) patch.guests = Math.max(0, Math.min(99, Math.floor(guests)))
     await ctx.db.patch(tableId, patch)
@@ -364,6 +390,9 @@ export const clearAllAssignments = mutation({
             sittingStartedAt: undefined,
             forcePaymentMode: undefined,
             isVip: undefined,
+            paymentMode: undefined,
+            paymentModeLockedAt: undefined,
+            paymentModeLockedBy: undefined,
           } : {}),
         })
         cleared++
@@ -524,7 +553,90 @@ export const closeWithoutPayment = mutation({
       forcePaymentMode: false,
       isVip: false,
       closedWithoutPayment: true,
+      paymentMode: undefined,
+      paymentModeLockedAt: undefined,
+      paymentModeLockedBy: undefined,
     })
+  },
+})
+
+// GOAL_PAIEMENTS_11 — Verrou du mode de paiement par table/sitting.
+// Le PREMIER convive qui agit fixe le mode pour toute la table. Mutation
+// convive ANONYME (comme claims.claimPart) : l'identité est le clientId
+// (SessionState.clientId, uuid par onglet — jamais l'IP). Lecture + écriture
+// dans la MÊME mutation Convex = même transaction : deux appels concurrents
+// sont sérialisés, un seul gagne, l'autre reçoit {locked:false, actualMode}.
+// JAMAIS de throw sur un mode déjà fixé — le client doit pouvoir afficher un
+// message accueillant, pas une erreur brute.
+export const choosePaymentMode = mutation({
+  args: {
+    tableId: v.id("tables"),
+    mode: v.union(v.literal("item"), v.literal("diviser")),
+    clientId: v.string(),
+  },
+  handler: async (ctx, { tableId, mode, clientId }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    const me = String(clientId).slice(0, 60)
+
+    if (table.paymentMode === undefined) {
+      await ctx.db.patch(tableId, {
+        paymentMode: mode,
+        paymentModeLockedAt: Date.now(),
+        paymentModeLockedBy: me,
+      })
+      return { locked: true, mode }
+    }
+    // Retry réseau du même convive : idempotent, on lui confirme SON verrou.
+    if (table.paymentModeLockedBy === me) {
+      return { locked: true, mode: table.paymentMode, alreadyMine: true }
+    }
+    // Un autre convive a verrouillé avant lui — refus doux, jamais d'exception.
+    return { locked: false, actualMode: table.paymentMode }
+  },
+})
+
+// GOAL_PAIEMENTS_11 — Réinitialisation du verrou par le gérant (owner/manager).
+// Refusée tant qu'un paiement est en cours (hold "paiement_attente" actif) :
+// changer de mode pendant qu'un convive paie fausserait sa ventilation.
+// L'état remplacé est archivé dans paymentModeHistory (resetBy = ligne members
+// du gérant si elle existe — un owner sans ligne members est loggé sans resetBy).
+export const resetPaymentMode = mutation({
+  args: { tableId: v.id("tables") },
+  handler: async (ctx, { tableId }) => {
+    const table = await ctx.db.get(tableId)
+    if (!table) throw new Error("Table introuvable")
+    const { identity } = await requireRestaurantAccess(ctx, table.restaurantId, ["owner", "manager"])
+
+    const frozen = (table.orderItems ?? []).some(l =>
+      (l.holds ?? []).some(h => h.state === "paiement_attente"))
+    if (frozen) {
+      throw new Error("Un paiement est en cours sur cette table — réessayez quand il sera terminé")
+    }
+    if (table.paymentMode === undefined) return { reset: false }
+
+    const me = await ctx.db
+      .query("members")
+      .withIndex("by_clerkUserId", q => q.eq("clerkUserId", identity.subject))
+      .filter(q => q.eq(q.field("restaurantId"), table.restaurantId))
+      .first()
+
+    await ctx.db.patch(tableId, {
+      paymentModeHistory: [
+        ...(table.paymentModeHistory ?? []),
+        {
+          mode: table.paymentMode,
+          lockedAt: table.paymentModeLockedAt ?? 0,
+          lockedBy: table.paymentModeLockedBy ?? "",
+          resetBy: me?._id,
+          resetAt: Date.now(),
+        },
+      ],
+      paymentMode: undefined,
+      paymentModeLockedAt: undefined,
+      paymentModeLockedBy: undefined,
+    })
+    return { reset: true }
   },
 })
 

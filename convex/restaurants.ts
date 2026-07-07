@@ -40,7 +40,18 @@ export const getTableContext = query({
       && (flag.status === "active" || flag.status === "beta")
       && flag.rolloutType === "allowlist"
       && !!flag.rolloutValue?.restaurantIds?.includes(restaurant._id)
-    return { restaurant: safeRestaurant, table, newPaymentFlow }
+    // GOAL_PAIEMENTS_12 — verrou du mode de paiement par table : flag SÉPARÉ
+    // (activable/désactivable indépendamment du paiement fractionné). `table`
+    // est renvoyée entière et porte déjà paymentMode : le premier rendu client
+    // (avant WebSocket) connaît donc le mode verrouillé.
+    const verrouFlag = await ctx.db.query("featureFlags")
+      .withIndex("by_key", q => q.eq("key", "VERROU_MODE_PAIEMENT"))
+      .unique()
+    const verrouModePaiement = !!verrouFlag
+      && (verrouFlag.status === "active" || verrouFlag.status === "beta")
+      && verrouFlag.rolloutType === "allowlist"
+      && !!verrouFlag.rolloutValue?.restaurantIds?.includes(restaurant._id)
+    return { restaurant: safeRestaurant, table, newPaymentFlow, verrouModePaiement }
   },
 })
 

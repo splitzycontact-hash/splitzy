@@ -60,6 +60,37 @@ export const setNouveauPaiementFractionne = internalMutation({
   },
 });
 
+// Outil admin (CLI `npx convex run` uniquement — internalMutation, jamais
+// appelable depuis un client) : allowlist du verrou de mode de paiement par
+// table (GOAL_PAIEMENTS_12/14, même pattern que NOUVEAU_PAIEMENT_FRACTIONNE —
+// flag SÉPARÉ pour activer/désactiver le verrou sans toucher au reste du
+// système de paiement). Évalué serveur dans restaurants:getTableContext.
+// Tableau vide → flag disabled → comportement actuel (3 onglets libres).
+// Usage : npx convex run featureFlags:setVerrouModePaiement '{"restaurantIds":["<id>"]}' --prod
+export const setVerrouModePaiement = internalMutation({
+  args: { restaurantIds: v.array(v.string()) },
+  handler: async (ctx, { restaurantIds }) => {
+    const existing = await ctx.db.query("featureFlags")
+      .withIndex("by_key", q => q.eq("key", "VERROU_MODE_PAIEMENT"))
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: restaurantIds.length > 0 ? "active" : "disabled",
+        rolloutType: "allowlist",
+        rolloutValue: { restaurantIds },
+      });
+      return existing._id;
+    }
+    return ctx.db.insert("featureFlags", {
+      key: "VERROU_MODE_PAIEMENT",
+      description: "Verrou du mode de paiement par table (écran de choix unique, premier convive fixe le mode) pour les restaurants listés — tous les autres gardent les 3 onglets libres.",
+      status: restaurantIds.length > 0 ? "active" : "disabled",
+      rolloutType: "allowlist",
+      rolloutValue: { restaurantIds },
+    });
+  },
+});
+
 export const update = mutation({
   args: {
     key: v.string(),

@@ -119,6 +119,21 @@ export default defineSchema({
     // une table libre via tables.addOrderItems, effacé au resetToFree.
     // Optionnel : les sittings ouvertes par la caisse ou un scan QR n'en ont pas.
     sittingStartedAt: v.optional(v.number()),
+    // GOAL_PAIEMENTS_11 — verrou du mode de paiement par sitting : fixé par le
+    // premier convive qui agit (tables.choosePaymentMode), appliqué à toute la
+    // table. Purgé aux mêmes points que sittingStartedAt. lockedBy = clientId
+    // (SessionState.clientId, uuid par onglet — jamais l'IP, partagée en wifi).
+    paymentMode: v.optional(v.union(v.literal("item"), v.literal("diviser"))),
+    paymentModeLockedAt: v.optional(v.number()),
+    paymentModeLockedBy: v.optional(v.string()),
+    // Historique des réinitialisations gérant (tables.resetPaymentMode).
+    paymentModeHistory: v.optional(v.array(v.object({
+      mode: v.string(),
+      lockedAt: v.number(),
+      lockedBy: v.string(),
+      resetBy: v.optional(v.id("members")),
+      resetAt: v.optional(v.number()),
+    }))),
     orderItems: v.optional(v.array(v.object({
       name: v.string(),
       qty: v.number(),

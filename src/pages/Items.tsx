@@ -58,6 +58,11 @@ export function Items() {
   return state.newPaymentFlow ? <ItemsNew /> : <ItemsLegacy />
 }
 
+const MODE_LABEL: Record<'item' | 'diviser', string> = {
+  item: 'Chacun paie ses plats',
+  diviser: "On divise l'addition",
+}
+
 function ItemsNew() {
   const { state, dispatch } = useSession()
   const navigate = useNavigate()
@@ -72,6 +77,90 @@ function ItemsNew() {
     const t = setInterval(() => setNowMs(Date.now()), 30_000)
     return () => clearInterval(t)
   }, [])
+
+  // ── GOAL_PAIEMENTS_12 — verrou du mode de paiement par table ──────────────
+  // Tout est conditionné par le flag VERROU_MODE_PAIEMENT (allowlist serveur).
+  // Hors allowlist : verrou=false → comportement actuel strictement inchangé.
+  const verrou = state.verrouModePaiement
+  // Mode verrouillé : le live (WS) fait foi dès qu'il a répondu ; avant, le
+  // cache posé par TableEntry (HTTP) couvre le premier rendu iOS. Le routing
+  // est basé sur cet ÉTAT, jamais sur l'historique du navigateur — le bouton
+  // retour ne peut donc pas réafficher un écran de choix périmé.
+  const lockedMode: 'item' | 'diviser' | null =
+    liveTable !== undefined && liveTable !== null
+      ? ((liveTable as { paymentMode?: 'item' | 'diviser' }).paymentMode ?? null)
+      : state.cachedPaymentMode
+  // Popup de confirmation (mode tapé, pas encore confirmé) + envoi en cours.
+  const [pendingMode, setPendingMode] = useState<'item' | 'diviser' | null>(null)
+  const [modeBusy, setModeBusy] = useState(false)
+  const [modeError, setModeError] = useState(false)
+  // Bascule : un AUTRE convive a verrouillé un mode différent — message doux.
+  const [switchNotice, setSwitchNotice] = useState<'item' | 'diviser' | null>(null)
+
+  // Cache ← live : garde cachedPaymentMode frais (navigation, RESET_SESSION).
+  useEffect(() => {
+    if (!verrou || liveTable === undefined || liveTable === null) return
+    const live = (liveTable as { paymentMode?: 'item' | 'diviser' }).paymentMode ?? null
+    if (live !== state.cachedPaymentMode) {
+      dispatch({ type: 'SET_CACHED_PAYMENT_MODE', payload: live })
+    }
+  }, [verrou, liveTable, state.cachedPaymentMode, dispatch])
+
+  // Mode verrouillé → splitMode forcé dans la famille correspondante.
+  useEffect(() => {
+    if (!verrou || lockedMode === null) return
+    if (lockedMode === 'item' && state.splitMode !== 'item') {
+      dispatch({ type: 'SET_SPLIT_MODE', payload: 'item' })
+    }
+    if (lockedMode === 'diviser' && state.splitMode === 'item') {
+      dispatch({ type: 'SET_SPLIT_MODE', payload: 'equal' })
+    }
+  }, [verrou, lockedMode, state.splitMode, dispatch])
+
+  // Abonnement réactif : le verrou arrive PENDANT que la popup est ouverte
+  // (l'autre convive a confirmé avant moi) → fermer la popup sans attendre le
+  // retour de la mutation. Si le mode verrouillé diffère de celui que je
+  // confirmais, afficher le message de bascule ; sinon (écho WS de mon propre
+  // verrou, ou même choix simultané) continuer silencieusement.
+  useEffect(() => {
+    if (!verrou || lockedMode === null || pendingMode === null) return
+    if (lockedMode !== pendingMode) setSwitchNotice(lockedMode)
+    setPendingMode(null)
+    setModeBusy(false)
+  }, [verrou, lockedMode, pendingMode])
+
+  const applyLockedMode = (mode: 'item' | 'diviser') => {
+    dispatch({ type: 'SET_CACHED_PAYMENT_MODE', payload: mode })
+    dispatch({ type: 'SET_SPLIT_MODE', payload: mode === 'item' ? 'item' : 'equal' })
+  }
+
+  // Confirmer → choosePaymentMode (HTTP direct, fiable iOS). Jamais d'erreur
+  // brute si un autre convive a gagné la course : message accueillant.
+  const confirmPendingMode = () => {
+    const mode = pendingMode
+    if (!mode || modeBusy || !state.convexTableId) return
+    setModeBusy(true)
+    setModeError(false)
+    httpMutation<{ locked: boolean; mode?: 'item' | 'diviser'; actualMode?: 'item' | 'diviser' }>(
+      'tables:choosePaymentMode',
+      { tableId: state.convexTableId, mode, clientId: state.clientId },
+    )
+      .then(r => {
+        if (r.locked) {
+          applyLockedMode(r.mode ?? mode)
+        } else {
+          const actual = r.actualMode === 'diviser' ? 'diviser' : 'item'
+          applyLockedMode(actual)
+          setSwitchNotice(actual)
+        }
+        setPendingMode(null)
+      })
+      .catch(err => {
+        console.error('[Items] choosePaymentMode', err)
+        setModeError(true)
+      })
+      .finally(() => setModeBusy(false))
+  }
 
   // Spinner seulement si ni Convex ni cache ne sont disponibles.
   // Sur iOS Safari, liveTable peut rester undefined longtemps (WS lent).
@@ -126,6 +215,175 @@ function ItemsNew() {
           Retour
         </button>
       </div>
+    )
+  }
+
+  // ── GOAL_PAIEMENTS_12 — message de bascule (un autre convive a verrouillé
+  // un autre mode). Affiché après une course perdue ou un verrou arrivé
+  // pendant la popup. « Continuer » → écran du mode verrouillé.
+  if (verrou && switchNotice !== null) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100%', background: '#FAFAFA', padding: '0 24px', textAlign: 'center', gap: 12,
+      }}>
+        <div style={{ fontSize: 40 }}>🤝</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#0A0A0A' }}>
+          Un autre convive vient de choisir «&nbsp;{MODE_LABEL[switchNotice]}&nbsp;» pour toute la table.
+        </div>
+        <div style={{ fontSize: 13, color: '#9CA3AF' }}>On continue avec ce mode.</div>
+        <button
+          type="button"
+          onClick={() => setSwitchNotice(null)}
+          style={{
+            marginTop: 8, height: 48, padding: '0 32px', borderRadius: 14, border: 0,
+            background: '#E8920A', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          Continuer
+        </button>
+      </div>
+    )
+  }
+
+  // ── GOAL_PAIEMENTS_12 — écran de choix du mode, AVANT tout contenu par mode.
+  // Uniquement : table en paiement + aucun mode verrouillé + restaurant dans
+  // l'allowlist. Un convive tardif (mode déjà fixé) ne le voit jamais.
+  if (verrou && lockedMode === null && liveTable?.status === 'payment') {
+    return (
+      <m.div
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#FAFAFA' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px 6px' }}>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            style={{
+              width: 44, height: 44, borderRadius: 12, border: '1px solid #E4E4E7',
+              background: '#fff', color: '#0A0A0A', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M9.5 3L5 7.5L9.5 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 700, color: '#0A0A0A', letterSpacing: '-0.01em' }}>
+            Mode de paiement
+          </div>
+          <div style={{ width: 34 }} />
+        </div>
+        <div style={{ padding: '0 20px 4px' }}>
+          <StepBar current={3} />
+        </div>
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 20px 40px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#0A0A0A', letterSpacing: '-0.02em' }}>
+              Comment souhaitez-vous payer l'addition&nbsp;?
+            </div>
+            <div style={{ fontSize: 13, color: '#9CA3AF', marginTop: 6 }}>
+              Le choix s'applique à toute la table.
+            </div>
+          </div>
+          {([ 'item', 'diviser' ] as const).map(mode => (
+            <button
+              key={mode}
+              type="button"
+              disabled={modeBusy}
+              onClick={() => { setModeError(false); setPendingMode(mode) }}
+              style={{
+                minHeight: 76, marginBottom: 12, borderRadius: 18,
+                border: '1px solid #E4E4E7', background: '#fff',
+                display: 'flex', alignItems: 'center', gap: 14, padding: '0 18px',
+                cursor: modeBusy ? 'default' : 'pointer', textAlign: 'left',
+                opacity: modeBusy ? 0.6 : 1,
+                touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <div style={{
+                width: 44, height: 44, borderRadius: 12, background: '#FFF4E5',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, flexShrink: 0,
+              }}>
+                {mode === 'item' ? '🍽' : '➗'}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#0A0A0A' }}>{MODE_LABEL[mode]}</div>
+                <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
+                  {mode === 'item' ? 'Chaque convive sélectionne et règle ses articles.' : 'Parts égales ou montant libre, au choix de chacun.'}
+                </div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M6 3.5L10.5 8L6 12.5" stroke="#A1A1AA" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          ))}
+        </div>
+
+        {/* Popup de confirmation légère */}
+        {pendingMode !== null && (
+          <div
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(10,10,10,0.45)', zIndex: 60,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+            }}
+            onClick={e => { if (e.target === e.currentTarget && !modeBusy) setPendingMode(null) }}
+          >
+            <div style={{
+              width: '100%', maxWidth: 340, background: '#fff', borderRadius: 20,
+              padding: '22px 20px', textAlign: 'center',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.18)',
+            }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#0A0A0A', lineHeight: 1.4 }}>
+                Toute la table va payer {pendingMode === 'item' ? 'par article' : "en divisant l'addition"}. Confirmer&nbsp;?
+              </div>
+              {modeError && (
+                <div style={{
+                  marginTop: 10, fontSize: 12, color: '#B91C1C', fontWeight: 600,
+                  background: '#FEF2F2', border: '1px solid rgba(239,68,68,0.25)',
+                  borderRadius: 10, padding: '8px 10px',
+                }}>
+                  Connexion instable — réessayez.
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                <button
+                  type="button"
+                  disabled={modeBusy}
+                  onClick={() => setPendingMode(null)}
+                  style={{
+                    flex: 1, height: 48, borderRadius: 14, border: '1px solid #E4E4E7',
+                    background: '#fff', color: '#52525B', fontSize: 14, fontWeight: 700,
+                    cursor: modeBusy ? 'default' : 'pointer',
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={modeBusy}
+                  onClick={confirmPendingMode}
+                  style={{
+                    flex: 1, height: 48, borderRadius: 14, border: 0,
+                    background: '#E8920A', color: '#fff', fontSize: 14, fontWeight: 700,
+                    cursor: modeBusy ? 'default' : 'pointer',
+                    opacity: modeBusy ? 0.6 : 1,
+                    touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  {modeBusy ? 'Confirmation…' : 'Confirmer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </m.div>
     )
   }
 
@@ -335,14 +593,38 @@ function ItemsNew() {
         </div>
       )}
 
-      {/* Mode tabs */}
+      {/* GOAL_PAIEMENTS_12 — mode verrouillé : bandeau à la place du libre choix */}
+      {verrou && lockedMode !== null && (
+        <div style={{ padding: '8px 20px 0' }}>
+          <div style={{
+            background: '#FFF4E5', border: '1px solid rgba(232,146,10,0.25)',
+            borderRadius: 12, padding: '10px 12px',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 14 }}>🔒</span>
+            <div style={{ flex: 1, fontSize: 12, color: '#92400E', fontWeight: 600 }}>
+              Mode de la table : <strong>{MODE_LABEL[lockedMode]}</strong>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mode tabs — masqués si le verrou impose "par article" ; réduits à la
+          famille "diviser" (parts égales / montant libre) si ce mode est
+          verrouillé ; libres (3 onglets, comportement historique) sinon. */}
+      {(!verrou || lockedMode === null || lockedMode === 'diviser') && (
       <div style={{ padding: '8px 20px 0' }}>
         <div style={{ background: '#F1F1F2', borderRadius: 12, padding: 4, display: 'flex' }}>
-          {([
-            { id: 'item' as const, label: 'Par article' },
-            { id: 'equal' as const, label: 'Parts égales' },
-            { id: 'custom' as const, label: 'Montant libre' },
-          ]).map(tab => {
+          {(verrou && lockedMode === 'diviser'
+            ? [
+                { id: 'equal' as const, label: 'Parts égales' },
+                { id: 'custom' as const, label: 'Montant libre' },
+              ]
+            : [
+                { id: 'item' as const, label: 'Par article' },
+                { id: 'equal' as const, label: 'Parts égales' },
+                { id: 'custom' as const, label: 'Montant libre' },
+              ]).map(tab => {
             const active = state.splitMode === tab.id
             return (
               <button
@@ -364,6 +646,7 @@ function ItemsNew() {
           })}
         </div>
       </div>
+      )}
 
       {/* Mode content */}
       {state.splitMode === 'item' && (

@@ -77,6 +77,13 @@ export interface SessionState {
   // getTableContext). false → écran historique 3 onglets + contrat
   // payments:create legacy, strictement inchangés.
   newPaymentFlow: boolean
+  // GOAL_PAIEMENTS_12 — verrou du mode de paiement par table : true si le
+  // restaurant est dans l'allowlist du flag VERROU_MODE_PAIEMENT (évalué
+  // serveur, transmis par getTableContext). false → onglets libres, inchangés.
+  verrouModePaiement: boolean
+  // Mode verrouillé connu AVANT le WebSocket (posé par TableEntry depuis
+  // getTableContext, mis à jour par choosePaymentMode). null = pas de verrou.
+  cachedPaymentMode: 'item' | 'diviser' | null
 }
 
 export type SessionAction =
@@ -97,7 +104,8 @@ export type SessionAction =
   | { type: 'TOGGLE_FEEDBACK_TAG'; payload: string }
   | { type: 'SET_FEEDBACK_TEXT'; payload: string }
   | { type: 'SEND_FEEDBACK' }
-  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number; cachedOrderItems?: CachedOrderItem[]; cachedPaidCents?: number; newPaymentFlow?: boolean } }
+  | { type: 'SET_TABLE_CONTEXT'; payload: { restaurantName: string; tableNumber: number; tableCapacity: number; convexRestaurantId: string; convexTableId: string | null; tableTotalCents: number; cachedOrderItems?: CachedOrderItem[]; cachedPaidCents?: number; newPaymentFlow?: boolean; verrouModePaiement?: boolean; cachedPaymentMode?: 'item' | 'diviser' | null } }
+  | { type: 'SET_CACHED_PAYMENT_MODE'; payload: 'item' | 'diviser' | null }
   | { type: 'ADD_CACHED_PAID_CENTS'; payload: number }
   | { type: 'MARK_CACHED_ITEMS_PAID' }
   | { type: 'MARK_SPECIFIC_ITEMS_PAID'; payload: string[] }

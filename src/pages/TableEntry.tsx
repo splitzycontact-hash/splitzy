@@ -28,10 +28,15 @@ type HttpCtx = {
     // mode « par article » puisse réclamer même avant l'établissement du WS.
     orderItems?: { name: string; qty: number; unitCents: number; paid?: boolean; lineId?: string; paidCents?: number }[]
     paidCents?: number
+    // GOAL_PAIEMENTS_12 — mode verrouillé de la table : transmis au cache pour
+    // que le premier rendu (avant WebSocket) connaisse déjà le verrou.
+    paymentMode?: 'item' | 'diviser'
   } | null
   // GOAL_PAIEMENTS_08 — évalué serveur (allowlist NOUVEAU_PAIEMENT_FRACTIONNE).
   // Absent (backend pas encore déployé) → false → ancien écran.
   newPaymentFlow?: boolean
+  // GOAL_PAIEMENTS_12 — évalué serveur (allowlist VERROU_MODE_PAIEMENT).
+  verrouModePaiement?: boolean
 } | null
 
 type LoadState =
@@ -128,6 +133,8 @@ export function TableEntry() {
             cachedOrderItems: ctx.table!.orderItems ?? [],
             cachedPaidCents: ctx.table!.paidCents ?? 0,
             newPaymentFlow: ctx.newPaymentFlow === true,
+            verrouModePaiement: ctx.verrouModePaiement === true,
+            cachedPaymentMode: ctx.table!.paymentMode ?? null,
           },
         })
       })

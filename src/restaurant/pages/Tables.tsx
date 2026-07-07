@@ -38,6 +38,13 @@ type TableData = {
   sittingStartedAt?: number
   orderItems?: OrderLine[]
   alert?: boolean; convexId: Id<'tables'> | null
+  // GOAL_PAIEMENTS_12 — mode de paiement verrouillé par le premier convive.
+  paymentMode?: 'item' | 'diviser'
+}
+
+const PAYMENT_MODE_LABEL: Record<'item' | 'diviser', string> = {
+  item: 'Chacun paie ses plats',
+  diviser: "On divise l'addition",
 }
 type SimItem = { name: string; qty: number; unitCents: number }
 type MenuDoc = { name: string; priceCents: number; category?: string; emoji?: string; isAvailable?: boolean }
@@ -332,11 +339,17 @@ export function Tables() {
   const { fire, ConfettiCanvas } = useConfetti()
 
   const restaurantId = useRestaurantId()
+  const role = useRestaurantRole()
   const rawTables   = useQuery(api.tables.list,              restaurantId ? { restaurantId } : 'skip')
   const rawMenu     = useQuery(api.menuItems.listByRestaurant, restaurantId ? { restaurantId } : 'skip')
   const rawPayments = useQuery(api.payments.list,            restaurantId ? { restaurantId } : 'skip')
   const resetToFree  = useMutation(api.tables.resetToFree)
   const updateStatus = useMutation(api.tables.updateStatus)
+  // GOAL_PAIEMENTS_12 — réinitialisation du verrou de mode (modal détail).
+  const resetPaymentMode = useMutation(api.tables.resetPaymentMode)
+  const [resetModeConfirm, setResetModeConfirm] = useState(false)
+  const [resetModeError, setResetModeError]     = useState<string | null>(null)
+  const [resetModeLoading, setResetModeLoading] = useState(false)
 
   const menu = (rawMenu ?? []) as MenuDoc[]
 
@@ -344,6 +357,7 @@ export function Tables() {
     _id: Id<'tables'>; number: number; status: TableStatus;
     guests?: number; durationMinutes?: number; amountCents?: number; paidCents?: number; paidTipCents?: number;
     sittingStartedAt?: number; orderItems?: OrderLine[]; alert?: boolean
+    paymentMode?: 'item' | 'diviser'
   }
 
   // Convives payeurs de la sitting courante : paiements Encaissé de la table,
@@ -370,6 +384,7 @@ export function Tables() {
         paidGuests: sittingPayerCount(t._id, t.paidCents ?? 0),
         sittingStartedAt: t.sittingStartedAt, orderItems: t.orderItems,
         alert: t.alert, convexId: t._id,
+        paymentMode: t.paymentMode,
       }))
     : []
 
@@ -534,7 +549,7 @@ export function Tables() {
                   key={table.id}
                   table={table}
                   onSimulate={() => { setSimTbl(table); setSimItems(generateOrder(menu)) }}
-                  onView={() => setSelected(table)}
+                  onView={() => { setSelected(table); setResetModeConfirm(false); setResetModeError(null) }}
                   onAdd={() => setAddModal(table)}
                   onSend={() => setSendModal(table)}
                 />
@@ -566,6 +581,69 @@ export function Tables() {
                     {(liveSelected.paidCents ?? 0) > 0 && <div className="flex justify-between text-sm"><span className="ds-text-tertiary">Déjà réglé</span><span className="font-semibold ds-text-success tabular-nums">{formatEur(liveSelected.paidCents ?? 0)}</span></div>}
                   </div>
                 ) : null}
+                {/* GOAL_PAIEMENTS_12 — mode de paiement verrouillé + réinitialisation */}
+                {liveSelected.paymentMode && (
+                  <div className="border-t pt-4 space-y-2" style={{ borderColor: 'var(--ds-border)' }}>
+                    <div className="flex justify-between text-sm items-center">
+                      <span className="ds-text-tertiary">Mode actuel</span>
+                      <span className="font-semibold ds-text-primary">{PAYMENT_MODE_LABEL[liveSelected.paymentMode]}</span>
+                    </div>
+                    {role !== 'viewer' && liveSelected.convexId && (
+                      !resetModeConfirm ? (
+                        <button
+                          onClick={() => { setResetModeConfirm(true); setResetModeError(null) }}
+                          className="w-full font-semibold text-xs rounded-lg py-2 border"
+                          style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+                        >
+                          Réinitialiser le mode de paiement
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="text-xs ds-text-tertiary">
+                            Les convives devront choisir à nouveau le mode. Confirmer&nbsp;?
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setResetModeConfirm(false)}
+                              disabled={resetModeLoading}
+                              className="flex-1 font-semibold text-xs rounded-lg py-2 border"
+                              style={{ background: 'var(--ds-bg-subtle)', borderColor: 'var(--ds-border)', color: 'var(--ds-text-secondary)' }}
+                            >
+                              Annuler
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!liveSelected.convexId) return
+                                setResetModeLoading(true)
+                                setResetModeError(null)
+                                try {
+                                  await resetPaymentMode({ tableId: liveSelected.convexId as Id<'tables'> })
+                                  setResetModeConfirm(false)
+                                } catch (err) {
+                                  const raw = err instanceof Error ? err.message : String(err)
+                                  const m = raw.match(/Uncaught Error: ([^\n]+)/)
+                                  setResetModeError(m ? m[1].trim() : 'Réinitialisation impossible — réessayez.')
+                                } finally {
+                                  setResetModeLoading(false)
+                                }
+                              }}
+                              disabled={resetModeLoading}
+                              className="flex-1 font-semibold text-xs rounded-lg py-2 text-white disabled:opacity-50"
+                              style={{ background: '#E8920A' }}
+                            >
+                              {resetModeLoading ? 'Réinitialisation…' : 'Confirmer'}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    )}
+                    {resetModeError && (
+                      <div className="text-xs font-semibold rounded-lg px-3 py-2" style={{ background: 'rgba(239,68,68,0.08)', color: '#B91C1C' }}>
+                        {resetModeError}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-3 px-6 pb-5">
                 {liveSelected.status !== 'free' && liveSelected.convexId && (
