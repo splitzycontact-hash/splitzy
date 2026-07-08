@@ -169,7 +169,7 @@ export function Hero() {
           animate={{ opacity: 1, y: 0, transition: { duration: 0.4, delay: 0.05 } }}
         >
           <a
-            href="#changelog"
+            href="/changelog"
             className="inline-flex items-center gap-2 pl-1 pr-3 py-1 rounded-full text-[12.5px] font-medium text-white/80 hover:bg-white/[0.07] transition-colors backdrop-blur-sm whitespace-nowrap"
             style={{ background: 'linear-gradient(#0A0A0A, #0A0A0A) padding-box, linear-gradient(135deg, rgba(232,146,10,0.6), rgba(255,255,255,0.08)) border-box', border: '1px solid transparent' }}
           >
@@ -177,7 +177,7 @@ export function Hero() {
               <IconSparkles size={11} stroke={2.2} />
               Nouveau
             </span>
-            <span>Insights IA sur vos feedbacks — v1.1</span>
+            <span>Paiement fractionné v2 + verrou de mode</span>
             <IconArrowRight size={13} className="text-white/40" />
           </a>
         </m.div>
@@ -185,8 +185,8 @@ export function Hero() {
         {/* H1 */}
         <m.div initial="hidden" animate="visible" custom={0.1} variants={fadeInUp}>
           <h1 className="mt-6 md:mt-8 text-center text-[36px] md:text-[56px] leading-[1.05] font-bold text-white max-w-3xl mx-auto text-balance font-display">
-            <span className="block">Fini les additions qui traînent.</span>
-            <span className="block text-orange-500">Vos clients paient en 30 secondes.</span>
+            <span className="block">Pilotez votre restaurant,</span>
+            <span className="block text-orange-500">même sans y être.</span>
           </h1>
         </m.div>
 
@@ -195,7 +195,7 @@ export function Hero() {
           className="mt-5 md:mt-6 text-center text-[16px] md:text-[18px] leading-[1.6] text-white/60 max-w-xl mx-auto"
           initial="hidden" animate="visible" custom={0.2} variants={fadeInUp}
         >
-          Splitzy permet à vos convives de partager l'addition et payer leur part depuis leur téléphone. Sans app, sans friction.
+          Plan de salle en direct, KPIs, équipe, insights IA — et le paiement fractionné par QR code qui a fait connaître Splitzy. Vos clients paient leur part en 30 secondes, sans app.
         </m.p>
 
         {/* CTAs */}

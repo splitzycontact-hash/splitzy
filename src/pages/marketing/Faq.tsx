@@ -10,7 +10,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Comment intégrer Splitzy à ma caisse ?",
-    a: "Splitzy s'intègre nativement avec Square (synchronisation du menu et des prix en temps réel). Les intégrations Lightspeed et Tiller sont en cours de développement. Sans intégration caisse, l'addition peut être saisie manuellement en 30 secondes.",
+    a: "Splitzy s'intègre nativement avec Square, Lightspeed et Tiller (synchronisation du menu et des prix). Sans intégration caisse, l'addition peut être saisie manuellement en 30 secondes.",
   },
   {
     q: "Quels moyens de paiement sont acceptés ?",
@@ -26,7 +26,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Puis-je tester gratuitement ?",
-    a: "Oui. Le plan Gratuit inclut jusqu'à 50 règlements par mois, sans carte requise. L'essai Pro de 14 jours débloque les règlements illimités et le support prioritaire.",
+    a: "Oui. Le plan Gratuit permet de tester Splitzy sans carte bancaire ni engagement. Passez à l'Essentiel ou au Pro quand vous êtes prêt — le changement de plan se fait en un clic depuis le dashboard.",
   },
   {
     q: "Est-ce que ça fonctionne pour les grandes tables ?",

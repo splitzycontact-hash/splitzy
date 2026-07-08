@@ -1,6 +1,7 @@
 import { m } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { fadeInUp, useFadeInView } from './shared'
-import { IconWallet, IconQr, IconChartBar, IconCloud, IconBell, IconBolt, IconShield } from './Icons'
+import { IconWallet, IconChartBar, IconBell, IconSparkles, IconUsers, IconMenuBook } from './Icons'
 
 function FeatureCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
@@ -18,10 +19,11 @@ function FeatureCard({ children, className = '' }: { children: React.ReactNode; 
   )
 }
 
-function SmallCard({ Icon, title, desc }: {
+function SmallCard({ Icon, title, desc, to }: {
   Icon: React.ComponentType<{ size?: number; stroke?: number }>
   title: string
   desc: string
+  to?: string
 }) {
   return (
     <FeatureCard className="p-6 md:p-7 h-full flex flex-col">
@@ -33,13 +35,18 @@ function SmallCard({ Icon, title, desc }: {
       </div>
       <h3 className="text-[17px] md:text-[18px] font-semibold text-ink-900 leading-snug">{title}</h3>
       <p className="mt-2 text-[14px] leading-[1.55] text-ink-500">{desc}</p>
+      {to && (
+        <Link to={to} className="mt-3 text-[13px] font-medium text-orange-600 hover:text-orange-700 transition-colors">
+          En savoir plus →
+        </Link>
+      )}
     </FeatureCard>
   )
 }
 
-function DarkSmallCard({ Icon, title, desc }: {
+function DarkSmallCard({ Icon, title, desc, to }: {
   Icon: React.ComponentType<{ size?: number; stroke?: number }>
-  title: string; desc: string
+  title: string; desc: string; to?: string
 }) {
   return (
     <m.div
@@ -52,6 +59,11 @@ function DarkSmallCard({ Icon, title, desc }: {
       </div>
       <h3 className="text-[17px] md:text-[18px] font-semibold text-white leading-snug font-display">{title}</h3>
       <p className="mt-2 text-[14px] leading-[1.55] text-white/50">{desc}</p>
+      {to && (
+        <Link to={to} className="mt-3 text-[13px] font-medium text-orange-400 hover:text-orange-300 transition-colors">
+          En savoir plus →
+        </Link>
+      )}
     </m.div>
   )
 }
@@ -97,58 +109,64 @@ function SmartSplitVisual() {
   )
 }
 
-function PaymentVisual() {
+const SALLE_TABLES: { n: number; status: 'free' | 'dining' | 'payment' }[] = [
+  { n: 1, status: 'dining' }, { n: 2, status: 'free' },   { n: 3, status: 'payment' }, { n: 4, status: 'dining' },
+  { n: 5, status: 'free' },   { n: 6, status: 'dining' }, { n: 7, status: 'payment' }, { n: 8, status: 'free' },
+]
+
+const SALLE_STATUS = {
+  free:    { bg: '#F4F4F5', border: '#E4E4E7', text: '#A1A1AA' },
+  dining:  { bg: '#FFF4E5', border: '#FCD9A0', text: '#B45309' },
+  payment: { bg: '#F0FDF4', border: '#BBF7D0', text: '#15803D' },
+}
+
+function SalleVisual() {
   return (
-    <div className="relative h-full min-h-[260px] flex items-center justify-center">
+    <div className="relative h-full min-h-[260px] flex items-center">
       <div className="absolute inset-0 bg-gradient-to-br from-orange-50/60 via-white to-white" />
-      <div className="relative w-full p-6 md:p-7 flex flex-col items-center">
-        <div className="text-center mb-6">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-ink-400 mb-1">À régler</p>
-          <p className="text-[36px] md:text-[42px] font-bold text-ink-900 tabular-nums leading-none">
-            24,00&nbsp;<span className="text-orange-600">€</span>
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-2.5 w-full max-w-[280px]">
-          <div className="bg-ink-900 rounded-xl py-3 px-3 flex items-center justify-center text-white text-[13px] font-semibold gap-1.5">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M11.5 8.5c0-1 .7-1.8 1.6-2.3-.5-.8-1.4-1.3-2.5-1.3-1 0-1.8.6-2.4.6-.6 0-1.4-.6-2.3-.6C4.3 4.9 3 6.3 3 8.7c0 1.4.5 2.9 1.2 3.8.4.4.8 1 1.4 1 .5 0 .8-.4 1.5-.4.8 0 1 .4 1.6.4.6 0 1-.5 1.5-1 .5-.6.7-1.1.7-1.2-.5-.2-1.4-.8-1.4-1.8zM10 4.3c.4-.5.7-1.1.6-1.8-.6 0-1.3.4-1.7.9-.4.4-.7 1-.6 1.7.7 0 1.4-.4 1.7-.8z" />
-            </svg>
-            Pay
+      <div className="relative w-full p-6 md:p-7">
+        <div className="bg-white rounded-2xl shadow-[0_18px_40px_-20px_rgba(24,24,27,0.18)] border border-ink-100 p-4 max-w-[300px] mx-auto">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-ink-400">Salle en direct</span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse-dot" />
+              Live
+            </span>
           </div>
-          <div className="bg-white border border-ink-200 rounded-xl py-3 px-3 flex items-center justify-center text-ink-900 text-[13px] font-semibold gap-1.5">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="5"  cy="8" r="4" fill="#EB001B" />
-              <circle cx="11" cy="8" r="4" fill="#F79E1B" />
-              <path d="M8 5.2a4 4 0 0 0 0 5.6 4 4 0 0 0 0-5.6z" fill="#FF5F00" />
-            </svg>
-            CB
+          <div className="grid grid-cols-4 gap-1.5">
+            {SALLE_TABLES.map((t) => {
+              const s = SALLE_STATUS[t.status]
+              return (
+                <div
+                  key={t.n}
+                  className="rounded-lg py-2.5 text-center text-[11px] font-bold tabular-nums"
+                  style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.text }}
+                >
+                  T{t.n}
+                </div>
+              )
+            })}
           </div>
-          <div className="bg-white border border-ink-200 rounded-xl py-3 px-3 flex items-center justify-center text-ink-900 text-[13px] font-semibold gap-1.5 col-span-2">
-            <svg width="50" height="14" viewBox="0 0 50 14" aria-hidden="true">
-              <text x="0"  y="11" fontFamily="Geist, sans-serif" fontSize="10" fontWeight="700" fill="#4285F4">G</text>
-              <text x="7"  y="11" fontFamily="Geist, sans-serif" fontSize="10" fontWeight="700" fill="#DB4437">o</text>
-              <text x="14" y="11" fontFamily="Geist, sans-serif" fontSize="10" fontWeight="700" fill="#F4B400">o</text>
-              <text x="21" y="11" fontFamily="Geist, sans-serif" fontSize="10" fontWeight="700" fill="#4285F4">g</text>
-              <text x="27" y="11" fontFamily="Geist, sans-serif" fontSize="10" fontWeight="700" fill="#0F9D58">l</text>
-              <text x="31" y="11" fontFamily="Geist, sans-serif" fontSize="10" fontWeight="700" fill="#DB4437">e</text>
-              <text x="40" y="11" fontFamily="Geist, sans-serif" fontSize="10" fontWeight="600" fill="#5F6368">Pay</text>
-            </svg>
+          <div className="mt-3 pt-3 border-t border-dashed border-ink-200 flex items-center gap-2">
+            <span className="shrink-0 w-6 h-6 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+              <IconBell size={13} stroke={2} />
+            </span>
+            <p className="text-[11px] text-ink-500 leading-snug">
+              <span className="font-semibold text-ink-900">Table 3</span> demande le paiement — 142,80 €
+            </p>
           </div>
         </div>
-        <p className="mt-5 text-[11px] text-ink-400 inline-flex items-center gap-1.5">
-          <IconShield size={12} stroke={2} />
-          Paiement sécurisé · 3DS
-        </p>
       </div>
     </div>
   )
 }
 
-function LargeCard({ Icon, title, desc, Visual }: {
+function LargeCard({ Icon, title, desc, Visual, to }: {
   Icon: React.ComponentType<{ size?: number; stroke?: number }>
   title: string
   desc: string
   Visual: React.ComponentType
+  to?: string
 }) {
   return (
     <FeatureCard className="overflow-hidden md:col-span-2 flex flex-col md:flex-row min-h-[280px]">
@@ -161,6 +179,11 @@ function LargeCard({ Icon, title, desc, Visual }: {
         </div>
         <h3 className="text-[20px] md:text-[22px] font-semibold text-ink-900 leading-snug">{title}</h3>
         <p className="mt-3 text-[15px] leading-[1.6] text-ink-500">{desc}</p>
+        {to && (
+          <Link to={to} className="mt-4 text-[14px] font-medium text-orange-600 hover:text-orange-700 transition-colors">
+            En savoir plus →
+          </Link>
+        )}
       </div>
       <div className="flex-1 border-t md:border-t-0 md:border-l border-ink-100 relative overflow-hidden">
         <div aria-hidden="true" className="absolute inset-0 pointer-events-none opacity-[0.035]"
@@ -199,13 +222,13 @@ export function Features() {
             variants={fadeInUp}
             className="mt-5 text-[28px] md:text-[40px] font-bold text-ink-900 leading-[1.15] text-balance max-w-2xl mx-auto font-display"
           >
-            Tout ce dont votre restaurant a besoin.
+            Quatre piliers. Un seul outil.
           </m.h2>
           <m.p
             variants={fadeInUp}
             className="mt-4 text-[16px] md:text-[18px] text-ink-500 max-w-xl mx-auto leading-[1.6]"
           >
-            Pensé pour les gérants débordés, pas pour les ingénieurs.
+            Paiement, pilotage, IA, équipe — pensé pour les gérants débordés, pas pour les ingénieurs.
           </m.p>
         </m.div>
 
@@ -217,30 +240,50 @@ export function Features() {
         >
           <LargeCard
             Icon={IconWallet}
-            title="Partage intelligent de l'addition"
-            desc="Chaque convive sélectionne ses plats. Splitzy calcule automatiquement les montants individuels, TVA incluse."
+            title="Paiement fractionné sans friction"
+            desc="QR code sur table, zéro app. Trois modes de partage — par article, parts égales, montant libre — et un verrou de mode qui évite les mélanges entre convives. Apple Pay, Google Pay, CB."
             Visual={SmartSplitVisual}
+            to="/fonctionnalites#paiement"
           />
           <m.div
             className="flex flex-col gap-5 md:gap-6"
             variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
           >
-            <DarkSmallCard Icon={IconQr} title="QR codes par table" desc="Générez autant de QR codes que de tables. Réutilisables, modifiables à tout moment." />
-            <SmallCard Icon={IconChartBar} title="Dashboard en temps réel" desc="Suivez chaque transaction live. Export comptable en un clic." />
+            <DarkSmallCard
+              Icon={IconSparkles}
+              title="IA embarquée"
+              desc="Insights sur vos ventes, analyse automatique des feedbacks, suggestions d'action concrètes."
+              to="/fonctionnalites#ia"
+            />
+            <SmallCard
+              Icon={IconUsers}
+              title="Équipe : planning, extras, chat"
+              desc="Shifts, renforts convoqués par email, messagerie interne gérant ↔ salle en direct."
+              to="/fonctionnalites#equipe"
+            />
           </m.div>
 
           <m.div
             className="flex flex-col gap-5 md:gap-6"
             variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
           >
-            <SmallCard Icon={IconCloud} title="Sans application à télécharger" desc="100 % web. Vos clients scannent et c'est tout." />
-            <DarkSmallCard Icon={IconBell} title="Notifications instantanées" desc="Soyez alerté dès qu'une table a fini de régler." />
+            <SmallCard
+              Icon={IconBell}
+              title="Feedback privé, avant Google"
+              desc="Le client mécontent vous parle en privé au lieu de poster une étoile. Alerte immédiate si note basse."
+            />
+            <DarkSmallCard
+              Icon={IconMenuBook}
+              title="Menu en direct"
+              desc="Rupture (86), changement de prix ou plat du jour : visibles sur le menu QR instantanément."
+            />
           </m.div>
           <LargeCard
-            Icon={IconBolt}
-            title="Paiements sans friction"
-            desc="Apple Pay, Google Pay, carte bancaire. Vos clients paient en moins de 30 secondes depuis leur téléphone."
-            Visual={PaymentVisual}
+            Icon={IconChartBar}
+            title="Pilotage temps réel"
+            desc="CA du jour, plan de salle interactif, alertes manager — paiement bloqué, QR inactif, avis négatif. Tout le service en direct, où que vous soyez."
+            Visual={SalleVisual}
+            to="/fonctionnalites#pilotage"
           />
         </m.div>
       </div>

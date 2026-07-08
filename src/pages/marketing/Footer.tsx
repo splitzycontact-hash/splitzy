@@ -45,7 +45,7 @@ export function Footer() {
           <div className="col-span-2 md:col-span-4 max-w-sm">
             <SplitzyLogo />
             <p className="mt-4 text-[14px] leading-[1.6] text-white/55">
-              Le partage d'addition sans friction, pensé pour les restaurants français modernes.
+              Le poste de pilotage à distance de votre restaurant — salle, équipe, insights IA et paiement fractionné sans friction.
             </p>
             <ul className="mt-6 flex items-center gap-2">
               {SOCIAL_LINKS.map((s) => (

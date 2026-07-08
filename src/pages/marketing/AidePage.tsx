@@ -7,12 +7,16 @@ import { Footer } from './Footer'
 // ─── Données ───────────────────────────────────────────────────────────────────
 
 const CATEGORIES = [
-  { icon: '💳', title: 'Paiement',          sub: 'Méthodes, sécurité, reçus' },
-  { icon: '👤', title: 'Mon compte',         sub: 'Connexion, abonnement, facturation' },
-  { icon: '⬛', title: 'QR codes & Tables', sub: 'Configuration, impression, problèmes' },
+  { icon: '💳', title: 'Paiement',           sub: 'Méthodes, partage, sécurité, reçus' },
+  { icon: '👤', title: 'Mon compte',          sub: 'Connexion, abonnement, facturation' },
+  { icon: '⬛', title: 'QR codes & Tables',  sub: 'Configuration, impression, problèmes' },
+  { icon: '🗺', title: 'Plan de salle',      sub: 'Statuts live, VIP, forcer paiement' },
+  { icon: '📅', title: 'Planning & équipe',  sub: 'Shifts, extras, pool de confiance' },
+  { icon: '💬', title: 'Chat interne',       sub: 'Messages directs, broadcast salle' },
+  { icon: '🌙', title: 'Clôture de service', sub: 'Récap, pourboires, export' },
 ]
 
-const POPULAR = ['Frais clients', 'Changer de plan', 'Générer mes QR codes', 'Annuler']
+const POPULAR = ['Frais clients', 'Changer de plan', 'Générer mes QR codes', 'Plan de salle', 'Convoquer un extra']
 
 const FAQ: { category: string; items: { q: string; a: string }[] }[] = [
   {
@@ -24,7 +28,7 @@ const FAQ: { category: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: 'Quels moyens de paiement sont acceptés ?',
-        a: 'Apple Pay, Google Pay, et toutes les cartes bancaires (Visa, Mastercard, American Express). Le paiement est traité par Square — sécurisé et certifié PCI DSS.',
+        a: 'Apple Pay, Google Pay, et toutes les cartes bancaires (Visa, Mastercard, American Express). Le paiement est traité par Stripe — certifié PCI DSS niveau 1.',
       },
       {
         q: 'Quand est-ce que je reçois mes virements ?',
@@ -75,6 +79,66 @@ const FAQ: { category: string; items: { q: string; a: string }[] }[] = [
       {
         q: "Peut-on utiliser Splitzy sans caisse logicielle ?",
         a: "Oui. Splitzy fonctionne de façon autonome — vous saisissez l'addition directement dans le dashboard. L'intégration avec un POS (Square, Lightspeed) est optionnelle.",
+      },
+    ],
+  },
+  {
+    category: 'Plan de salle',
+    items: [
+      {
+        q: 'Comment fonctionne le plan de salle interactif ?',
+        a: "Dans votre dashboard, allez dans « Salle ». Disposez vos tables en glisser-déposer, par zone. Chaque table affiche son statut en temps réel : libre, à table, en paiement. Vous voyez toute la salle d'un coup d'œil, même à distance.",
+      },
+      {
+        q: 'Puis-je forcer le paiement sur une table ?',
+        a: "Oui. Depuis le plan de salle, le bouton « Forcer paiement QR » ouvre l'écran de paiement pour cette table. Vous pouvez aussi marquer une table VIP (votre équipe est prévenue) ou clôturer une table manuellement.",
+      },
+      {
+        q: 'À quoi sert le timer affiché sur certaines tables ?',
+        a: "Au-delà de 30 minutes sans activité, un timer apparaît sur la table pour vous aider à repérer celles à relancer ou à libérer.",
+      },
+    ],
+  },
+  {
+    category: 'Planning & équipe',
+    items: [
+      {
+        q: 'Comment créer le planning de mon équipe ?',
+        a: "Dashboard → « Planning » : créez un shift en quelques clics (poste, horaires, membre de l'équipe). Le planning est visible par toute l'équipe en temps réel.",
+      },
+      {
+        q: 'Comment convoquer un extra pour un service ?',
+        a: "Dashboard → « Extras » : choisissez un extra dans votre répertoire et envoyez-lui une proposition de shift par email en un clic. Il confirme ou refuse depuis le lien reçu, et vous êtes notifié aussitôt.",
+      },
+      {
+        q: "Qu'est-ce que le pool de confiance ?",
+        a: "Après chaque service, vous pouvez noter vos extras. Les mieux notés forment votre pool de confiance — les profils à recontacter en priorité pour les prochains renforts.",
+      },
+    ],
+  },
+  {
+    category: 'Chat interne',
+    items: [
+      {
+        q: 'Qui peut utiliser le chat interne ?',
+        a: "Toute l'équipe du restaurant. Le gérant peut écrire à un membre en direct (message privé) ou diffuser une consigne à toute la salle (broadcast). Le widget de chat est accessible depuis toutes les pages du dashboard.",
+      },
+      {
+        q: 'Le chat est-il visible des clients ?',
+        a: "Non, jamais. C'est une messagerie strictement interne à votre équipe, totalement séparée du parcours de paiement client.",
+      },
+    ],
+  },
+  {
+    category: 'Clôture de service',
+    items: [
+      {
+        q: 'Comment clôturer un service ?',
+        a: "Depuis le plan de salle, ouvrez le récap de clôture : il liste automatiquement les paiements encaissés du jour (CA, couverts, pourboires), avec export CSV pour votre comptabilité.",
+      },
+      {
+        q: 'Comment sont répartis les pourboires ?',
+        a: "Définissez votre règle de partage dans Paramètres → Pourboires. À la clôture, Splitzy calcule la répartition par serveur et peut envoyer le rapport par email.",
       },
     ],
   },
@@ -220,6 +284,7 @@ function HeroSection() {
               whileHover={{ scale: 1.02 }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = '#E8920A')}
               onMouseLeave={e => (e.currentTarget.style.borderColor = '#2D2D30')}
+              onClick={() => document.getElementById(`faq-${cat.title}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
             >
               <div style={{
                 width: 40, height: 40, borderRadius: 10, background: '#FFF4E5',
@@ -276,10 +341,11 @@ function FAQSection() {
         {FAQ.map((block, blockIdx) => (
           <m.div
             key={block.category}
+            id={`faq-${block.category}`}
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.45, delay: blockIdx * 0.08, ease: 'easeOut' }}
-            style={{ marginBottom: 48 }}
+            style={{ marginBottom: 48, scrollMarginTop: 90 }}
           >
             {/* Category title */}
             <div style={{
@@ -434,7 +500,7 @@ export function AidePage() {
     <div className="w-full min-h-screen" style={{ background: '#18181B' }}>
       <Helmet>
         <title>Centre d'aide — Splitzy</title>
-        <meta name="description" content="Guides, tutoriels et réponses pour bien démarrer avec Splitzy. Installation, QR codes, paiements : on vous accompagne pas à pas." />
+        <meta name="description" content="Guides et réponses pour bien démarrer avec Splitzy : paiement, QR codes, plan de salle, planning équipe, chat interne, clôture de service. On vous accompagne pas à pas." />
       </Helmet>
       <Navbar />
       <HeroSection />

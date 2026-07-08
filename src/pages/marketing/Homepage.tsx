@@ -17,8 +17,8 @@ export function Homepage() {
   return (
     <div className="marketing-site w-full min-h-screen bg-ink-900">
       <Helmet>
-        <title>Splitzy — Partagez l'addition, encaissez plus vite</title>
-        <meta name="description" content="Permettez à vos clients de payer leur part en 30 secondes via QR code. Sans application, sans attente. Essayez Splitzy gratuitement." />
+        <title>Splitzy — Pilotez votre restaurant à distance, encaissez plus vite</title>
+        <meta name="description" content="Plan de salle en direct, KPIs temps réel, équipe, insights IA — et le paiement fractionné par QR code, sans application. Pilotez votre restaurant même sans y être. Essayez Splitzy gratuitement." />
       </Helmet>
       <Navbar />
       <main>

@@ -155,13 +155,13 @@ export default function FonctionnalitesHero() {
           >
             <span className="block overflow-hidden">
               <m.span {...wordReveal(0.1)} className="inline-block">
-                Payez en 10&nbsp;sec.
+                Encaissez en 30&nbsp;sec.
               </m.span>
             </span>
             <span className="block overflow-hidden">
               <m.span {...wordReveal(0.22)} className="inline-block">
-                <span className="text-[#E8920A]">Interceptez</span>{' '}
-                l'insatisfaction.
+                <span className="text-[#E8920A]">Pilotez</span>{' '}
+                à distance.
               </m.span>
             </span>
             <span className="block overflow-hidden">
@@ -176,8 +176,9 @@ export default function FonctionnalitesHero() {
             {...fadeUp(0.5)}
             className="mb-8 max-w-[460px] text-[17px] leading-[1.55] text-[#52525B]"
           >
-            Paiement QR, feedback interception, analytics temps réel. La seule
-            solution qui empêche les mauvais avis d'arriver sur Google.
+            Paiement fractionné par QR, plan de salle en direct, équipe, insights
+            IA : tout ce qu'il faut pour piloter votre établissement — même sans
+            y être.
           </m.p>
 
           {/* CTAs */}
@@ -201,9 +202,10 @@ export default function FonctionnalitesHero() {
 
           {/* Feature pills */}
           <m.div {...fadeUp(0.7)} className="flex flex-wrap gap-2">
-            <FeaturePill href="#feature-01" icon="⚡" label="Paiement 10 sec" />
-            <FeaturePill href="#feature-02" icon="🛡" label="Interception avis" />
-            <FeaturePill href="#feature-03" icon="📊" label="Analytics" />
+            <FeaturePill href="#paiement" icon="⚡" label="Paiement fractionné" />
+            <FeaturePill href="#pilotage" icon="📊" label="Pilotage temps réel" />
+            <FeaturePill href="#equipe" icon="👥" label="Équipe" />
+            <FeaturePill href="#ia" icon="✨" label="IA & Réputation" />
           </m.div>
         </div>
 

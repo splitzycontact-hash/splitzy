@@ -89,6 +89,14 @@ export const IconChartBar = (p: IconProps) => (
   </Icon>
 )
 export const IconCloud = (p: IconProps) => <Icon {...p} d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.5 1.5A4 4 0 0 0 7 19h10.5z" />
+export const IconUsers = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </Icon>
+)
 export const IconShield = (p: IconProps) => <Icon {...p} d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6l8-3z" />
 export const IconQuote = (p: IconProps) => (
   <Icon {...p} fill="currentColor" noStroke>

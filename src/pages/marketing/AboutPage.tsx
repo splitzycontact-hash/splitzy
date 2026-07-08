@@ -32,6 +32,19 @@ const TIMELINE = [
   },
   // HIDDEN — carte "240+ restaurants" fictive
   // { date: "Aujourd'hui", step: '03', label: 'En production', title: '240+ restaurants',
+  {
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E8920A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>
+      </svg>
+    ),
+    date: 'Juin 2026',
+    step: '03',
+    label: 'Extension produit',
+    title: 'Du paiement au pilotage',
+    desc: "Plan de salle en direct, planning équipe, chat interne, insights IA, clôture de service : Splitzy devient le poste de pilotage à distance du restaurant — le paiement fractionné n'est plus qu'un module parmi d'autres.",
+    featured: false,
+  },
 ]
 
 const VALUES = [
@@ -72,7 +85,7 @@ export function AboutPage() {
     <div className="w-full min-h-screen" style={{ background: '#0A0A0A', color: 'white' }}>
       <Helmet>
         <title>À propos — Splitzy</title>
-        <meta name="description" content="Splitzy est né d'un constat simple : l'addition reste le pire moment du repas. On a construit l'outil que les restaurateurs méritaient." />
+        <meta name="description" content="Splitzy est né d'un constat simple : l'addition reste le pire moment du repas. On a construit l'outil que les restaurateurs méritaient — devenu depuis un poste de pilotage complet du restaurant." />
       </Helmet>
       <Navbar />
 
@@ -156,7 +169,7 @@ export function AboutPage() {
               <span style={{ color: '#E8920A' }}>QR code</span> sur table.
             </h2>
             <p className="mt-5 max-w-[560px] mx-auto text-[16px] text-zinc-600">
-              Un parcours de 9 mois entre la discussion en terrasse et les premiers tests terrain.
+              De la discussion en terrasse aux tests terrain — jusqu'au pilotage complet du restaurant.
             </p>
           </div>
 
@@ -336,6 +349,16 @@ export function AboutPage() {
                 On construit <span className="text-white font-semibold">Splitzy</span> pour intercepter l'insatisfaction{' '}
                 <em style={{ fontFamily: "'Instrument Serif', Georgia, serif", color: '#E8920A', fontStyle: 'italic' }}>avant</em>{' '}
                 qu'elle n'atteigne Google. Pour qu'un client mécontent puisse être entendu — et qu'un service raté ne devienne pas une cicatrice publique.
+              </p>
+              <p className="mt-5 text-[17px] text-zinc-300 leading-relaxed">
+                Et depuis, le produit a grandi avec les gérants qui l'utilisent : au paiement fractionné se sont
+                ajoutés le plan de salle en temps réel, le planning d'équipe, le chat interne, les insights IA et la
+                clôture de service. Splitzy est devenu ce qu'on aurait voulu offrir à cet ami restaurateur dès le
+                premier jour : <span className="text-white font-semibold">un poste de pilotage complet</span>, qui
+                tient dans la poche.{' '}
+                <a href="/fonctionnalites" className="underline underline-offset-4 hover:opacity-80 transition-opacity" style={{ color: '#E8920A' }}>
+                  Voir toutes les fonctionnalités →
+                </a>
               </p>
 
               {/* HIDDEN — stats fictives (0 clients réels) — remettre quand on a de vrais chiffres

@@ -20,12 +20,57 @@ const CATEGORY_CONFIG: Record<string, { color: string; bg: string; textColor: st
   Interface:   { color: '#E8920A', bg: '#FFF4E5', textColor: '#B8730A' },
   Performance: { color: '#64748B', bg: '#F8FAFC', textColor: '#475569' },
   Dashboard:   { color: '#3B82F6', bg: '#EFF6FF', textColor: '#1D4ED8' },
+  Équipe:      { color: '#EC4899', bg: '#FDF2F8', textColor: '#BE185D' },
   Mobile:      { color: '#8B5CF6', bg: '#F5F3FF', textColor: '#6D28D9' },
-  Payments:    { color: '#22C55E', bg: '#F0FDF4', textColor: '#15803D' },
+  Paiements:   { color: '#22C55E', bg: '#F0FDF4', textColor: '#15803D' },
   Lancement:   { color: '#FAFAFA', bg: '#27272A', textColor: '#FAFAFA' },
 }
 
+// Dates vérifiées sur l'historique git (GOAL_WEB_00) :
+//   v1.4 — c527629 (06/07/2026) paiement fractionné v2, 86d603f (07/07/2026) verrou de mode
+//   v1.3 — 5eecb80 (23/06/2026) plan de salle, M5/M11 (24/06/2026) VIP/force + clôture
+//   v1.2 — 0723f36 (14/06/2026) planning, 745d561 (23/06/2026) chat, 96799c1 (24/06/2026) extras
 const ENTRIES: ChangelogEntry[] = [
+  {
+    version: 'v1.4',
+    category: 'Paiements',
+    date: 'Juillet 2026',
+    title: 'Paiement fractionné v2 + verrou de mode',
+    description: "Le partage d'addition repensé de fond en comble — et un verrou qui empêche les convives de mélanger les modes de paiement sur une même table.",
+    items: [
+      { icon: '🔒', text: 'Verrou de mode : le premier paiement fixe le mode de partage pour toute la table' },
+      { icon: '🧾', text: 'Partage d\'un article à 2, 3 ou 4 (÷2 ÷3 ÷4) en mode « par article »' },
+      { icon: '📒', text: 'Grand livre des paiements : les montants restants sont toujours exacts, même à plusieurs' },
+      { icon: '🔧', text: 'Libellés d\'état fiabilisés : « reste à payer » reflète les paiements réellement encaissés' },
+    ],
+    isLatest: true,
+  },
+  {
+    version: 'v1.3',
+    category: 'Dashboard',
+    date: 'Juin 2026',
+    title: 'Plan de salle interactif & clôture de service',
+    description: 'Votre salle en temps réel, pilotable à distance — et un service qui se clôture tout seul.',
+    items: [
+      { icon: '🗺', text: 'Plan de salle en drag & drop, par zones, avec statuts de table en direct' },
+      { icon: '⭐', text: 'Tables VIP, timer d\'inactivité, forcer le paiement QR ou clôturer une table à distance' },
+      { icon: '🌙', text: 'Clôture de service : récap automatique (CA, couverts, pourboires) + export CSV' },
+      { icon: '💶', text: 'Répartition des pourboires par serveur, rapport envoyé par email' },
+    ],
+  },
+  {
+    version: 'v1.2',
+    category: 'Équipe',
+    date: 'Juin 2026',
+    title: 'Équipe : planning, extras & chat interne',
+    description: "Toute la gestion d'équipe arrive dans Splitzy : shifts, renforts de dernière minute et communication avec la salle.",
+    items: [
+      { icon: '📅', text: 'Planning & shifts : vue calendrier, création en quelques clics, suivi de présence' },
+      { icon: '🤝', text: 'Extras : répertoire, convocation par email en 1 clic, confirmation depuis le lien reçu' },
+      { icon: '🏅', text: 'Pool de confiance : notez vos extras après chaque service' },
+      { icon: '💬', text: 'Chat interne gérant ↔ salle : broadcast, messages directs, widget flottant' },
+    ],
+  },
   {
     version: 'v1.1',
     category: 'IA',
@@ -38,7 +83,6 @@ const ENTRIES: ChangelogEntry[] = [
       { icon: '💡', text: 'Suggestions d\'action concrètes basées sur les feedbacks' },
       { icon: '📬', text: 'Résumé IA hebdomadaire envoyé par email chaque lundi matin' },
     ],
-    isLatest: true,
   },
   {
     version: 'v1.0',
@@ -51,7 +95,7 @@ const ENTRIES: ChangelogEntry[] = [
       { icon: '⭐', text: 'Page Réputation — suivi de note Google, feedbacks privés, interceptions' },
       { icon: '📈', text: 'Analytics — heatmap horaire, rotation des tables, satisfaction par service' },
       { icon: '🍽', text: 'Gestion du menu — ajout, modification, sync Square en un clic' },
-      { icon: '🔌', text: 'Intégrations — Square connecté, Lightspeed et Tiller en cours' },
+      { icon: '🔌', text: 'Intégrations POS — sync du menu depuis Square, Lightspeed ou Tiller' },
     ],
   },
   {
@@ -93,7 +137,7 @@ const ENTRIES: ChangelogEntry[] = [
   },
   {
     version: 'v0.6',
-    category: 'Payments',
+    category: 'Paiements',
     date: 'Mars 2026',
     title: 'Intégration Square en production',
     items: [
@@ -119,6 +163,8 @@ const ENTRIES: ChangelogEntry[] = [
 // ─── Hero Section ──────────────────────────────────────────────────────────────
 
 function HeroSection() {
+  const latest = ENTRIES[0]
+  const latestCat = CATEGORY_CONFIG[latest.category] ?? CATEGORY_CONFIG['Performance']
   return (
     <section
       style={{ background: '#18181B' }}
@@ -192,7 +238,7 @@ function HeroSection() {
                 style={{ display: 'block', width: 7, height: 7, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }}
               />
               <span style={{ color: '#D4D4D8', fontSize: 13, fontWeight: 500 }}>
-                Dernière mise à jour : Juin 2026
+                Dernière mise à jour : {ENTRIES[0].date}
               </span>
             </m.div>
           </div>
@@ -215,29 +261,24 @@ function HeroSection() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ background: '#FAF5FF', color: '#7E22CE', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99 }}>
-                  v1.1
+                <span style={{ background: latestCat.bg, color: latestCat.textColor, fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99 }}>
+                  {latest.version}
                 </span>
-                <span style={{ color: '#71717A', fontSize: 13 }}>· IA</span>
+                <span style={{ color: '#71717A', fontSize: 13 }}>· {latest.category}</span>
               </div>
-              <span style={{ color: '#52525B', fontSize: 12 }}>Juin 2026</span>
+              <span style={{ color: '#52525B', fontSize: 12 }}>{latest.date}</span>
             </div>
 
             <p style={{ color: '#F4F4F5', fontSize: 18, fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.02em', marginBottom: 8 }}>
-              Insights IA<br />sur vos feedbacks
+              {latest.title}
             </p>
 
             <p style={{ color: '#71717A', fontSize: 13, lineHeight: 1.6, marginBottom: 20 }}>
-              {"L'IA détecte les problèmes récurrents dans vos feedbacks privés — avant qu'ils n'arrivent sur Google."}
+              {latest.description}
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
-              {[
-                { icon: '🤖', text: 'Détection automatique des thèmes (service, attente, cuisine…)' },
-                { icon: '📊', text: 'Score de satisfaction par service et par heure' },
-                { icon: '💡', text: "Suggestions d'action concrètes" },
-                { icon: '📬', text: 'Résumé IA chaque lundi matin par email' },
-              ].map((item, i) => (
+              {latest.items.map((item, i) => (
                 <div key={i} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
                   <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
                   <span style={{ color: '#71717A', fontSize: 13, lineHeight: 1.5 }}>{item.text}</span>
@@ -247,7 +288,7 @@ function HeroSection() {
 
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #27272A', display: 'flex', alignItems: 'center', gap: 7 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
-              <span style={{ color: '#52525B', fontSize: 12 }}>En production depuis Juin 2026</span>
+              <span style={{ color: '#52525B', fontSize: 12 }}>En production depuis {latest.date}</span>
             </div>
           </m.div>
         </div>

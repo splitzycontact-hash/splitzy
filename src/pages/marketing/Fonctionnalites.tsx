@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { m } from 'framer-motion'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 import { useFadeInView, useCountUp } from './shared'
@@ -21,7 +21,7 @@ function TextReveal({ children, className = '' }: { children: string; className?
           viewport={{ once: true, margin: '-30px' }}
           transition={{ duration: 0.5, delay: i * 0.07, ease: [0.25, 0.46, 0.45, 0.94] }}
         >
-          {word}{i < words.length - 1 ? ' ' : ''}
+          {word}{i < words.length - 1 ? ' ' : ''}
         </m.span>
       ))}
     </span>
@@ -54,6 +54,107 @@ function MagneticCta({ children, href }: { children: React.ReactNode; href: stri
   )
 }
 
+// ── Badge disponibilité ──────────────────────────────────────────────────
+function DispoBadge({ available, dark = false, note }: { available: boolean; dark?: boolean; note?: string }) {
+  if (available) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.06em]"
+        style={dark
+          ? { background: 'rgba(34,197,94,0.12)', color: '#4ADE80' }
+          : { background: '#F0FDF4', color: '#15803D' }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: dark ? '#4ADE80' : '#22C55E' }} />
+        {note ? `Disponible · ${note}` : 'Disponible'}
+      </span>
+    )
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.06em]"
+      style={dark
+        ? { background: 'rgba(255,255,255,0.07)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.12)' }
+        : { background: '#F4F4F5', color: '#71717A', border: '1px solid #E4E4E7' }}
+    >
+      À venir
+    </span>
+  )
+}
+
+// ── Module card (variantes claire / sombre) ──────────────────────────────
+type Module = {
+  icon: string
+  title: string
+  desc: string
+  available: boolean
+  note?: string
+}
+
+function ModuleCard({ mod, index, dark = false }: { mod: Module; index: number; dark?: boolean }) {
+  return (
+    <m.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.45, delay: index * 0.08 }}
+      className="rounded-2xl p-6 flex flex-col hover:-translate-y-1 transition-transform duration-200"
+      style={dark
+        ? { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }
+        : { background: '#FFFFFF', border: '1px solid #E4E4E7', boxShadow: '0 1px 3px rgba(24,24,27,0.04)' }}
+    >
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-[18px]"
+          style={dark ? { background: 'rgba(232,146,10,0.12)' } : { background: '#FFF4E5' }}
+        >
+          {mod.icon}
+        </div>
+        <DispoBadge available={mod.available} dark={dark} note={mod.note} />
+      </div>
+      <h3 className="text-[15px] font-bold mb-2" style={{ color: dark ? '#FFFFFF' : '#0A0A0A' }}>
+        {mod.title}
+      </h3>
+      <p className="text-[13px] leading-relaxed" style={{ color: dark ? '#A1A1AA' : '#71717A' }}>
+        {mod.desc}
+      </p>
+    </m.div>
+  )
+}
+
+// ── Section header commun ────────────────────────────────────────────────
+function SectionHeader({
+  badge, title, sub, dark = false, center = false,
+}: {
+  badge: string; title: string; sub?: string; dark?: boolean; center?: boolean
+}) {
+  return (
+    <div className={center ? 'text-center' : ''}>
+      <span
+        className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-[0.1em] mb-6"
+        style={dark
+          ? { background: 'rgba(232,146,10,0.12)', color: '#E8920A' }
+          : { background: '#FFF4E5', color: '#E8920A' }}
+      >
+        {badge}
+      </span>
+      <h2
+        className={dark ? 'text-white text-balance' : 'text-balance'}
+        style={{ fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.05, fontSize: 'clamp(30px, 4.2vw, 46px)', color: dark ? undefined : '#0A0A0A' }}
+      >
+        <TextReveal>{title}</TextReveal>
+      </h2>
+      {sub && (
+        <p
+          className={`mt-5 text-[16px] leading-relaxed ${center ? 'max-w-[560px] mx-auto' : 'max-w-[560px]'}`}
+          style={{ color: dark ? '#A1A1AA' : '#52525B' }}
+        >
+          {sub}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ── Spring counter stat ──────────────────────────────────────────────────
 function ReservationStat() {
   const { ref, inView } = useFadeInView()
@@ -76,8 +177,8 @@ function ReservationStat() {
 const QR_STEPS = [
   { n: '01', label: 'Le client scanne le QR code sur la table' },
   { n: '02', label: 'Voit son addition (connecté ou non à la caisse)' },
-  { n: '03', label: 'Paie : carte, Apple Pay, Google Pay' },
-  { n: '04', label: "Partage l'addition automatiquement" },
+  { n: '03', label: 'Choisit sa part : par article, parts égales ou montant libre' },
+  { n: '04', label: 'Paie : carte, Apple Pay, Google Pay' },
   { n: '05', label: 'Télécharge son reçu' },
 ]
 
@@ -181,7 +282,7 @@ function QrPhoneMockup() {
         className="absolute -right-6 top-1/3 bg-white rounded-2xl shadow-xl px-3 py-2 border"
         style={{ borderColor: '#E4E4E7' }}
       >
-        <div className="text-[10px] font-bold text-emerald-600">✓ Payé en 8 sec</div>
+        <div className="text-[10px] font-bold text-emerald-600">✓ Part payée en 30 sec</div>
       </m.div>
     </m.div>
   )
@@ -299,8 +400,8 @@ function DashboardMockup() {
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-px" style={{ background: '#E4E4E7' }}>
           {[
-            { label: 'Note moy.', value: '4,7', unit: '★', color: '#E8920A' },
-            { label: 'Feedbacks', value: '23', unit: 'ce mois', color: '#3B82F6' },
+            { label: 'CA du jour', value: '1 842', unit: '€', color: '#E8920A' },
+            { label: 'Note moy.', value: '4,7', unit: '★', color: '#3B82F6' },
             { label: 'Tables', value: '12', unit: 'actives', color: '#8B5CF6' },
             { label: 'Rotation', value: '34', unit: 'min/table', color: '#059669' },
           ].map((s) => (
@@ -315,25 +416,27 @@ function DashboardMockup() {
         </div>
         {/* Feedback list */}
         <div className="px-6 py-4">
-          <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide mb-3">Derniers feedbacks</div>
+          <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wide mb-3">Alertes & activité</div>
           <div className="space-y-2.5">
             {[
+              { stars: 0, text: 'Table 6 : paiement bloqué depuis 4 min', time: 'à l’instant', color: '#EF4444', tag: 'Alerte' },
               { stars: 5, text: 'Service impeccable, on reviendra !', time: 'il y a 3 min', color: '#22C55E' },
-              { stars: 4, text: 'Très bon repas, attente un peu longue.', time: 'il y a 18 min', color: '#84CC16' },
-              { stars: 2, text: 'Entrée froide, dommage.', time: 'il y a 1h', color: '#EF4444', private: true },
+              { stars: 2, text: 'Entrée froide, dommage.', time: 'il y a 1h', color: '#EF4444', tag: 'Privé' },
             ].map((f, i) => (
               <div key={i} className="flex items-start gap-3 py-2 border-b last:border-0" style={{ borderColor: '#F4F4F5' }}>
-                <div className="text-[11px] font-bold mt-0.5" style={{ color: f.color }}>{'★'.repeat(f.stars)}</div>
+                <div className="text-[11px] font-bold mt-0.5" style={{ color: f.color }}>
+                  {f.stars > 0 ? '★'.repeat(f.stars) : '⚠'}
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] text-zinc-700 truncate">{f.text}</p>
                   <p className="text-[10px] text-zinc-400 mt-0.5">{f.time}</p>
                 </div>
-                {f.private && (
+                {f.tag && (
                   <span
                     className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
                     style={{ background: '#FFF4E5', color: '#E8920A' }}
                   >
-                    Privé
+                    {f.tag}
                   </span>
                 )}
               </div>
@@ -348,7 +451,7 @@ function DashboardMockup() {
         className="absolute -left-6 top-1/4 bg-white rounded-xl shadow-lg px-3 py-2 border text-[11px] font-semibold"
         style={{ borderColor: '#E8920A', color: '#E8920A' }}
       >
-        Satisfaction 94%
+        Temps réel
       </m.div>
       <m.div
         animate={{ y: [0, 5, 0] }}
@@ -362,20 +465,22 @@ function DashboardMockup() {
   )
 }
 
-// ── Split mode cards ──────────────────────────────────────────────────────
+// ── Split mode cards (fond clair) ─────────────────────────────────────────
+// Code réel : src/context/types.ts (splitMode 'item' | 'equal' | 'custom'),
+// src/pages/Items.tsx + src/components/features/SplitStrip.tsx (splitFactor ÷2/÷3/÷4)
 const SPLIT_MODES = [
   {
     icon: '🧾',
     title: 'Par article',
-    desc: 'Chaque convive sélectionne ses plats. Splitzy calcule.',
+    desc: 'Chaque convive sélectionne ses plats. Un article se partage à 2, 3 ou 4 (÷2 ÷3 ÷4).',
   },
   {
     icon: '👥',
-    title: 'Par personnes',
+    title: 'Parts égales',
     desc: 'Division égale entre N personnes en un clic.',
   },
   {
-    icon: '💬',
+    icon: '💶',
     title: 'Montant libre',
     desc: "Chacun saisit ce qu'il souhaite payer.",
   },
@@ -389,89 +494,145 @@ function SplitCard({ mode, index }: { mode: typeof SPLIT_MODES[number]; index: n
       viewport={{ once: true }}
       transition={{ duration: 0.45, delay: index * 0.12 }}
       whileHover={{ scale: 1.03, y: -4, transition: { duration: 0.2 } }}
-      className="flex flex-col items-center text-center p-7 rounded-2xl border cursor-default"
-      style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)' }}
+      className="flex flex-col items-center text-center p-7 rounded-2xl border cursor-default bg-white"
+      style={{ borderColor: '#E4E4E7', boxShadow: '0 1px 3px rgba(24,24,27,0.04)' }}
     >
       <div className="text-4xl mb-4">{mode.icon}</div>
-      <h3 className="text-[16px] font-bold text-white mb-2">{mode.title}</h3>
-      <p className="text-[13px] text-zinc-400 leading-relaxed">{mode.desc}</p>
+      <h3 className="text-[16px] font-bold mb-2" style={{ color: '#0A0A0A' }}>{mode.title}</h3>
+      <p className="text-[13px] leading-relaxed" style={{ color: '#71717A' }}>{mode.desc}</p>
     </m.div>
   )
 }
 
-// ── Dashboard feature grid ────────────────────────────────────────────────
-const DASHBOARD_FEATURES = [
+// ── Données modules (chaque entrée vérifiée dans le code — GOAL_WEB_00) ───
+
+// Pilotage :
+//   KPIs & Analytics  → src/restaurant/pages/Overview.tsx + Analytics.tsx (routes /restaurant, /restaurant/analytics)
+//   Plan de salle     → src/restaurant/pages/SallePage.tsx + convex/zones.ts (route /restaurant/salle)
+//   Menu en direct    → src/restaurant/pages/MenuPage.tsx (isAvailable = 86, plat du jour, prix live)
+//   Alertes manager   → src/restaurant/pages/Overview.tsx (paiement bloqué, QR inactif, avis négatifs)
+//   Clôture           → src/restaurant/pages/SallePage.tsx + convex/closures.ts (getTipDistribution, sendTipReport)
+//   Multi-étab.       → PAS ENCORE EN CODE (aucune vue agrégée dans src/restaurant/) → "À venir"
+const PILOTAGE_MODULES: Module[] = [
   {
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8920A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-      </svg>
-    ),
-    title: 'Satisfaction en temps réel',
-    desc: 'Graphe des notes par heure, semaine, mois.',
+    icon: '📊',
+    title: 'KPIs & Analytics temps réel',
+    desc: 'CA du service, couverts, ticket moyen, rotation des tables, moyens de paiement, pourboires. Graphes par période et heatmap horaire.',
+    available: true,
   },
   {
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8920A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-      </svg>
-    ),
-    title: 'Feedbacks privés',
-    desc: 'Historique complet, réponses directes au client.',
+    icon: '🗺',
+    title: 'Plan de salle interactif',
+    desc: 'Tables en drag & drop, statuts en direct, tables VIP, timer d’inactivité. Forcez le paiement QR ou clôturez une table à distance.',
+    available: true,
   },
   {
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8920A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-      </svg>
-    ),
-    title: 'Rotation des tables',
-    desc: 'Heatmap horaire pour optimiser chaque service.',
+    icon: '🍽',
+    title: 'Menu en direct',
+    desc: 'Rupture (« 86 »), changement de prix ou plat du jour : répercuté instantanément sur le menu QR des clients. Sync Square en un clic.',
+    available: true,
   },
   {
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8920A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-      </svg>
-    ),
-    title: 'Export données clients',
-    desc: 'CSV complet : emails, téléphones, historique.',
+    icon: '🔔',
+    title: 'Alertes manager',
+    desc: '« Table 6 : paiement bloqué depuis 4 min », « Aucun paiement — problème QR ? », avis négatif reçu : prévenu au moment où ça se passe.',
+    available: true,
+  },
+  {
+    icon: '🌙',
+    title: 'Clôture de service',
+    desc: 'Récap automatique (CA, couverts, pourboires), répartition des pourboires par serveur, export CSV et rapport envoyé par email.',
+    available: true,
+  },
+  {
+    icon: '🏢',
+    title: 'Multi-établissements',
+    desc: 'Vue agrégée de tous vos restaurants, benchmark entre sites, déploiement de menu groupé. En cours de construction.',
+    available: false,
+  },
+]
+
+// Équipe :
+//   Planning  → src/restaurant/pages/Planning.tsx + convex/planning.ts, convex/shifts.ts (route /restaurant/planning)
+//   Extras    → src/restaurant/pages/ExtrasPage.tsx + convex/extras.ts, convex/extraConvocations.ts (route /restaurant/extras)
+//   Chat      → src/restaurant/pages/ChatPage.tsx + components/FloatingChat.tsx + convex/messages.ts (route /restaurant/chat)
+const EQUIPE_MODULES: Module[] = [
+  {
+    icon: '📅',
+    title: 'Planning & shifts',
+    desc: 'Vue calendrier par poste, création de shift en quelques clics, suivi de présence et métriques par serveur.',
+    available: true,
+  },
+  {
+    icon: '🤝',
+    title: 'Extras & renforts',
+    desc: 'Répertoire d’extras, convocation par email en un clic, confirmation depuis le lien reçu, pool de confiance avec notation après chaque service.',
+    available: true,
+  },
+  {
+    icon: '💬',
+    title: 'Chat interne',
+    desc: 'Messagerie gérant ↔ salle : broadcast à toute l’équipe ou messages directs, notifications, widget accessible depuis tout le dashboard.',
+    available: true,
+  },
+]
+
+// IA & Réputation :
+//   Insights IA       → convex/insights.ts + src/restaurant/pages/Analytics.tsx (réservé plan Pro — gate isPro)
+//   Feedback privé    → src/restaurant/pages/Reputation.tsx + convex/feedbacks.ts (route /restaurant/reputation)
+const IA_MODULES: Module[] = [
+  {
+    icon: '✨',
+    title: 'Insights IA',
+    desc: 'Analyse automatique de vos ventes et feedbacks : tendances, rotation lente, suggestions d’action concrètes pour le prochain service.',
+    available: true,
+    note: 'plan Pro',
+  },
+  {
+    icon: '⭐',
+    title: 'Feedback privé & tags',
+    desc: 'Chaque avis arrive dans une inbox privée avec tags automatiques (service, attente, cuisine). Alerte immédiate si note basse.',
+    available: true,
   },
 ]
 
 // ── Main component ────────────────────────────────────────────────────────
 export function FonctionnalitesPage() {
+  const { hash } = useLocation()
+
+  // React Router ne scrolle pas vers les ancres (#paiement, #pilotage, #equipe, #ia)
+  // lors d'une navigation client-side — on le fait manuellement après le mount.
+  useEffect(() => {
+    if (!hash) return
+    const t = setTimeout(() => {
+      document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 150)
+    return () => clearTimeout(t)
+  }, [hash])
+
   return (
     <div className="w-full min-h-screen" style={{ background: '#FAFAFA' }}>
       <Helmet>
         <title>Fonctionnalités — Splitzy</title>
-        <meta name="description" content="QR code par table, paiement sans contact, dashboard temps réel, intégration Square. Tout ce qu'il faut pour moderniser votre salle en 30 minutes." />
+        <meta name="description" content="Paiement fractionné par QR code, plan de salle en direct, planning équipe, chat interne, insights IA : toutes les fonctionnalités pour piloter votre restaurant à distance." />
       </Helmet>
       <Navbar />
 
       <FonctionnalitesHero />
 
-      {/* ── FEATURE 1 : QR Paiement (#FAFAFA) ───────────────────────────── */}
-      <section id="feature-01" className="py-24 md:py-32" style={{ background: '#FAFAFA', borderTop: '1px solid #E4E4E7' }}>
+      {/* ── PAIEMENT (#FAFAFA) ────────────────────────────────────────────
+          Module vérifié : flow convive src/pages/Items.tsx → Payment.tsx,
+          modes src/context/types.ts, verrou convex/featureFlags.ts (VERROU_MODE_PAIEMENT) */}
+      <section id="paiement" className="py-24 md:py-32" style={{ background: '#FAFAFA', borderTop: '1px solid #E4E4E7' }}>
         <div className="max-w-[1100px] mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
             {/* Left: text */}
             <div>
-              <span
-                className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-[0.1em] mb-6"
-                style={{ background: '#FFF4E5', color: '#E8920A' }}
-              >
-                Feature 01
-              </span>
-              <h2
-                className="text-balance"
-                style={{ fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.05, fontSize: 'clamp(32px, 4.5vw, 48px)', color: '#0A0A0A' }}
-              >
-                <TextReveal>Paiement en moins de 30 secondes.</TextReveal>
-              </h2>
-              <p className="mt-5 text-[16px] leading-relaxed" style={{ color: '#52525B' }}>
-                Zéro application à télécharger. Zéro friction. Le client scanne, voit son addition, paie et reçoit son reçu en moins de 30 secondes.
-              </p>
+              <SectionHeader
+                badge="Paiement"
+                title="Le paiement fractionné qui a fait connaître Splitzy."
+                sub="Zéro application à télécharger, zéro friction. Le client scanne, choisit sa part, paie et repart avec son reçu — en moins de 30 secondes."
+              />
               <QrStepList />
               {/* Stat */}
               <m.div
@@ -493,11 +654,95 @@ export function FonctionnalitesPage() {
               <QrPhoneMockup />
             </div>
           </div>
+
+          {/* 3 modes de partage */}
+          <div className="mt-20">
+            <div className="text-center mb-10">
+              <h3 className="text-balance" style={{ fontWeight: 800, letterSpacing: '-0.03em', fontSize: 'clamp(22px, 3vw, 30px)', color: '#0A0A0A' }}>
+                Trois façons de partager l'addition.
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {SPLIT_MODES.map((mo, i) => (
+                <SplitCard key={mo.title} mode={mo} index={i} />
+              ))}
+            </div>
+
+            {/* Verrou de mode de paiement */}
+            <m.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.15 }}
+              className="mt-6 rounded-2xl border p-6 md:p-7 flex flex-col md:flex-row md:items-center gap-5"
+              style={{ background: '#FFFFFF', borderColor: 'rgba(232,146,10,0.35)', boxShadow: '0 10px 30px -18px rgba(232,146,10,0.35)' }}
+            >
+              <div
+                className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-[22px]"
+                style={{ background: '#FFF4E5' }}
+              >
+                🔒
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2.5 flex-wrap mb-1.5">
+                  <h4 className="text-[16px] font-bold" style={{ color: '#0A0A0A' }}>Verrou de mode de paiement</h4>
+                  <DispoBadge available note="nouveau" />
+                </div>
+                <p className="text-[14px] leading-relaxed" style={{ color: '#52525B' }}>
+                  Dès que le premier convive paie, son mode de partage est verrouillé pour toute la table.
+                  Impossible de mélanger « par article » et « parts égales » sur la même addition — fini les
+                  confusions et les tables qui paient trop ou pas assez.
+                </p>
+              </div>
+            </m.div>
+          </div>
         </div>
       </section>
 
-      {/* ── FEATURE 2 : Feedback interception (#18181B) ──────────────────── */}
-      <section id="feature-02" className="py-24 md:py-32" style={{ background: '#18181B' }}>
+      {/* ── PILOTAGE (#18181B) ────────────────────────────────────────────── */}
+      <section id="pilotage" className="py-24 md:py-32" style={{ background: '#18181B' }}>
+        <div className="max-w-[1100px] mx-auto px-6">
+          <div className="text-center mb-14">
+            <SectionHeader
+              badge="Pilotage"
+              title="Votre établissement en temps réel, où que vous soyez."
+              sub="Le dashboard Splitzy vous donne la salle, les chiffres et les alertes en direct — depuis le comptoir, chez vous, ou à l'autre bout de la France."
+              dark
+              center
+            />
+          </div>
+
+          <DashboardMockup />
+
+          <div className="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {PILOTAGE_MODULES.map((mod, i) => (
+              <ModuleCard key={mod.title} mod={mod} index={i} dark />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── ÉQUIPE (#FAFAFA) ──────────────────────────────────────────────── */}
+      <section id="equipe" className="py-24 md:py-32" style={{ background: '#FAFAFA' }}>
+        <div className="max-w-[1100px] mx-auto px-6">
+          <div className="text-center mb-14">
+            <SectionHeader
+              badge="Équipe"
+              title="Votre équipe, organisée depuis le même outil."
+              sub="Planning, renforts de dernière minute et communication avec la salle : tout est au même endroit que vos paiements et vos chiffres."
+              center
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {EQUIPE_MODULES.map((mod, i) => (
+              <ModuleCard key={mod.title} mod={mod} index={i} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── IA & RÉPUTATION (#18181B) ─────────────────────────────────────── */}
+      <section id="ia" className="py-24 md:py-32" style={{ background: '#18181B' }}>
         <div className="max-w-[1100px] mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
             {/* Left: diagram */}
@@ -506,114 +751,31 @@ export function FonctionnalitesPage() {
             </div>
             {/* Right: text */}
             <div>
-              <span
-                className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-[0.1em] mb-6"
-                style={{ background: 'rgba(232,146,10,0.12)', color: '#E8920A' }}
-              >
-                Feature 02
-              </span>
-              <h2
-                className="text-white text-balance"
-                style={{ fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.05, fontSize: 'clamp(32px, 4.5vw, 48px)' }}
-              >
-                <TextReveal>La feature qu'aucun concurrent n'a.</TextReveal>
-              </h2>
-              <p className="mt-5 text-[15px] leading-relaxed" style={{ color: '#A1A1AA' }}>
-                Traditionnellement, un client insatisfait a deux options : partir sans rien dire ou laisser un avis 1 étoile sur Google.
-              </p>
-              <p className="mt-4 text-[15px] leading-relaxed" style={{ color: '#A1A1AA' }}>
-                Splitzy crée une <span className="text-white font-semibold">troisième voie</span> : vous contacter directement. L'avis négatif n'existe pas.
-              </p>
+              <SectionHeader
+                badge="IA & Réputation"
+                title="L'insatisfaction, interceptée avant Google."
+                sub="Un client mécontent a deux options : partir sans rien dire, ou poster une étoile sur Google. Splitzy crée une troisième voie : vous parler en privé. L'IA analyse chaque feedback et vous dit où agir."
+                dark
+              />
               {/* Spring counter */}
               <div className="mt-10">
                 <ReservationStat />
               </div>
-              {/* Proof line */}
               <p className="mt-4 text-[13px]" style={{ color: '#52525B' }}>
                 3 avis 1 étoile = −0,4 point de note moyenne.
               </p>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* ── FEATURE 3 : Dashboard (#FAFAFA) ──────────────────────────────── */}
-      <section id="feature-03" className="py-24 md:py-32" style={{ background: '#FAFAFA' }}>
-        <div className="max-w-[1100px] mx-auto px-6">
-          <div className="text-center mb-16">
-            <span
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-[0.1em] mb-6"
-              style={{ background: '#FFF4E5', color: '#E8920A' }}
-            >
-              Feature 03
-            </span>
-            <h2
-              className="text-balance"
-              style={{ fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.05, fontSize: 'clamp(32px, 4.5vw, 48px)', color: '#0A0A0A' }}
-            >
-              <TextReveal>Votre réputation, sous contrôle.</TextReveal>
-            </h2>
-            <p className="mt-5 max-w-[560px] mx-auto text-[16px] leading-relaxed" style={{ color: '#52525B' }}>
-              Recevez chaque feedback instantanément. Répondez avant que ça devienne un problème. Analytics complets.
-            </p>
-          </div>
-
-          {/* Dashboard mockup */}
-          <DashboardMockup />
-
-          {/* Feature grid */}
-          <div className="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {DASHBOARD_FEATURES.map((f, i) => (
-              <m.div
-                key={f.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.45, delay: i * 0.1 }}
-                className="bg-white border rounded-2xl p-6 hover:-translate-y-1 transition-transform duration-200 hover:shadow-lg hover:shadow-orange-600/5"
-                style={{ borderColor: '#E4E4E7' }}
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
-                  style={{ background: '#FFF4E5' }}
-                >
-                  {f.icon}
-                </div>
-                <h3 className="text-[15px] font-bold mb-2" style={{ color: '#0A0A0A' }}>{f.title}</h3>
-                <p className="text-[13px] leading-relaxed" style={{ color: '#71717A' }}>{f.desc}</p>
-              </m.div>
+          <div className="mt-14 grid grid-cols-1 md:grid-cols-2 gap-5 max-w-[760px] mx-auto">
+            {IA_MODULES.map((mod, i) => (
+              <ModuleCard key={mod.title} mod={mod} index={i} dark />
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── FEATURE 4 : Partage d'addition (#18181B) ─────────────────────── */}
-      <section className="py-24 md:py-32" style={{ background: '#18181B' }}>
-        <div className="max-w-[900px] mx-auto px-6 text-center">
-          <span
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-[0.1em] mb-6"
-            style={{ background: 'rgba(232,146,10,0.12)', color: '#E8920A' }}
-          >
-            Feature 04
-          </span>
-          <h2
-            className="text-white text-balance"
-            style={{ fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.05, fontSize: 'clamp(32px, 4.5vw, 48px)' }}
-          >
-            <TextReveal>Finies les discussions pour diviser l'addition.</TextReveal>
-          </h2>
-          <p className="mt-5 max-w-[520px] mx-auto text-[15px] leading-relaxed" style={{ color: '#A1A1AA' }}>
-            Trois façons de partager, pour que chaque table soit satisfaite. En 2 tapotements.
-          </p>
-          <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-5">
-            {SPLIT_MODES.map((m_, i) => (
-              <SplitCard key={m_.title} mode={m_} index={i} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── CTA FINAL (#FAFAFA → orange) ─────────────────────────────────── */}
+      {/* ── CTA FINAL (#FAFAFA) ───────────────────────────────────────────── */}
       <section className="py-24 md:py-32" style={{ background: '#FAFAFA' }}>
         <div className="max-w-[720px] mx-auto px-6 text-center">
           <h2
@@ -635,6 +797,13 @@ export function FonctionnalitesPage() {
               style={{ color: '#0A0A0A', borderColor: '#E4E4E7' }}
             >
               Voir les tarifs
+            </Link>
+            <Link
+              to="/demo"
+              className="inline-flex items-center gap-1 text-[15px] font-semibold px-7 py-3.5 rounded-xl border transition-colors hover:border-zinc-400"
+              style={{ color: '#0A0A0A', borderColor: '#E4E4E7' }}
+            >
+              Voir la démo
             </Link>
           </div>
         </div>

@@ -190,6 +190,76 @@ function QrVisual() {
   )
 }
 
+// ── Pilotage & équipe visual (dark) ──────────────────────────────────────────
+const SALLE_DARK_TABLES: { n: number; s: 'free' | 'dining' | 'payment' }[] = [
+  { n: 1, s: 'dining' }, { n: 2, s: 'free' },   { n: 3, s: 'payment' }, { n: 4, s: 'dining' },
+  { n: 5, s: 'free' },   { n: 6, s: 'payment' }, { n: 7, s: 'dining' }, { n: 8, s: 'free' },
+]
+
+const SALLE_DARK_STYLE = {
+  free:    { bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)', text: '#71717A' },
+  dining:  { bg: 'rgba(232,146,10,0.12)',  border: 'rgba(232,146,10,0.35)',  text: '#E8920A' },
+  payment: { bg: 'rgba(34,197,94,0.10)',   border: 'rgba(34,197,94,0.35)',   text: '#22C55E' },
+}
+
+function PilotageVisual() {
+  return (
+    <div
+      className="rounded-2xl overflow-hidden w-full max-w-[400px] mx-auto"
+      style={{ background: '#1C1C1E', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}
+    >
+      {/* Header */}
+      <div className="px-5 py-3.5 border-b" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] font-semibold text-white">Plan de salle</span>
+          <span className="inline-flex items-center gap-1.5 text-[11px]" style={{ color: '#22C55E' }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse-dot" />
+            En service
+          </span>
+        </div>
+      </div>
+
+      {/* Table grid */}
+      <div className="grid grid-cols-4 gap-2 p-4">
+        {SALLE_DARK_TABLES.map((t) => {
+          const s = SALLE_DARK_STYLE[t.s]
+          return (
+            <div
+              key={t.n}
+              className="rounded-xl py-3 text-center text-[12px] font-bold tabular-nums"
+              style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.text }}
+            >
+              T{t.n}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Chat + clôture */}
+      <div className="px-4 pb-4 space-y-2">
+        <div className="flex items-start gap-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+          <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[14px]" style={{ background: 'rgba(232,146,10,0.15)' }}>
+            💬
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-semibold text-white">Chat interne</p>
+            <p className="text-[10px] truncate" style={{ color: '#A1A1AA' }}>« La table 6 demande le gérant »</p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+          <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[14px]" style={{ background: 'rgba(34,197,94,0.15)' }}>
+            ✓
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-semibold text-white">Clôture de service</p>
+            <p className="text-[10px] truncate" style={{ color: '#A1A1AA' }}>Récap + pourboires répartis, envoyés par email</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Text reveal ───────────────────────────────────────────────────────────────
 function TextReveal({ line, baseDelay = 0 }: { line: string; baseDelay?: number }) {
   const words = line.split(' ')
@@ -343,7 +413,7 @@ export function Solution() {
             titleLine2="avant Google."
             body="Quand un client est mécontent, Splitzy lui propose d'abord de contacter directement le restaurant. Il exprime son problème en privé. Vous pouvez répondre et arranger la situation. Il ne part pas sur Google avec une étoile."
             cta="Voir comment ça marche →"
-            ctaHref="/fonctionnalites"
+            ctaHref="/fonctionnalites#ia"
             Visual={FeedbackPhoneMockup}
           />
 
@@ -353,7 +423,7 @@ export function Solution() {
             titleLine2="en temps réel."
             body="Recevez chaque feedback instantanément. Répondez avant que ça devienne un problème. Analytics complets — satisfaction, heures de pointe, rotation des tables. Export CSV inclus."
             cta="Découvrir le dashboard →"
-            ctaHref="/fonctionnalites"
+            ctaHref="/fonctionnalites#pilotage"
             reversed
             Visual={DashboardVisual}
           />
@@ -364,9 +434,20 @@ export function Solution() {
             titleLine2="Zéro appli, zéro friction."
             body="Le client scanne le QR code sur sa table. Il voit son addition, paie avec Apple Pay ou carte, et peut diviser l'addition automatiquement. Tout ça en moins de 30 secondes."
             cta="Voir le parcours client →"
-            ctaHref="/fonctionnalites"
+            ctaHref="/fonctionnalites#paiement"
             stat="⚡ 74% des clients préfèrent payer sans appeler le serveur."
             Visual={QrVisual}
+          />
+
+          <FeatureBlock
+            number="04"
+            titleLine1="Et le reste du service ?"
+            titleLine2="Aussi dans votre poche."
+            body="Plan de salle interactif, planning et extras, chat interne avec la salle, clôture de service automatique avec répartition des pourboires. Splitzy pilote votre établissement en temps réel — même quand vous n'êtes pas sur place."
+            cta="Découvrir le pilotage à distance →"
+            ctaHref="/fonctionnalites#pilotage"
+            reversed
+            Visual={PilotageVisual}
           />
         </div>
       </div>

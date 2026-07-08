@@ -3,6 +3,7 @@ import { m, AnimatePresence } from 'framer-motion'
 import { IconArrowRight, IconMenu, IconClose } from './Icons'
 
 const NAV_LINKS = [
+  { label: 'Fonctionnalités',   href: '/fonctionnalites' },
   { label: 'Comment ça marche', href: '/#comment-ca-marche' },
   { label: 'Tarifs',            href: '/pricing' },
   { label: 'Blog',              href: '/blog' },

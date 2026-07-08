@@ -4,6 +4,7 @@ import { fadeInUp, useFadeInView } from './shared'
 import {
   IconMenuBook, IconQr, IconWallet,
   IconPhoneScan, IconTap, IconBolt,
+  IconChartBar, IconBell, IconCheck,
 } from './Icons'
 
 type StepData = {
@@ -18,6 +19,11 @@ const STEPS: Record<string, StepData[]> = {
     { Icon: IconMenuBook, title: 'Configurez votre menu',    desc: 'Ajoutez vos plats et activez Splitzy en 5 minutes.', chip: 'Onboarding' },
     { Icon: IconQr,       title: 'Générez un QR code',      desc: 'Un QR unique par table, imprimé ou affiché sur écran.', chip: 'Sans contact' },
     { Icon: IconWallet,   title: 'Encaissez automatiquement', desc: 'Chaque convive paie sa part, vous recevez le total.', chip: 'Virement J+2' },
+  ],
+  gerant: [
+    { Icon: IconChartBar, title: 'Ouvrez votre dashboard',   desc: 'CA du jour, tables actives, pourboires : la vue d\'ensemble en un coup d\'œil.', chip: 'Temps réel' },
+    { Icon: IconBell,     title: 'Pilotez la salle en direct', desc: 'Plan de salle interactif, alertes paiement, tables VIP — même depuis chez vous.', chip: 'À distance' },
+    { Icon: IconCheck,    title: 'Clôturez le service',       desc: 'Récap automatique, répartition des pourboires, export comptable.', chip: 'Automatique' },
   ],
   client: [
     { Icon: IconPhoneScan, title: 'Scannez le QR code',          desc: "Avec l'appareil photo, aucune app à télécharger.", chip: '2 secondes' },
@@ -93,7 +99,7 @@ function StepCard({ step, idx }: { step: StepData; idx: number }) {
 }
 
 export function HowItWorks() {
-  const [tab, setTab] = useState<'restaurant' | 'client'>('restaurant')
+  const [tab, setTab] = useState<'restaurant' | 'gerant' | 'client'>('restaurant')
   const { ref, inView } = useFadeInView()
   const steps = STEPS[tab]
 
@@ -143,7 +149,15 @@ export function HowItWorks() {
                   active={tab === 'restaurant'}
                   onClick={() => setTab('restaurant')}
                 >
-                  Pour le restaurant
+                  Installation
+                </TabButton>
+                <TabButton
+                  id="hw-tab-gerant"
+                  controls="hw-panel-gerant"
+                  active={tab === 'gerant'}
+                  onClick={() => setTab('gerant')}
+                >
+                  Au quotidien
                 </TabButton>
                 <TabButton
                   id="hw-tab-client"
@@ -160,8 +174,8 @@ export function HowItWorks() {
 
         <div
           role="tabpanel"
-          id={tab === 'restaurant' ? 'hw-panel-restaurant' : 'hw-panel-client'}
-          aria-labelledby={tab === 'restaurant' ? 'hw-tab-restaurant' : 'hw-tab-client'}
+          id={`hw-panel-${tab}`}
+          aria-labelledby={`hw-tab-${tab}`}
           className="mt-10 md:mt-14"
         >
           <AnimatePresence mode="wait">

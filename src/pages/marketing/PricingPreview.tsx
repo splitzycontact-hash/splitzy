@@ -25,8 +25,9 @@ const PLANS: Plan[] = [
     desc: 'Pour tester sans risque',
     features: [
       "Jusqu'à 3 tables",
+      'Paiement fractionné par QR code',
       '10 feedbacks / mois',
-      'Dashboard basique',
+      'Dashboard basique (vue d\'ensemble)',
       'Support par email',
     ],
     cta: 'Commencer →',
@@ -38,12 +39,14 @@ const PLANS: Plan[] = [
     name: 'ESSENTIEL',
     price: '59€',
     period: '/mois HT',
-    desc: 'Pour protéger votre réputation',
+    desc: 'Pour piloter votre service au quotidien',
     features: [
-      'Tables illimitées',
-      'Feedbacks illimités',
-      'Notifications temps réel',
-      'Analytics avancés',
+      'Tables et feedbacks illimités',
+      'Paiement fractionné — 3 modes + verrou',
+      'Plan de salle interactif en temps réel',
+      'Planning équipe, extras & chat interne',
+      'Clôture de service & répartition des pourboires',
+      'Analytics avancés & alertes manager',
       'Emails clients capturés à chaque paiement',
       'Frais bancaires inclus',
     ],
@@ -61,9 +64,10 @@ const PLANS: Plan[] = [
     desc: 'Pour les établissements ambitieux',
     features: [
       'Tout le plan Essentiel',
-      'Intégrations POS (Square, Lightspeed…)',
+      'Insights IA — ventes, feedbacks, suggestions d\'action',
+      'Intégrations POS (Square, Lightspeed, Tiller…)',
       'CRM Clients — email, téléphone, historique des visites',
-      'Multi-établissements',
+      'Multi-établissements (à venir)',
       'Support prioritaire (réponse < 4h)',
     ],
     cta: 'Nous contacter →',
@@ -213,11 +217,11 @@ export function PricingPreview() {
           style={{ color: '#52525B' }}
         >
           <a
-            href="/pricing"
+            href="/fonctionnalites"
             className="underline underline-offset-4 font-medium hover:opacity-80 transition-opacity"
             style={{ color: '#E8920A' }}
           >
-            Voir tous les détails et la FAQ →
+            Comparer toutes les fonctionnalités →
           </a>
         </m.p>
       </div>
