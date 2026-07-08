@@ -13,16 +13,18 @@ function TextReveal({ children, className = '' }: { children: string; className?
   return (
     <span className={className}>
       {words.map((word, i) => (
-        <m.span
-          key={i}
-          style={{ display: 'inline-block' }}
-          initial={{ opacity: 0, y: 22 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-30px' }}
-          transition={{ duration: 0.5, delay: i * 0.07, ease: [0.25, 0.46, 0.45, 0.94] }}
-        >
-          {word}{i < words.length - 1 ? ' ' : ''}
-        </m.span>
+        <span key={i}>
+          <m.span
+            style={{ display: 'inline-block' }}
+            initial={{ opacity: 0, y: 22 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-30px' }}
+            transition={{ duration: 0.5, delay: i * 0.07, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            {word}
+          </m.span>
+          {i < words.length - 1 ? ' ' : ''}
+        </span>
       ))}
     </span>
   )

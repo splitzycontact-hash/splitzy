@@ -31,7 +31,7 @@
     --cream: #FFFBF5;
     --ink-950: #0A0A0A;
     --orange-glow: rgba(232, 146, 10, 0.25);
-    --font-display: 'Syne', system-ui, sans-serif;
+    --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
   }
 }
 
