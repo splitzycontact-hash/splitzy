@@ -335,7 +335,7 @@ export const BLOG_ARTICLES: Article[] = [
       { t: 'h2', v: "Le problème côté client" },
       { t: 'p', v: "74% des clients préfèrent pouvoir payer sans avoir à appeler le serveur, selon une étude Statista. Mais l'infrastructure pour le faire simplement n'existe pas dans la plupart des restaurants." },
       { t: 'h2', v: "Pourquoi ça n'a pas été résolu avant ?" },
-      { t: 'p', v: "Parce que le problème se situe à l'intersection de plusieurs systèmes : la caisse du restaurant, le terminal de paiement, et l'expérience client côté mobile. Les résoudre séparément ne suffit pas — il faut les connecter." },
+      { t: 'p', v: "Parce que le problème se situe à l'intersection de plusieurs systèmes : la caisse du restaurant, le terminal de paiement, et l'expérience client côté mobile. Les résoudre séparément ne suffit pas — il faut repenser le moment du paiement de bout en bout." },
       { t: 'ul', v: [
         "Pour le client : chacun paie ce qu'il a consommé, en quelques secondes, depuis son téléphone.",
         "Pour le restaurateur : plus d'allers-retours avec le terminal, plus de stress en fin de service, une table libérée plus rapidement.",

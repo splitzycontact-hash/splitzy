@@ -195,15 +195,15 @@ function ArticleCta() {
         Protégez votre note Google dès ce soir.
       </h3>
       <p className="mt-3 text-[15px] max-w-[400px] mx-auto leading-relaxed" style={{ color: '#A1A1AA' }}>
-        Installation en 15 minutes. Sans engagement. Les 30 premiers jours sont gratuits.
+        Installation en 15 minutes. Sans engagement.
       </p>
       <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
         <a
-          href="/restaurant/onboarding"
+          href="/contact"
           className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-[15px] font-semibold text-white"
           style={{ background: '#E8920A' }}
         >
-          Commencer gratuitement →
+          Demander une démo →
         </a>
         <a
           href="/demo"

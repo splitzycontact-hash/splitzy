@@ -9,7 +9,7 @@ export function PricingPage() {
     <div className="marketing-site w-full min-h-screen bg-ink-900">
       <Helmet>
         <title>Tarifs — Splitzy</title>
-        <meta name="description" content="Commencez gratuitement, passez Pro quand vous êtes prêt. Aucun engagement, aucun frais caché. Splitzy s'adapte à la taille de votre restaurant." />
+        <meta name="description" content="Un plan gratuit pour découvrir, Essentiel et Pro pour piloter votre service. Aucun engagement, aucun frais caché. Demandez une démo — Splitzy s'adapte à la taille de votre restaurant." />
       </Helmet>
       <Navbar />
       <main className="pt-16">

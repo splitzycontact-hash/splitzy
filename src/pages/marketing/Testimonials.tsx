@@ -220,11 +220,11 @@ export function Testimonials() {
         >
           Rejoignez +47 établissements parisiens qui protègent leur réputation.{' '}
           <a
-            href="/restaurant/onboarding"
+            href="/contact"
             className="underline underline-offset-4 font-medium hover:opacity-80 transition-opacity"
             style={{ color: '#E8920A' }}
           >
-            Commencer gratuitement →
+            Demander une démo →
           </a>
         </m.div>
       </div>

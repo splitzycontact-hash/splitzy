@@ -78,14 +78,14 @@ export function Navbar() {
                 href="/restaurant/sign-in"
                 className="text-[14px] font-medium text-white/80 hover:text-white px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
               >
-                Se connecter
+                Espace Client
               </a>
               <a
-                href="/restaurant/onboarding"
+                href="/contact"
                 className="inline-flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white text-[14px] font-medium px-4 py-2 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-orange-600/30 hover:-translate-y-0.5 whitespace-nowrap"
               >
-                <span className="hidden lg:inline">Commencer gratuitement</span>
-                <span className="lg:hidden">Commencer</span>
+                <span className="hidden lg:inline">Demander une démo</span>
+                <span className="lg:hidden">Démo</span>
                 <IconArrowRight size={15} />
               </a>
             </div>
@@ -154,11 +154,11 @@ export function Navbar() {
 
               <div className="mt-auto pt-8 flex flex-col gap-3">
                 <a
-                  href="/restaurant/onboarding"
+                  href="/contact"
                   onClick={closeDrawer}
                   className="inline-flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 active:bg-orange-700 text-white font-medium text-base px-6 py-4 rounded-xl shadow-lg shadow-orange-600/30"
                 >
-                  Commencer gratuitement
+                  Demander une démo
                   <IconArrowRight size={17} />
                 </a>
                 <a
@@ -166,7 +166,7 @@ export function Navbar() {
                   onClick={closeDrawer}
                   className="inline-flex items-center justify-center text-white font-medium text-base px-6 py-4 rounded-xl border border-white/20 active:bg-white/5"
                 >
-                  Se connecter
+                  Espace Client
                 </a>
               </div>
             </m.nav>

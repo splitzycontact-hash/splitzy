@@ -185,8 +185,9 @@ export function Hero() {
         {/* H1 */}
         <m.div initial="hidden" animate="visible" custom={0.1} variants={fadeInUp}>
           <h1 className="mt-6 md:mt-8 text-center text-[36px] md:text-[56px] leading-[1.05] font-bold text-white max-w-3xl mx-auto text-balance font-display">
-            <span className="block">Pilotez votre restaurant,</span>
-            <span className="block text-orange-500">même sans y être.</span>
+            <span className="block">Encaissement intelligent</span>
+            <span className="block text-orange-500">et pilotage centralisé</span>
+            <span className="block">pour votre restaurant.</span>
           </h1>
         </m.div>
 
@@ -195,7 +196,7 @@ export function Hero() {
           className="mt-5 md:mt-6 text-center text-[16px] md:text-[18px] leading-[1.6] text-white/60 max-w-xl mx-auto"
           initial="hidden" animate="visible" custom={0.2} variants={fadeInUp}
         >
-          Plan de salle en direct, KPIs, équipe, insights IA — et le paiement fractionné par QR code qui a fait connaître Splitzy. Vos clients paient leur part en 30 secondes, sans app.
+          Vos clients paient et partagent l'addition par QR code, synchronisé avec votre caisse. Avis Google automatisés, pilotage en temps réel.
         </m.p>
 
         {/* CTAs */}
@@ -206,10 +207,10 @@ export function Hero() {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
             <m.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
               <a
-                href="/restaurant/onboarding"
+                href="/contact"
                 className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 bg-orange-600 text-white font-medium text-[15px] px-6 py-3.5 rounded-xl shadow-lg shadow-orange-600/40 hover:bg-orange-700 hover:shadow-xl hover:shadow-orange-600/50 transition-colors"
               >
-                Commencer gratuitement
+                Demander une démo
                 <IconArrowRight size={16} />
               </a>
             </m.div>
@@ -219,7 +220,7 @@ export function Hero() {
                 className="inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-white/[0.04] border border-white/15 text-white font-medium text-[15px] px-6 py-3.5 rounded-xl hover:bg-white/[0.08] hover:border-white/25 transition-colors backdrop-blur-sm"
               >
                 <IconPlay size={13} />
-                Voir la démo
+                Voir comment ça marche
               </a>
             </m.div>
           </div>
@@ -230,7 +231,7 @@ export function Hero() {
           className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] text-white/40"
           initial="hidden" animate="visible" custom={0.4} variants={fadeInUp}
         >
-          {['Gratuit pour commencer', 'Aucune carte requise', 'Configuré en 5 min'].map((t) => (
+          {['Sans application à télécharger', 'Installation en 15 minutes', 'Sans engagement'].map((t) => (
             <li key={t} className="inline-flex items-center gap-1.5">
               <IconCheck size={14} stroke={2.4} className="text-orange-500" />
               {t}

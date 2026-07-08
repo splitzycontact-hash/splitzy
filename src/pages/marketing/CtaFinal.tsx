@@ -1,27 +1,6 @@
 import { useRef, useState } from 'react'
 import { m } from 'framer-motion'
-
-function TextReveal({ children }: { children: string }) {
-  const words = children.split(' ')
-  return (
-    <span>
-      {words.map((word, i) => (
-        <span key={i}>
-          <m.span
-            style={{ display: 'inline-block' }}
-            initial={{ opacity: 0, y: 22 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-20px' }}
-            transition={{ duration: 0.5, delay: i * 0.07, ease: [0.25, 0.46, 0.45, 0.94] }}
-          >
-            {word}
-          </m.span>
-          {i < words.length - 1 ? ' ' : ''}
-        </span>
-      ))}
-    </span>
-  )
-}
+import { IconArrowRight } from './Icons'
 
 function MagneticBtn({ children, href }: { children: React.ReactNode; href: string }) {
   const ref = useRef<HTMLAnchorElement>(null)
@@ -58,7 +37,7 @@ export function CtaFinal() {
   return (
     <section
       id="cta-final"
-      className="relative py-28 md:py-36 overflow-hidden text-center"
+      className="relative py-24 md:py-32 overflow-hidden"
       style={{ background: '#1A1A1A' }}
       aria-labelledby="cta-heading"
     >
@@ -71,54 +50,79 @@ export function CtaFinal() {
 
       {/* Subtle radial glow */}
       <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(232,146,10,0.12) 0%, transparent 65%)',
+        background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(232,146,10,0.10) 0%, transparent 65%)',
       }} />
-      <div aria-hidden="true" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse at center bottom, rgba(232,146,10,0.15) 0%, transparent 70%)' }} />
 
-      <div className="relative max-w-[680px] mx-auto px-6">
-        <h2
-          id="cta-heading"
-          className="text-white text-balance font-display"
-          style={{ fontWeight: 900, fontSize: 'clamp(34px, 5.5vw, 52px)', lineHeight: 1.05, letterSpacing: '-0.04em' }}
-        >
-          <TextReveal>{'Votre prochaine'}</TextReveal>
-          <br />
-          <TextReveal>{'1 étoile peut attendre.'}</TextReveal>
+      <div className="relative max-w-[960px] mx-auto px-6">
+        <h2 id="cta-heading" className="sr-only">
+          Accéder à Splitzy ou planifier une démonstration
         </h2>
 
-        <m.p
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.45, delay: 0.35 }}
-          className="mt-6 text-[17px] md:text-[18px] leading-[1.7] max-w-[480px] mx-auto"
-          style={{ color: '#A1A1AA' }}
-        >
-          93% de vos futurs clients liront vos avis avant de venir.
-          Protégez votre réputation avant le prochain avis négatif.
-          Installation en 15 minutes. Sans engagement.
-        </m.p>
-
-        <m.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.45, delay: 0.5 }}
-          className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
-        >
-          <MagneticBtn href="/restaurant/onboarding">
-            Commencer gratuitement →
-          </MagneticBtn>
-
-          <a
-            href="/contact"
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl text-[15px] font-medium text-white transition-colors hover:bg-white/10"
-            style={{ border: '1px solid rgba(255,255,255,0.25)' }}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 items-stretch">
+          {/* ── Encart 1 — client existant ── */}
+          <m.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45 }}
+            className="flex flex-col rounded-2xl p-8 md:p-10"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.10)' }}
           >
-            Parler à un expert
-          </a>
-        </m.div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em] mb-4" style={{ color: '#A1A1AA' }}>
+              Déjà client
+            </p>
+            <h3
+              className="text-white text-balance font-display"
+              style={{ fontWeight: 800, fontSize: 'clamp(24px, 3vw, 30px)', lineHeight: 1.12, letterSpacing: '-0.03em' }}
+            >
+              Déjà équipé de Splitzy&nbsp;?
+            </h3>
+            <p className="mt-4 text-[15px] leading-[1.65]" style={{ color: '#A1A1AA' }}>
+              Retrouvez votre plan de salle, vos encaissements et vos statistiques en temps réel.
+            </p>
+            <div className="mt-8 md:mt-auto md:pt-8">
+              <a
+                href="/restaurant/sign-in"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-[15px] font-medium text-white transition-colors hover:bg-white/10"
+                style={{ border: '1px solid rgba(255,255,255,0.25)' }}
+              >
+                Accéder à mon Dashboard
+                <IconArrowRight size={15} />
+              </a>
+            </div>
+          </m.div>
+
+          {/* ── Encart 2 — prospect ── */}
+          <m.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.45, delay: 0.12 }}
+            className="relative flex flex-col rounded-2xl p-8 md:p-10 overflow-hidden"
+            style={{ background: 'rgba(232,146,10,0.06)', border: '1px solid rgba(232,146,10,0.35)' }}
+          >
+            <div aria-hidden="true" className="absolute -top-24 -right-24 w-[280px] h-[280px] pointer-events-none"
+              style={{ background: 'radial-gradient(closest-side, rgba(232,146,10,0.18), transparent 70%)' }} />
+            <p className="relative text-[11px] font-bold uppercase tracking-[0.12em] mb-4" style={{ color: '#E8920A' }}>
+              Nouveau sur Splitzy
+            </p>
+            <h3
+              className="relative text-white text-balance font-display"
+              style={{ fontWeight: 800, fontSize: 'clamp(24px, 3vw, 30px)', lineHeight: 1.12, letterSpacing: '-0.03em' }}
+            >
+              Modernisez la gestion de votre établissement.
+            </h3>
+            <p className="relative mt-4 text-[15px] leading-[1.65]" style={{ color: '#A1A1AA' }}>
+              Encaissement en 30 secondes, tables libérées plus vite, pilotage en temps réel.
+              Installation en 15 minutes, sans engagement.
+            </p>
+            <div className="relative mt-8 md:mt-auto md:pt-8">
+              <MagneticBtn href="/contact">
+                Planifier une démonstration →
+              </MagneticBtn>
+            </div>
+          </m.div>
+        </div>
       </div>
     </section>
   )

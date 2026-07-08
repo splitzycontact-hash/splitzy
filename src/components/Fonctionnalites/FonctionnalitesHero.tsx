@@ -185,9 +185,9 @@ export default function FonctionnalitesHero() {
           <m.div {...fadeUp(0.6)} className="mb-6 flex flex-wrap items-center gap-3">
             <MagneticButton
               className="group inline-flex items-center gap-2 rounded-[10px] bg-[#E8920A] px-[22px] py-[14px] text-[15px] font-semibold text-white shadow-[0_1px_2px_rgba(232,146,10,0.3),0_4px_12px_-2px_rgba(232,146,10,0.35)] transition-colors hover:bg-[#B8730A]"
-              onClick={() => navigate('/restaurant/onboarding')}
+              onClick={() => navigate('/contact')}
             >
-              Commencer gratuitement
+              Demander une démo
               <span className="inline-block transition-transform duration-300 ease-[cubic-bezier(.34,1.56,.64,1)] group-hover:translate-x-[3px]">
                 →
               </span>

@@ -432,11 +432,11 @@ function CtaSection() {
               Splitzy évolue vite.
             </p>
             <p style={{ color: '#71717A', fontSize: 14, lineHeight: 1.55 }}>
-              Commencez gratuitement — sans engagement, installation en 15 min.
+              Demandez une démo — sans engagement, installation en 15 min.
             </p>
           </div>
           <a
-            href="/pricing"
+            href="/contact"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
               background: '#E8920A', color: '#FFFFFF', fontSize: 14, fontWeight: 700,
@@ -446,7 +446,7 @@ function CtaSection() {
             onMouseEnter={e => (e.currentTarget.style.background = '#B8730A')}
             onMouseLeave={e => (e.currentTarget.style.background = '#E8920A')}
           >
-            Commencer gratuitement <span aria-hidden>→</span>
+            Demander une démo <span aria-hidden>→</span>
           </a>
         </m.div>
       </div>

@@ -45,11 +45,11 @@ const FAQ: { category: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: 'Comment créer mon compte restaurant ?',
-        a: "Rendez-vous sur splitzy.fr et cliquez sur « Commencer gratuitement ». Renseignez le nom de votre établissement, votre email et créez un mot de passe. L'installation prend moins de 15 minutes.",
+        a: "Demandez une démo depuis la page Contact : l'équipe Splitzy crée votre compte avec vous et configure vos tables. L'installation prend moins de 15 minutes.",
       },
       {
         q: 'Puis-je changer de plan à tout moment ?',
-        a: 'Oui. Vous pouvez passer du plan Gratuit au plan Essentiel (59€/mois) ou Pro (99€/mois) depuis votre dashboard, à tout moment et sans frais de changement.',
+        a: 'Oui. Contactez l\'équipe Splitzy pour passer du plan Gratuit au plan Essentiel (59€/mois) ou Pro (99€/mois), à tout moment et sans frais de changement.',
       },
       {
         q: 'Comment annuler mon abonnement ?',

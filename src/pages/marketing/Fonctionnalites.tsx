@@ -784,14 +784,14 @@ export function FonctionnalitesPage() {
             className="text-balance"
             style={{ fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.05, fontSize: 'clamp(36px, 5vw, 56px)', color: '#0A0A0A' }}
           >
-            <TextReveal>Prêt à essayer ?</TextReveal>
+            <TextReveal>Prêt à voir Splitzy en action ?</TextReveal>
           </h2>
           <p className="mt-5 text-[16px] leading-relaxed" style={{ color: '#52525B' }}>
-            Configuré en 15 minutes. Gratuit pour commencer. Aucune carte requise.
+            Démonstration personnalisée, sans engagement. Configuré en 15 minutes.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <MagneticCta href="/restaurant/onboarding">
-              Commencer gratuitement →
+            <MagneticCta href="/contact">
+              Réserver une démo →
             </MagneticCta>
             <Link
               to="/pricing"
@@ -805,7 +805,7 @@ export function FonctionnalitesPage() {
               className="inline-flex items-center gap-1 text-[15px] font-semibold px-7 py-3.5 rounded-xl border transition-colors hover:border-zinc-400"
               style={{ color: '#0A0A0A', borderColor: '#E4E4E7' }}
             >
-              Voir la démo
+              Voir comment ça marche
             </Link>
           </div>
         </div>

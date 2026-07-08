@@ -26,7 +26,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Puis-je tester gratuitement ?",
-    a: "Oui. Le plan Gratuit permet de tester Splitzy sans carte bancaire ni engagement. Passez à l'Essentiel ou au Pro quand vous êtes prêt — le changement de plan se fait en un clic depuis le dashboard.",
+    a: "Oui. Le plan Gratuit permet de tester Splitzy sans carte bancaire ni engagement. Passez à l'Essentiel ou au Pro quand vous êtes prêt — contactez l'équipe, le changement de plan se fait sans frais.",
   },
   {
     q: "Est-ce que ça fonctionne pour les grandes tables ?",

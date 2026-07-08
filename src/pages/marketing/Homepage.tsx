@@ -17,8 +17,8 @@ export function Homepage() {
   return (
     <div className="marketing-site w-full min-h-screen bg-ink-900">
       <Helmet>
-        <title>Splitzy — Pilotez votre restaurant à distance, encaissez plus vite</title>
-        <meta name="description" content="Plan de salle en direct, KPIs temps réel, équipe, insights IA — et le paiement fractionné par QR code, sans application. Pilotez votre restaurant même sans y être. Essayez Splitzy gratuitement." />
+        <title>Splitzy — Encaissement intelligent et pilotage centralisé pour votre restaurant</title>
+        <meta name="description" content="Vos clients paient et partagent l'addition par QR code, synchronisé avec votre caisse. Avis Google automatisés, pilotage en temps réel. Demandez une démo de Splitzy." />
       </Helmet>
       <Navbar />
       <main>

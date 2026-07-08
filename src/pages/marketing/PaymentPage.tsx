@@ -678,13 +678,13 @@ export function PaymentPage() {
       <section className="py-16 md:py-20 px-4 md:px-6 bg-ink-900 text-center">
         <div className="max-w-xl mx-auto">
           <h2 className="text-[28px] md:text-[34px] font-extrabold text-white tracking-tight mb-3">Prêt à simplifier vos additions&nbsp;?</h2>
-          <p className="text-[14px] md:text-[15px] text-white/50 mb-8">Démarrez en 15 minutes. Aucune carte requise.</p>
+          <p className="text-[14px] md:text-[15px] text-white/50 mb-8">Installation en 15 minutes. Sans engagement.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="/restaurant/onboarding" className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-[15px] px-7 py-3.5 rounded-xl transition-all hover:shadow-lg hover:shadow-orange-600/30 hover:-translate-y-0.5">
-              Commencer gratuitement <IconArrowRight size={16} />
+            <a href="/contact" className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-[15px] px-7 py-3.5 rounded-xl transition-all hover:shadow-lg hover:shadow-orange-600/30 hover:-translate-y-0.5">
+              Demander une démo <IconArrowRight size={16} />
             </a>
-            <a href="/contact" className="inline-flex items-center gap-2 border border-white/20 text-white/80 hover:text-white font-medium text-[14px] px-6 py-3.5 rounded-xl transition-colors hover:border-white/40">
-              Demander une démo
+            <a href="/pricing" className="inline-flex items-center gap-2 border border-white/20 text-white/80 hover:text-white font-medium text-[14px] px-6 py-3.5 rounded-xl transition-colors hover:border-white/40">
+              Voir les tarifs
             </a>
           </div>
         </div>
