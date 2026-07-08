@@ -13,6 +13,7 @@ import { useServiceStartTs } from '../hooks/useServiceStartTs'
 import { StandaloneThemeToggle } from '../components/StandaloneThemeToggle'
 import { BlurFade } from '../components/ui/BlurFade'
 import { ROLE_LABEL, type RestaurantRole } from '../lib/roles'
+import { normalizePlan, PLAN_LABEL, PLAN_PRICE_LABEL } from '../lib/plans'
 
 const clerkReady = (() => {
   const k = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined
@@ -253,9 +254,10 @@ export function Sidebar() {
         className="flex flex-col gap-3 px-3.5 pb-[18px] pt-3.5 border-t"
         style={{ borderColor: 'var(--ds-border)' }}
       >
-        {/* Plan card */}
+        {/* Plan card — 3 paliers : Gratuit / Essentiel / Pro (lib/plans.ts) */}
         {(() => {
-          const isPro = restaurant?.plan === 'pro'
+          const plan = normalizePlan(restaurant?.plan)
+          const isPro = plan === 'pro'
           return (
             <m.div
               className="rounded-[10px] px-3 py-3 relative overflow-hidden"
@@ -276,12 +278,12 @@ export function Sidebar() {
                 Plan actuel
               </div>
               <div className="font-bold text-[14px] mt-1" style={{ color: isPro ? '#FAFAFA' : '#0A0A0A' }}>
-                {isPro ? 'Plan Pro' : 'Plan Essentiel'}
+                {PLAN_LABEL[plan]}
               </div>
               <div className="text-[11.5px] mt-0.5" style={{ color: isPro ? '#71717A' : '#52525B' }}>
                 {isPro
-                  ? <><b style={{ fontWeight: 700, color: '#F5A030' }}>99€</b> /mois</>
-                  : <><b style={{ fontWeight: 700, color: '#0A0A0A' }}>59€</b> /mois</>
+                  ? <><b style={{ fontWeight: 700, color: '#F5A030' }}>{PLAN_PRICE_LABEL.pro}</b> /mois</>
+                  : <><b style={{ fontWeight: 700, color: '#0A0A0A' }}>{PLAN_PRICE_LABEL[plan]}</b> /mois</>
                 }
               </div>
               {!isPro && (
@@ -292,7 +294,7 @@ export function Sidebar() {
                   style={{ background: 'linear-gradient(90deg, #E8920A, #F5A030)' }}
                 >
                   <span className="relative z-10 flex items-center justify-center gap-1 text-[11.5px] font-semibold" style={{ color: '#fff' }}>
-                    Passer au Pro
+                    {plan === 'free' ? "Passer à l'Essentiel" : 'Passer au Pro'}
                     <ArrowUpRight size={12} />
                   </span>
                   <m.div

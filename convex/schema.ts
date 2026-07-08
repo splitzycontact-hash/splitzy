@@ -15,9 +15,13 @@ export default defineSchema({
     // Message libre affiché aux clients sur l'écran de paiement QR (plat du jour,
     // promo du soir…). Édité depuis MenuPage, persisté via restaurants.updateSpecialMessage.
     specialMessage: v.optional(v.string()),
+    // Palier de facturation : free | essentiel | pro. Absent = traité comme
+    // "free" côté dashboard (GOAL_BILLING_ESSENTIEL_FIX_RESIDUELS). Assigné
+    // UNIQUEMENT via restaurants.setPlanForTesting (CLI) tant que Market Pay
+    // n'est pas intégré — jamais modifiable depuis l'app (SECURITY M1).
+    plan: v.optional(v.union(v.literal("free"), v.literal("essentiel"), v.literal("pro"))),
     // Champs legacy présents sur d'anciens documents (plus écrits par create/update).
     // Déclarés en optionnel pour que le schéma valide les docs existants en prod.
-    plan: v.optional(v.string()),
     status: v.optional(v.string()),
     kycStatus: v.optional(v.string()),
     siret: v.optional(v.string()),
@@ -496,7 +500,7 @@ export default defineSchema({
 
   subscriptions: defineTable({
     restaurantId: v.id("restaurants"),
-    plan: v.union(v.literal("free"), v.literal("pro")),
+    plan: v.union(v.literal("free"), v.literal("essentiel"), v.literal("pro")),
     status: v.union(
       v.literal("active"), v.literal("past_due"),
       v.literal("canceled"), v.literal("paused")

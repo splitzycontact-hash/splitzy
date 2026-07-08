@@ -174,8 +174,8 @@ export const kpis = query({
     ]);
 
     const proCount = restaurants.filter(r => r.plan === "pro").length;
-    const subsBased = activeSubs.reduce((s, sub) => s + (sub.amountCents ?? 3900), 0);
-    const mrr = subsBased > 0 ? subsBased : proCount * 3900;
+    const subsBased = activeSubs.reduce((s, sub) => s + (sub.amountCents ?? 9900), 0);
+    const mrr = subsBased > 0 ? subsBased : proCount * 9900;
     const statusActive = restaurants.filter(r => r.status === "active").length;
     const activeRestaurants = statusActive > 0
       ? statusActive

@@ -6,6 +6,7 @@ import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
+import { normalizePlan, planFeatures } from '../lib/plans'
 import { formatEur } from '../../utils/formatCurrency'
 import { NumberTicker } from '../components/ui/NumberTicker'
 import { Skeleton } from '../../components/ui/skeleton'
@@ -326,7 +327,10 @@ export function Analytics() {
   const latestInsights = useQuery(api.insights.getLatestInsights, restaurantId ? { restaurantId } : 'skip')
   const overview       = useQuery(api.payments.getOverviewStats,  restaurantId ? { restaurantId } : 'skip')
   const kpiComp        = useQuery(api.analytics.getKpiComparison,  restaurantId ? { restaurantId, period: kpiPeriod } : 'skip')
-  const isPro          = restaurant?.plan === 'pro'
+  const navigate       = useNavigate()
+  const plan           = normalizePlan(restaurant?.plan)
+  const features       = planFeatures(plan)
+  const isPro          = features.insightsIA
 
   const payments = (rawPayments ?? []) as ConvexPayment[]
   const allFeedbacks = (rawFeedbacks ?? []) as { stars: number }[]
@@ -630,6 +634,33 @@ export function Analytics() {
     { label: 'Couverts',           value: String(kpiComp.current.covers),    delta: kpiComp.deltas.covers,    accent: false },
     { label: 'Ticket moyen',       value: kpiComp.current.covers > 0 ? formatEur(Math.round(kpiComp.current.avgTicket)) : '—', delta: kpiComp.deltas.avgTicket, accent: false },
   ] : null
+
+  // Palier Gratuit : analytics avancés verrouillés — le plan Gratuit n'inclut que
+  // le dashboard basique (vue d'ensemble), cf. page Pricing du site. Essentiel et
+  // Pro ont l'accès complet ; les Insights IA restent réservés au Pro plus bas.
+  if (!features.advancedAnalytics) {
+    return (
+      <RestaurantLayout>
+        <PageHeader title="Analytics" subtitle={<span>Analyse de vos revenus et performances</span>} />
+        <div className="px-4 py-5 md:px-9 md:py-6">
+          <div className="ds-panel flex flex-col items-center gap-3 py-14 px-4 text-center">
+            <TrendingUp size={28} style={{ color: '#E8920A' }} />
+            <p className="font-semibold text-[14.5px] ds-text-primary">Analytics avancés</p>
+            <p className="text-[12.5px] ds-text-secondary max-w-sm leading-[1.5]">
+              Graphiques de revenus, heatmap horaire, comparaisons période à période et rapport imprimable — disponibles à partir du Plan Essentiel.
+            </p>
+            <button
+              className="text-[13px] font-semibold"
+              style={{ color: '#E8920A' }}
+              onClick={() => navigate('/restaurant/settings?section=plan')}
+            >
+              {"Passer à l'Essentiel →"}
+            </button>
+          </div>
+        </div>
+      </RestaurantLayout>
+    )
+  }
 
   return (
     <RestaurantLayout>

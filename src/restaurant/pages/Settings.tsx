@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useAction } from 'convex/react'
 import { useClerk, useUser } from '@clerk/clerk-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { QRCodeSVG } from 'qrcode.react'
 import { toast } from 'sonner'
@@ -15,6 +15,7 @@ import { api } from '../../../convex/_generated/api'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { useRestaurant, useRestaurantId, useRestaurantRole } from '../context/RestaurantContext'
+import { normalizePlan, planFeatures, PLAN_LABEL, type RestaurantPlan } from '../lib/plans'
 import FloorPlan from '../components/floor/FloorPlan'
 import { ZONE_PALETTE } from '../components/floor/floorColors'
 import { assignEmoji, normalizeCategoryId } from '../../utils/menuEmoji'
@@ -226,6 +227,12 @@ function parseCsv(text: string): CsvResult | string {
 }
 
 function PosSection({ tables, restaurantId }: { tables: TableRef[]; restaurantId: Id<'restaurants'> | null }) {
+  // Connexion d'une caisse = plan Pro (GOAL_BILLING_ESSENTIEL_FIX_RESIDUELS).
+  // L'import CSV reste ouvert à tous les plans : c'est la seule voie d'entrée des
+  // montants de table pour un compte sans POS — le verrouiller casserait le flow client.
+  const posRestaurant = useRestaurant()
+  const posNavigate   = useNavigate()
+  const posLocked     = !planFeatures(normalizePlan(posRestaurant?.plan)).posIntegrations
   const importAmounts = useMutation(api.tables.importAmounts)
   const replaceMenu = useMutation(api.menuItems.replaceAll)
   const upsertIntegration = useMutation(api.posIntegrations.upsert)
@@ -259,6 +266,9 @@ function PosSection({ tables, restaurantId }: { tables: TableRef[]; restaurantId
 
   function openModal(pos: PosIntegration) {
     if (pos.status === 'soon') return
+    // Non-Pro : seuls l'import CSV et les intégrations déjà connectées (pour les
+    // gérer/déconnecter) restent ouverts — la bannière au-dessus explique pourquoi.
+    if (posLocked && pos.id !== 'csv' && !isConnected(pos.id)) return
     const existing = getIntegration(pos.id)
     const prefilled: Record<string, string> = {}
     if (existing) {
@@ -366,6 +376,22 @@ function PosSection({ tables, restaurantId }: { tables: TableRef[]; restaurantId
             Connectez votre caisse enregistreuse pour synchroniser automatiquement les additions avec Splitzy.
           </p>
 
+          {posLocked && (
+            <div className="mb-6 border border-amber-200 bg-amber-50 rounded-xl p-4 flex gap-3 items-start">
+              <span className="text-lg shrink-0">🔒</span>
+              <div>
+                <div className="text-sm font-semibold text-dark mb-0.5">Réservé au plan Pro</div>
+                <div className="text-xs text-muted">
+                  La connexion d'une caisse (Square, SumUp, Tiller…) est disponible avec le Plan Pro.
+                  L'import CSV reste disponible sur tous les plans.{' '}
+                  <button className="text-brand font-semibold underline" onClick={() => posNavigate('/restaurant/settings?section=plan')}>
+                    Passer au Pro →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Connected first */}
           {integrations && integrations.length > 0 && (
             <div className="mb-6">
@@ -383,7 +409,14 @@ function PosSection({ tables, restaurantId }: { tables: TableRef[]; restaurantId
             <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Disponibles</div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {POS_INTEGRATIONS.filter(p => !isConnected(p.id) && p.status !== 'soon').map(pos => (
-                <PosCard key={pos.id} pos={pos} connected={false} onClick={() => openModal(pos)} />
+                <PosCard
+                  key={pos.id}
+                  pos={posLocked && pos.id !== 'csv'
+                    ? { ...pos, badge: 'Plan Pro', badgeStyle: 'bg-amber-50 text-amber-700 border border-amber-200' }
+                    : pos}
+                  connected={false}
+                  onClick={() => openModal(pos)}
+                />
               ))}
             </div>
           </div>
@@ -998,6 +1031,10 @@ type EditItem = { _id: string; name: string; category: string; priceCents: numbe
 type AddItem  = { name: string; category: string; priceCents: number; emoji: string; description: string }
 
 function MenuSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null }) {
+  // Sync Square = intégration POS, donc plan Pro (le bouton n'apparaît de toute
+  // façon que si une intégration Square est connectée).
+  const menuRestaurant = useRestaurant()
+  const menuPosLocked  = !planFeatures(normalizePlan(menuRestaurant?.plan)).posIntegrations
   const rawItems = useQuery(api.menuItems.listByRestaurant, restaurantId ? { restaurantId } : 'skip')
   const updateItem = useMutation(api.menuItems.updateItem)
   const deleteItem = useMutation(api.menuItems.deleteItem)
@@ -1097,7 +1134,7 @@ function MenuSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
             <p className="text-xs text-muted mt-0.5">{items.length} article{items.length !== 1 ? 's' : ''} · importez via CSV ou ajoutez manuellement</p>
           </div>
           <div className="flex items-center gap-2">
-            {squareIntegration && (
+            {squareIntegration && !menuPosLocked && (
               <button
                 onClick={handleSquareSync}
                 disabled={syncing}
@@ -1330,37 +1367,40 @@ function MenuSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
   )
 }
 
+// Paliers alignés sur la page Pricing du site (PricingPreview.tsx) — ids = valeurs
+// réelles de restaurants.plan. Aucun self-service : le changement de plan passe
+// par l'équipe Splitzy (setPlanForTesting côté CLI) tant que Market Pay n'est pas là.
 const PLANS = [
   {
-    id: 'starter',
-    name: 'Starter',
+    id: 'free',
+    name: 'Gratuit',
     price: 0,
-    priceLabel: 'Gratuit',
-    desc: 'Pour tester Splitzy',
-    features: ['Jusqu\'à 5 tables', '100 paiements / mois', 'QR codes inclus', 'Support par email'],
-    missing: ['Intégrations POS', 'Analytics avancés', 'Multi-établissements'],
-    cta: 'Plan actuel',
+    priceLabel: '0 € / mois',
+    desc: 'Pour tester sans risque',
+    features: ["Jusqu'à 3 tables", 'Paiement fractionné par QR code', '10 feedbacks / mois', "Dashboard basique (vue d'ensemble)", 'Support par email'],
+    missing: ['Analytics avancés', 'Plan de salle & équipe', 'Insights IA'],
+    cta: 'Nous contacter',
     highlight: false,
+  },
+  {
+    id: 'essentiel',
+    name: 'Essentiel',
+    price: 59,
+    priceLabel: '59 € / mois HT',
+    desc: 'Pour piloter votre service au quotidien',
+    features: ['Tables et feedbacks illimités', 'Paiement fractionné — 3 modes + verrou', 'Plan de salle interactif en temps réel', 'Planning équipe, extras & chat interne', 'Clôture de service & pourboires', 'Analytics avancés & alertes manager'],
+    missing: ['Insights IA', 'Intégrations POS'],
+    cta: 'Nous contacter',
+    highlight: true,
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: 29,
-    priceLabel: '29 € / mois',
-    desc: 'Pour les restaurants actifs',
-    features: ['Tables illimitées', 'Paiements illimités', 'Toutes les intégrations POS', 'Analytics complets', 'Export CSV & PDF', 'Support prioritaire'],
-    missing: ['Multi-établissements'],
-    cta: 'Passer au Pro',
-    highlight: true,
-  },
-  {
-    id: 'enterprise',
-    name: 'Entreprise',
-    price: null,
-    priceLabel: 'Sur devis',
-    desc: 'Pour les groupes & chaînes',
-    features: ['Multi-établissements', 'Tableau de bord unifié', 'API & webhooks', 'Intégration comptable', 'Manager dédié', 'SLA garanti'],
-    missing: [],
+    price: 99,
+    priceLabel: '99 € / mois HT',
+    desc: 'Pour les établissements ambitieux',
+    features: ["Tout le plan Essentiel", "Insights IA — ventes, feedbacks, suggestions d'action", 'Intégrations POS (Square, Lightspeed, Tiller…)', 'CRM Clients — email, téléphone, historique', 'Support prioritaire (réponse < 4h)'],
+    missing: ['Multi-établissements (à venir)'],
     cta: 'Nous contacter',
     highlight: false,
   },
@@ -1383,12 +1423,8 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
   const setSuspended = useMutation(api.restaurants.setSuspended)
   const deleteAll    = useMutation(api.restaurants.deleteAll)
 
-  const currentPlan = restaurant?.plan ?? 'essentiel'
-  const PLAN_LABELS: Record<string, string> = {
-    gratuit: 'Plan Gratuit', starter: 'Plan Starter',
-    essentiel: 'Plan Essentiel', pro: 'Plan Pro',
-  }
-  const currentPlanLabel = PLAN_LABELS[currentPlan] ?? 'Plan Essentiel'
+  const currentPlan = normalizePlan(restaurant?.plan)
+  const currentPlanLabel = PLAN_LABEL[currentPlan]
   const [billingForm, setBillingForm] = useState({
     company: restaurant?.name ?? '',
     address: restaurant?.address ?? '',
@@ -1463,9 +1499,9 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
               </span>
             </div>
             <p className="text-[12.5px] ds-text-tertiary">
-              {currentPlan === 'pro' ? 'Tables illimitées · Paiements illimités · Support prioritaire'
-                : currentPlan === 'essentiel' ? "Jusqu'à 20 tables · Paiements illimités · Analytics"
-                : "Jusqu'à 5 tables · 50 paiements / mois · QR codes inclus"}
+              {currentPlan === 'pro' ? 'Tout Essentiel · Insights IA · Intégrations POS · Support prioritaire'
+                : currentPlan === 'essentiel' ? 'Tables & feedbacks illimités · Plan de salle · Planning & chat · Analytics'
+                : "Jusqu'à 3 tables · 10 feedbacks / mois · Dashboard basique"}
             </p>
           </div>
           <button
@@ -1518,8 +1554,15 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
                     </div>
                   ))}
                 </div>
+                {/* Pas de self-service tant que Market Pay n'est pas intégré :
+                    le CTA ouvre un email à l'équipe, il ne change PAS le plan. */}
                 <button
                   disabled={currentPlan === plan.id}
+                  onClick={() => {
+                    if (currentPlan !== plan.id) {
+                      window.location.href = `mailto:contact@splitzy.fr?subject=${encodeURIComponent(`Changement de plan — ${plan.name}`)}`
+                    }
+                  }}
                   className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors ${
                     currentPlan === plan.id
                       ? 'bg-bg text-muted cursor-not-allowed border border-border'
@@ -3645,37 +3688,52 @@ function AccountSection({
 // PLAN SECTION
 // ══════════════════════════════════════════════════════════════
 
-const PLAN_FEATURES = {
-  gratuit: [
-    "Jusqu'à 5 tables",
-    '50 paiements / mois',
-    'QR codes inclus',
-    'Feedbacks clients',
-    'Dashboard basique',
+// Listes alignées sur la page Pricing du site (PricingPreview.tsx) — ne rien
+// promettre qui n'existe pas en code (multi-établissements = « à venir »).
+const PLAN_CARD_FEATURES: Record<RestaurantPlan, string[]> = {
+  free: [
+    "Jusqu'à 3 tables",
+    'Paiement fractionné par QR code',
+    '10 feedbacks / mois',
+    "Dashboard basique (vue d'ensemble)",
+    'Support par email',
   ],
   essentiel: [
-    "Jusqu'à 20 tables",
-    'Paiements illimités',
-    'QR codes personnalisés',
-    'Analytics hebdomadaires',
-    'Réputation & Google',
-    'Support email',
+    'Tables et feedbacks illimités',
+    'Paiement fractionné — 3 modes + verrou',
+    'Plan de salle interactif en temps réel',
+    'Planning équipe, extras & chat interne',
+    'Clôture de service & pourboires',
+    'Analytics avancés & alertes manager',
   ],
   pro: [
-    'Tables illimitées',
-    'Paiements illimités',
-    'Score Splitzy avancé',
-    'Insights IA',
-    'Intégrations POS',
-    'Gestion équipe',
-    'Support prioritaire',
+    'Tout le plan Essentiel',
+    "Insights IA — ventes, feedbacks, suggestions d'action",
+    'Intégrations POS (Square, Lightspeed, Tiller…)',
+    'CRM Clients — email, téléphone, historique',
+    'Support prioritaire (réponse < 4h)',
   ],
 }
 
 function PlanSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null }) {
-  const feedbackCount = useQuery(api.feedbacks.list, restaurantId ? { restaurantId } : 'skip')?.length ?? 0
-  const currentPlan = 'essentiel'
-  const planLimit   = 300
+  const restaurant = useRestaurant()
+  // Plan réel du restaurant (avant : 'essentiel' hardcodé → badge « Actuel » faux).
+  const currentPlan = normalizePlan(restaurant?.plan)
+  const feedbacks = useQuery(api.feedbacks.list, restaurantId ? { restaurantId } : 'skip')
+  const tables    = useQuery(api.tables.list,    restaurantId ? { restaurantId } : 'skip')
+  const monthStart = (() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.getTime() })()
+  const feedbacksThisMonth = (feedbacks ?? []).filter(f => (f.createdAt ?? 0) >= monthStart).length
+  const tableCount = tables?.length ?? 0
+  // Quotas réels : seuls ceux du plan Gratuit existent (cf. site). Essentiel/Pro : illimité.
+  const usageRows = currentPlan === 'free'
+    ? [
+        { label: 'Tables actives',     value: tableCount,         limit: 3 as number | null,  unit: '/ 3 tables' },
+        { label: 'Feedbacks ce mois',  value: feedbacksThisMonth, limit: 10 as number | null, unit: '/ 10' },
+      ]
+    : [
+        { label: 'Tables actives',     value: tableCount,         limit: null as number | null, unit: '· illimité' },
+        { label: 'Feedbacks ce mois',  value: feedbacksThisMonth, limit: null as number | null, unit: '· illimité' },
+      ]
 
   return (
     <div className="space-y-5">
@@ -3695,10 +3753,15 @@ function PlanSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {(
           [
-            { id: 'gratuit',   name: 'Gratuit',   price: '0€',   period: '',           features: PLAN_FEATURES.gratuit,   cta: null },
-            { id: 'essentiel', name: 'Essentiel', price: '59€',  period: ' /mois',     features: PLAN_FEATURES.essentiel, cta: null },
-            { id: 'pro',       name: 'Pro',        price: '99€',  period: ' /mois',     features: PLAN_FEATURES.pro,        cta: 'Passer au Pro' },
-          ] as const
+            { id: 'free' as RestaurantPlan,      name: 'Gratuit',   price: '0€',  period: '' },
+            { id: 'essentiel' as RestaurantPlan, name: 'Essentiel', price: '59€', period: ' /mois HT' },
+            { id: 'pro' as RestaurantPlan,       name: 'Pro',       price: '99€', period: ' /mois HT' },
+          ].map(p => ({
+            ...p,
+            features: PLAN_CARD_FEATURES[p.id],
+            // Pas de self-service (Market Pay absent) : tout changement passe par l'équipe.
+            cta: p.id === currentPlan ? null : (p.id === 'pro' ? 'Passer au Pro' : 'Nous contacter'),
+          }))
         ).map(plan => {
           const isCurrent = plan.id === currentPlan
           return (
@@ -3743,7 +3806,7 @@ function PlanSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
               <div className="mt-auto pt-1">
                 {plan.cta ? (
                   <a
-                    href="mailto:splitzy.contact@gmail.com?subject=Passage au Plan Pro"
+                    href={`mailto:splitzy.contact@gmail.com?subject=${encodeURIComponent(`Changement de plan — ${plan.name}`)}`}
                     className="block text-center w-full py-2 rounded-[7px] text-[12px] font-semibold text-white transition-colors"
                     style={{ background: '#E8920A' }}
                   >
@@ -3767,15 +3830,12 @@ function PlanSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
       <div className="ds-panel">
         <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ds-border)' }}>
           <div className="font-bold text-[13.5px] ds-text-primary">Utilisation ce mois</div>
-          <span className="text-[12px] ds-text-tertiary">Plan {currentPlan}</span>
+          <span className="text-[12px] ds-text-tertiary">{PLAN_LABEL[currentPlan]}</span>
         </div>
         <div className="px-5 py-4 space-y-3">
-          {[
-            { label: 'Feedbacks reçus', value: feedbackCount, limit: planLimit, unit: `/ ${planLimit}` },
-            { label: 'Tables actives',  value: 10,            limit: 20,        unit: '/ 20 tables' },
-          ].map(row => {
-            const pct = Math.min(Math.round((row.value / row.limit) * 100), 100)
-            const warning = pct >= 80
+          {usageRows.map(row => {
+            const pct = row.limit ? Math.min(Math.round((row.value / row.limit) * 100), 100) : 0
+            const warning = row.limit !== null && pct >= 80
             return (
               <div key={row.label} className="grid items-center gap-3.5" style={{ gridTemplateColumns: '140px 1fr 100px' }}>
                 <span className="text-[12.5px] font-medium ds-text-primary">{row.label}</span>
@@ -3783,8 +3843,8 @@ function PlanSection({ restaurantId }: { restaurantId: Id<'restaurants'> | null 
                   <div
                     className="h-full rounded-full transition-all"
                     style={{
-                      width: `${pct}%`,
-                      background: warning ? 'var(--ds-warning)' : '#E8920A',
+                      width: row.limit ? `${pct}%` : '100%',
+                      background: row.limit ? (warning ? 'var(--ds-warning)' : '#E8920A') : 'var(--ds-bg-subtle)',
                     }}
                   />
                 </div>
@@ -4298,7 +4358,13 @@ export function Settings() {
     ? SUB_NAV.filter(n => !HIDDEN_FOR_MANAGER.includes(n.key))
     : SUB_NAV
 
-  const [section, setSection]       = useState<SectionKey>('restaurant')
+  // Deep-link `?section=…` (ex : CTA « Passer au Pro » de la Sidebar →
+  // /restaurant/settings?section=plan). Param invalide → section par défaut.
+  const [searchParams] = useSearchParams()
+  const requestedSection = searchParams.get('section') as SectionKey | null
+  const [section, setSection]       = useState<SectionKey>(
+    requestedSection && SUB_NAV.some(n => n.key === requestedSection) ? requestedSection : 'restaurant',
+  )
   const [saving, setSaving]         = useState(false)
   const [saved, setSaved]           = useState(false)
   const [logoUploading, setLogoUploading] = useState(false)

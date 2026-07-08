@@ -3,7 +3,12 @@ import { query } from "./_generated/server";
 import { isAdminAccess } from "./lib";
 
 const MONTHS_FR = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"];
-const PRO_PRICE_CENTS = 3900;
+const PRO_PRICE_CENTS = 9900;
+const ESSENTIEL_PRICE_CENTS = 5900;
+const PLAN_PRICE_CENTS: Record<string, number> = {
+  pro: PRO_PRICE_CENTS,
+  essentiel: ESSENTIEL_PRICE_CENTS,
+};
 
 export const financialKpis = query({
   args: { authEmail: v.optional(v.string()) },
@@ -17,18 +22,27 @@ export const financialKpis = query({
       ctx.db.query("subscriptions").withIndex("by_status", (q) => q.eq("status", "active")).collect(),
       ctx.db.query("payments").collect(),
     ]);
-    const proSubs = activeSubs.filter((s) => s.plan === "pro");
-    const proCount =
-      proSubs.length > 0 ? proSubs.length : restaurants.filter((r) => r.plan === "pro").length;
-    const mrrCents =
-      proSubs.length > 0
-        ? proSubs.reduce((s, sub) => s + (sub.amountCents ?? PRO_PRICE_CENTS), 0)
-        : proCount * PRO_PRICE_CENTS;
+    // Par palier payant : subs actives si présentes, sinon fallback sur
+    // restaurants.plan (aucune facturation réelle tant que Market Pay absent).
+    const paidPlanStats = (plan: "pro" | "essentiel") => {
+      const subs = activeSubs.filter((s) => s.plan === plan);
+      const count = subs.length > 0 ? subs.length : restaurants.filter((r) => r.plan === plan).length;
+      const cents =
+        subs.length > 0
+          ? subs.reduce((s, sub) => s + (sub.amountCents ?? PLAN_PRICE_CENTS[plan]), 0)
+          : count * PLAN_PRICE_CENTS[plan];
+      return { count, cents };
+    };
+    const pro = paidPlanStats("pro");
+    const essentiel = paidPlanStats("essentiel");
+    const proCount = pro.count;
+    const mrrCents = pro.cents + essentiel.cents;
     const monthPayments = payments.filter((p) => p.createdAt >= monthStart.getTime());
     return {
       mrrCents,
       arrCents: mrrCents * 12,
       proCount,
+      essentielCount: essentiel.count,
       monthlyVolumeCents: monthPayments.reduce((s, p) => s + p.totalCents, 0),
       monthlyCommissionCents: monthPayments.reduce((s, p) => s + p.commissionCents, 0),
     };
@@ -72,7 +86,7 @@ export const subscriptions = query({
             restaurantName: r?.name ?? "—",
             plan: s.plan as string,
             status: s.status as string,
-            amountCents: s.amountCents ?? PRO_PRICE_CENTS,
+            amountCents: s.amountCents ?? PLAN_PRICE_CENTS[s.plan as string] ?? PRO_PRICE_CENTS,
             currentPeriodEnd: s.currentPeriodEnd ?? null,
             mock: false,
           };
@@ -81,14 +95,14 @@ export const subscriptions = query({
     }
     const restaurants = await ctx.db.query("restaurants").collect();
     return restaurants
-      .filter((r) => r.plan === "pro")
+      .filter((r) => r.plan === "pro" || r.plan === "essentiel")
       .map((r) => ({
         _id: r._id as string,
         restaurantId: r._id,
         restaurantName: r.name,
-        plan: "pro" as string,
+        plan: r.plan as string,
         status: "active" as string,
-        amountCents: PRO_PRICE_CENTS,
+        amountCents: PLAN_PRICE_CENTS[r.plan as string] ?? PRO_PRICE_CENTS,
         currentPeriodEnd: null as number | null,
         mock: true,
       }));

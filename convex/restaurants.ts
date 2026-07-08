@@ -178,13 +178,15 @@ export const create = mutation({
     email: v.string(),
     type: v.string(),
     clerkUserId: v.string(),
-    plan: v.optional(v.string()),
+    plan: v.optional(v.union(v.literal("free"), v.literal("essentiel"), v.literal("pro"))),
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
     const existing = await ctx.db.query("restaurants").withIndex("by_slug", q => q.eq("slug", args.slug)).first()
     if (existing) return existing._id
-    return ctx.db.insert("restaurants", { ...args, clerkUserId: identity.subject })
+    // Plan par défaut = "free" (GOAL_BILLING_ESSENTIEL_FIX_RESIDUELS) : un compte
+    // créé sans plan explicite est Gratuit — jamais un palier payant implicite.
+    return ctx.db.insert("restaurants", { ...args, plan: args.plan ?? "free", clerkUserId: identity.subject })
   },
 })
 
@@ -241,14 +243,15 @@ export const deleteAll = mutation({
 })
 
 // Outil admin (CLI `npx convex run` uniquement — internalMutation, jamais
-// appelable depuis l'app) : bascule un restaurant précis en plan "pro" pour
-// un test/démo. Ne réintroduit PAS la faille corrigée en SECURITY (M1) —
-// `restaurants.update` reste sans le champ `plan`, donc un gérant ne peut
-// toujours pas se l'auto-attribuer depuis le dashboard. Cet outil n'est
-// atteignable qu'avec les identifiants de déploiement Convex.
-// Usage : npx convex run restaurants:setPlanForTesting '{"id":"<id>","plan":"pro"}' --prod
+// appelable depuis l'app) : bascule un restaurant précis en plan "free",
+// "essentiel" ou "pro" pour un test/démo. Seule voie d'assignation de plan
+// tant que Market Pay n'est pas intégré (aucun self-service). Ne réintroduit
+// PAS la faille corrigée en SECURITY (M1) — `restaurants.update` reste sans
+// le champ `plan`, donc un gérant ne peut toujours pas se l'auto-attribuer
+// depuis le dashboard. Atteignable qu'avec les identifiants de déploiement.
+// Usage : npx convex run restaurants:setPlanForTesting '{"id":"<id>","plan":"essentiel"}' --prod
 export const setPlanForTesting = internalMutation({
-  args: { id: v.id("restaurants"), plan: v.union(v.literal("free"), v.literal("pro")) },
+  args: { id: v.id("restaurants"), plan: v.union(v.literal("free"), v.literal("essentiel"), v.literal("pro")) },
   handler: async (ctx, { id, plan }) => {
     await ctx.db.patch(id, { plan })
   },

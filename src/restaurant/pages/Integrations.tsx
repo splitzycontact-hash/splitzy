@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
+import { useRestaurant } from '../context/RestaurantContext'
+import { normalizePlan, planFeatures } from '../lib/plans'
 import {
   ExternalLink, CheckCircle2, Clock, AlertTriangle, Plug,
   ArrowRight, RefreshCw, Settings, ThumbsUp, Activity, X, Printer,
@@ -11,6 +14,9 @@ const VOTE_KEY = 'splitzy-integration-voted'
 const INITIAL_VOTES: Record<string, number> = { Pennylane: 142, Tiller: 98, Mailchimp: 76 }
 
 export function Integrations() {
+  const restaurant = useRestaurant()
+  const navigate   = useNavigate()
+  const features   = planFeatures(normalizePlan(restaurant?.plan))
   const [requestModal, setRequestModal]   = useState(false)
   const [engineerModal, setEngineerModal] = useState(false)
   const [voted, setVoted] = useState<Set<string>>(() => {
@@ -41,6 +47,32 @@ export function Integrations() {
     const body = `Nom : ${engName}\n\nMessage : ${engMsg}`
     window.open(`mailto:splitzy.contact@gmail.com?subject=Contact ingénieur Splitzy&body=${encodeURIComponent(body)}`, '_blank')
     setEngineerModal(false); setEngName(''); setEngMsg('')
+  }
+
+  // Intégrations POS réservées au plan Pro (GOAL_BILLING_ESSENTIEL_FIX_RESIDUELS) —
+  // même pattern de verrou que les analytics avancés (Analytics.tsx).
+  if (!features.posIntegrations) {
+    return (
+      <RestaurantLayout>
+        <PageHeader title="Intégrations" subtitle={<span>Connectez votre caisse et vos outils métier</span>} />
+        <div className="px-4 py-5 md:px-9 md:py-6">
+          <div className="ds-panel flex flex-col items-center gap-3 py-14 px-4 text-center">
+            <Plug size={28} style={{ color: '#E8920A' }} />
+            <p className="font-semibold text-[14.5px] ds-text-primary">Réservé au plan Pro</p>
+            <p className="text-[12.5px] ds-text-secondary max-w-sm leading-[1.5]">
+              La connexion de votre caisse (Square, Lightspeed, Tiller…) et la synchronisation automatique du menu sont disponibles avec le Plan Pro.
+            </p>
+            <button
+              className="text-[13px] font-semibold"
+              style={{ color: '#E8920A' }}
+              onClick={() => navigate('/restaurant/settings?section=plan')}
+            >
+              {'Passer au Pro →'}
+            </button>
+          </div>
+        </div>
+      </RestaurantLayout>
+    )
   }
 
   return (

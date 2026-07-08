@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useQuery, useMutation, useAction } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
@@ -7,6 +8,7 @@ import type { Doc, Id } from '../../../convex/_generated/dataModel'
 import { formatEur } from '../../utils/formatCurrency'
 import { AVATARS } from '../../components/ui/Avatar'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
+import { normalizePlan, planFeatures } from '../lib/plans'
 import { RestaurantLayout } from '../layout/RestaurantLayout'
 import { PageHeader } from '../components/PageHeader'
 import { Users, Star, TrendingUp, Search, X, Send, Mail, Crown, Sparkles, ChevronRight, Printer, Download, Phone, Check } from 'lucide-react'
@@ -566,6 +568,8 @@ export function Clients() {
 
   const restaurantId = useRestaurantId()
   const restaurant   = useRestaurant()
+  const navigate     = useNavigate()
+  const features     = planFeatures(normalizePlan(restaurant?.plan))
   const sendCampaign = useAction(api.campaigns.sendCampaign)
   const payments  = (useQuery(api.payments.list,  restaurantId ? { restaurantId } : 'skip') ?? []).filter(p => p.status === 'Encaissé')
   const feedbacks =  useQuery(api.feedbacks.list, restaurantId ? { restaurantId } : 'skip') ?? []
@@ -744,6 +748,32 @@ export function Clients() {
   })
 
   const liveSelected = selected ? (customers.find(c => c.id === selected.id) ?? selected) : null
+
+  // CRM Clients réservé au plan Pro (GOAL_BILLING_ESSENTIEL_FIX_RESIDUELS) —
+  // même pattern de verrou que les analytics avancés (Analytics.tsx).
+  if (!features.crmClients) {
+    return (
+      <RestaurantLayout>
+        <PageHeader title="Clients" subtitle={<span>Votre base clients et campagnes email</span>} />
+        <div className="px-4 py-5 md:px-9 md:py-6">
+          <div className="ds-panel flex flex-col items-center gap-3 py-14 px-4 text-center">
+            <Users size={28} style={{ color: '#E8920A' }} />
+            <p className="font-semibold text-[14.5px] ds-text-primary">Réservé au plan Pro</p>
+            <p className="text-[12.5px] ds-text-secondary max-w-sm leading-[1.5]">
+              Le CRM Clients — historique de visites, contacts et campagnes email — est disponible avec le Plan Pro.
+            </p>
+            <button
+              className="text-[13px] font-semibold"
+              style={{ color: '#E8920A' }}
+              onClick={() => navigate('/restaurant/settings?section=plan')}
+            >
+              {'Passer au Pro →'}
+            </button>
+          </div>
+        </div>
+      </RestaurantLayout>
+    )
+  }
 
   return (
     <RestaurantLayout>

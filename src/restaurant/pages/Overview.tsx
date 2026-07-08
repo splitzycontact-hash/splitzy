@@ -11,6 +11,7 @@ import { BorderBeam } from '../components/ui/BorderBeam'
 import { AnimatedCircularProgress } from '../components/ui/AnimatedCircularProgress'
 import { Skeleton } from '../../components/ui/skeleton'
 import { useRestaurantId, useRestaurant } from '../context/RestaurantContext'
+import { normalizePlan, planFeatures } from '../lib/plans'
 import { formatEur } from '../../utils/formatCurrency'
 import { deltaPct } from '../lib/billing'
 import {
@@ -329,7 +330,8 @@ export function Overview() {
   const rawFeedbacks   = useQuery(api.feedbacks.list,            restaurantId ? { restaurantId } : 'skip')
   const latestInsights = useQuery(api.insights.getLatestInsights, restaurantId ? { restaurantId } : 'skip')
 
-  const isPro = restaurant?.plan?.toLowerCase() === 'pro'
+  // Insights IA = Pro uniquement (helper 3 paliers — free/essentiel voient le teaser).
+  const isPro = planFeatures(normalizePlan(restaurant?.plan)).insightsIA
 
   const DATE_FR = useMemo(
     () => new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
