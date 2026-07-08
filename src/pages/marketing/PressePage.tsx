@@ -153,7 +153,7 @@ function HeroSection() {
               style={{ display: 'flex', gap: 32, flexWrap: 'wrap' as const }}
             >
               {[
-                { label: 'FONDÉE', value: '2025 · Paris' },
+                { label: 'FONDÉE', value: '2025 · France' },
                 { label: 'STADE', value: 'Pre-seed · NEOMA Incubator' },
                 { label: 'ÉQUIPE', value: '2 co-fondateurs' },
               ].map((item) => (
@@ -220,7 +220,7 @@ function HeroSection() {
 
             {/* Tags */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const, marginBottom: 16 }}>
-              {['Fondée en 2025', 'Paris, France', 'NEOMA Incubator'].map((tag) => (
+              {['Fondée en 2025', 'France', 'NEOMA Incubator'].map((tag) => (
                 <span key={tag} style={{
                   background: '#27272A', border: '1px solid #3F3F46',
                   color: '#71717A', fontSize: 12, padding: '4px 12px', borderRadius: 99,

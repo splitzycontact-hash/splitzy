@@ -122,7 +122,7 @@ export function AboutPage() {
               Fondé en 2025
             </span>
             <span className="text-zinc-700">·</span>
-            <span>Paris, France</span>
+            <span>France</span>
             <span className="text-zinc-700">·</span>
             <span>Incubé au NEOMA</span>
           </div>
@@ -308,7 +308,7 @@ export function AboutPage() {
                 <p className="text-[15px] font-semibold" style={{ color: '#0A0A0A' }}>
                   On cherche notre 3<sup>e</sup> personne.
                 </p>
-                <p className="text-[13px] text-zinc-500">Profil produit · Paris · stage ou alternance.</p>
+                <p className="text-[13px] text-zinc-500">Profil produit · stage ou alternance.</p>
               </div>
             </div>
             <a href="/careers" className="inline-flex items-center gap-1 text-[13px] font-semibold hover:text-orange-600 transition-colors" style={{ color: '#0A0A0A' }}>
@@ -417,7 +417,7 @@ export function AboutPage() {
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-[22px] font-bold tracking-tight" style={{ background: '#0A0A0A' }}>N</div>
               <div>
                 <p className="text-[11px] tracking-[0.16em] uppercase text-zinc-500 font-semibold">Incubé chez</p>
-                <p className="mt-1 text-[24px] font-bold tracking-tight" style={{ color: '#0A0A0A' }}>NEOMA Incubator · Paris</p>
+                <p className="mt-1 text-[24px] font-bold tracking-tight" style={{ color: '#0A0A0A' }}>NEOMA Incubator</p>
                 <p className="text-[14px] text-zinc-500">Promotion 2025</p>
               </div>
             </div>

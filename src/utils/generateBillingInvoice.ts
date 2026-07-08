@@ -62,7 +62,6 @@ export function generateBillingInvoicePDF(inv: BillingInvoiceData) {
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
   doc.text('splitzy.fr  ·  contact@splitzy.fr', M, 25)
-  doc.text('15 rue du Commerce, 75015 Paris', M, 31)
 
   // Invoice label on right
   doc.setTextColor(...WHITE)
@@ -100,9 +99,8 @@ export function generateBillingInvoicePDF(inv: BillingInvoiceData) {
   doc.setFontSize(8.5)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(...GRAY)
-  doc.text('15 rue du Commerce', M + 5, y + 22)
-  doc.text('75015 Paris, France', M + 5, y + 28)
-  doc.text('SIRET : 123 456 789 00012', M + 5, y + 34)
+  doc.text('contact@splitzy.fr', M + 5, y + 22)
+  doc.text("SIRET : en cours d'immatriculation", M + 5, y + 28)
 
   // Destinataire box
   const col2X = M + colW + 10
@@ -259,7 +257,7 @@ export function generateBillingInvoicePDF(inv: BillingInvoiceData) {
   doc.setFontSize(7.5)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(...LIGHT_GRAY)
-  doc.text('Splitzy SAS — Capital 10 000 € — SIRET 123 456 789 00012 — TVA FR 12 123 456 789', M, y)
+  doc.text("Splitzy SAS — SIRET en cours d'immatriculation", M, y)
   doc.text("Conformement a la loi, aucun escompte n'est accorde pour paiement anticipe.", M, y + 5)
   doc.text('En cas de retard, des penalites de 3x le taux legal seront appliquees.', M, y + 10)
   doc.text(`Facture générée le ${new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} par Splitzy.`, M + W, y + 10, { align: 'right' })

@@ -1599,7 +1599,7 @@ function BillingSection({ restaurant }: { restaurant: ReturnType<typeof useResta
               type="text"
               value={billingForm.address}
               onChange={e => setBillingForm(p => ({ ...p, address: e.target.value }))}
-              placeholder="12 rue de la Paix, 75001 Paris"
+              placeholder="Adresse complète de votre établissement"
               className="w-full border border-border rounded-lg px-3 py-2.5 text-base md:text-sm text-dark focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
             />
           </div>

@@ -85,7 +85,7 @@ const para = 'text-[14px] leading-[1.7]'
 const EDITOR_ROWS = [
   { label: 'Raison sociale', value: 'Splitzy SAS' },
   { label: 'Forme juridique', value: 'Société par actions simplifiée (SAS)' },
-  { label: 'Siège social', value: '123 Rue de l’Innovation, 75001 Paris, France' },
+  { label: 'Siège social', value: 'Adresse en cours de finalisation' },
   { label: 'SIRET', value: 'En cours d’immatriculation' },
   { label: 'Directeur de la publication', value: 'Le représentant légal de Splitzy SAS' },
   { label: 'Contact', value: 'contact@splitzy.fr' },

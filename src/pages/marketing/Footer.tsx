@@ -98,7 +98,7 @@ export function Footer() {
               contact@splitzy.fr
             </a>
             <p className="text-[12px] text-white/45 leading-[1.5]">
-              Paris, France<br />
+              France<br />
               Réponse sous 24h ouvrées
             </p>
           </div>
