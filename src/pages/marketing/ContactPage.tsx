@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { m, AnimatePresence } from 'framer-motion'
 import { Navbar } from './Navbar'
 import { Footer } from './Footer'
 import { IconArrowRight } from './Icons'
+import { httpMutation } from '../../utils/convexHttp'
 
 // ── Icons ──────────────────────────────────────────────────────
 function IcMail({ className = '' }: { className?: string }) {
@@ -16,20 +18,6 @@ function IcClock({ className = '' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-    </svg>
-  )
-}
-function IcPin({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" />
-    </svg>
-  )
-}
-function IcChat({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
     </svg>
   )
 }
@@ -65,7 +53,7 @@ function IcChevDown({ className = '' }: { className?: string }) {
 // ── Subjects ───────────────────────────────────────────────────
 const SUBJECTS = [
   { id: 'demo',    label: 'Demande de démo',     dot: '#E8920A', eta: '~ 24 h' },
-  { id: 'support', label: 'Support technique',   dot: '#3B82F6', eta: '~ 4 h'  },
+  { id: 'support', label: 'Support technique',   dot: '#3B82F6', eta: '~ 24 h' },
   { id: 'press',   label: 'Presse & médias',      dot: '#8B5CF6', eta: '~ 24 h' },
   { id: 'partner', label: 'Partenariat',           dot: '#10B981', eta: '~ 48 h' },
   { id: 'other',   label: 'Autre',                 dot: '#A1A1AA', eta: '~ 24 h' },
@@ -154,6 +142,7 @@ function ContactForm({ onSent }: { onSent: (email: string) => void }) {
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle')
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const upd = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -168,11 +157,29 @@ function ContactForm({ onSent }: { onSent: (email: string) => void }) {
     return Object.keys(e).length === 0
   }
 
-  function submit(ev: React.FormEvent) {
+  async function submit(ev: React.FormEvent) {
     ev.preventDefault()
     if (!validate()) return
     setState('sending')
-    setTimeout(() => { setState('sent'); onSent(form.email) }, 1100)
+    setSubmitError(null)
+    try {
+      await httpMutation('contact:submitContact', {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        restaurantName: form.restaurant.trim() || undefined,
+        subject: form.subject,
+        message: form.message.trim(),
+      })
+      setState('sent')
+      onSent(form.email)
+    } catch (err) {
+      console.error('[Contact] submit failed:', err)
+      setState('idle')
+      setSubmitError(err instanceof Error && err.message.includes('déjà')
+        ? 'Un message a déjà été envoyé avec cet email aujourd’hui.'
+        : "L'envoi a échoué. Vérifiez votre connexion et réessayez — ou écrivez-nous à contact@splitzy.fr.")
+    }
   }
 
   const subj = SUBJECTS.find((s) => s.id === form.subject)!
@@ -187,10 +194,6 @@ function ContactForm({ onSent }: { onSent: (email: string) => void }) {
           <h2 className="text-[22px] font-extrabold text-ink-900 tracking-tight">Envoyez-nous un message</h2>
           <p className="text-[13.5px] text-ink-500 mt-1">On le lit. On vous répond. Promis.</p>
         </div>
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[11px] font-bold tracking-wide shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)]" />
-          ONLINE
-        </span>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -254,8 +257,8 @@ function ContactForm({ onSent }: { onSent: (email: string) => void }) {
             className="w-[18px] h-[18px] mt-0.5 shrink-0 accent-orange-600 cursor-pointer"
           />
           <span className="text-[12.5px] text-ink-500 leading-relaxed">
-            J'accepte que Splitzy utilise mes données pour répondre à ma demande. Aucun démarchage commercial.{' '}
-            <a href="/privacy" className="text-orange-600 underline">Confidentialité</a>
+            J'accepte que Splitzy me recontacte au sujet de ma demande.{' '}
+            <Link to="/privacy" className="text-orange-600 underline">Confidentialité</Link>
           </span>
         </label>
 
@@ -270,8 +273,14 @@ function ContactForm({ onSent }: { onSent: (email: string) => void }) {
           {state === 'sent'    && <><IcCheck className="w-[16px] h-[16px]" /><span>Message envoyé</span></>}
         </m.button>
 
+        {submitError && (
+          <p className="text-[12.5px] text-red-600 bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5 text-center leading-relaxed">
+            {submitError}
+          </p>
+        )}
+
         <p className="text-[11.5px] text-ink-400 text-center">
-          Réponse sous <strong className="text-ink-900 font-semibold">24 h ouvrées</strong>. Aucune carte requise, aucun démarchage.
+          Réponse sous <strong className="text-ink-900 font-semibold">24 h ouvrées</strong>. Aucune carte requise, sans engagement.
         </p>
       </div>
     </form>
@@ -280,7 +289,6 @@ function ContactForm({ onSent }: { onSent: (email: string) => void }) {
 
 // ── Sidebar ────────────────────────────────────────────────────
 function ContactSidebar() {
-  const [chatHover, setChatHover] = useState(false)
   return (
     <aside className="flex flex-col gap-3.5">
       {/* Direct */}
@@ -302,58 +310,24 @@ function ContactSidebar() {
         </div>
       </div>
 
-      {/* Location */}
-      <div className="bg-white border border-[#E4E4E7] rounded-2xl p-5">
-        <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-8 h-8 rounded-[9px] bg-orange-50 text-orange-600 flex items-center justify-center">
-            <IcPin className="w-4 h-4" />
-          </div>
-          <span className="text-[13px] font-bold text-ink-900">Localisation</span>
-        </div>
-        <p className="text-[14px] font-semibold text-ink-900 tracking-tight">Paris, France</p>
-        <p className="text-[12.5px] text-ink-500 mt-0.5">11<sup>e</sup> arrondissement · Métro Bastille</p>
-        <div className="mt-4 p-3.5 rounded-xl bg-[#FBF8F2] border border-[#E4E4E7] flex items-center gap-3">
-          <div className="w-9 h-9 rounded-[9px] bg-ink-900 text-white flex items-center justify-center text-[13px] font-extrabold tracking-tighter shrink-0">
-            NI
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-ink-400 uppercase tracking-widest">Incubé chez</p>
-            <p className="text-[13.5px] font-bold text-ink-900 tracking-tight">NEOMA Incubator</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Urgence */}
+      {/* Déjà client — support via le dashboard */}
       <div className="bg-white border border-[#E4E4E7] rounded-2xl p-5 flex flex-col gap-3.5">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-[9px] bg-orange-50 text-orange-600 flex items-center justify-center">
-            <IcChat className="w-4 h-4" />
+            <IcShield className="w-4 h-4" />
           </div>
-          <span className="text-[13px] font-bold text-ink-900">Urgence support</span>
+          <span className="text-[13px] font-bold text-ink-900">Déjà client Splitzy ?</span>
         </div>
         <p className="text-[13.5px] text-ink-500 leading-relaxed">
-          Un paiement bloqué, un client à votre table en ce moment ? Notre équipe répond en chat sous <strong className="text-ink-900 font-semibold">4 minutes</strong>.
+          Le plus rapide : ouvrez un ticket directement depuis votre dashboard. Votre demande arrive à l'équipe support avec le contexte de votre restaurant.
         </p>
-        <m.button
-          type="button"
-          whileTap={{ scale: 0.98 }}
-          onMouseEnter={() => setChatHover(true)}
-          onMouseLeave={() => setChatHover(false)}
-          className={`h-11 rounded-xl border-[1.5px] text-[13.5px] font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${chatHover ? 'bg-ink-900 text-white border-ink-900' : 'bg-white text-ink-900 border-ink-900'}`}
+        <Link
+          to="/restaurant/support"
+          className="h-11 rounded-xl border-[1.5px] border-ink-900 bg-white text-ink-900 text-[13.5px] font-bold flex items-center justify-center gap-2 no-underline transition-colors hover:bg-ink-900 hover:text-white"
         >
-          Ouvrir le chat
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)]" />
-        </m.button>
-      </div>
-
-      {/* SLA pills */}
-      <div className="grid grid-cols-3 gap-2.5">
-        {[{ label: 'Démo', time: '< 24 h' }, { label: 'Support', time: '< 4 h' }, { label: 'Presse', time: '< 24 h' }].map((s) => (
-          <div key={s.label} className="p-3 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] text-center">
-            <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest">{s.label}</p>
-            <p className="text-[14px] font-extrabold text-ink-900 tracking-tight mt-1">{s.time}</p>
-          </div>
-        ))}
+          Ouvrir un ticket support
+          <IconArrowRight size={13} />
+        </Link>
       </div>
     </aside>
   )
@@ -380,9 +354,9 @@ function FaqTeaser() {
             </h2>
             <p className="text-[14.5px] text-ink-500 mt-2">On a réuni les 4 questions les plus fréquentes.</p>
           </div>
-          <a href="/faq" className="inline-flex items-center gap-1.5 text-[13.5px] text-ink-900 font-semibold no-underline px-4 py-2.5 rounded-full border border-[#E4E4E7] bg-white hover:bg-[#FAFAFA] transition-colors shrink-0">
+          <Link to="/aide" className="inline-flex items-center gap-1.5 text-[13.5px] text-ink-900 font-semibold no-underline px-4 py-2.5 rounded-full border border-[#E4E4E7] bg-white hover:bg-[#FAFAFA] transition-colors shrink-0">
             Toutes les questions <IconArrowRight size={13} />
-          </a>
+          </Link>
         </div>
         <div className="bg-white rounded-2xl border border-[#E4E4E7] overflow-hidden">
           {FAQ_ITEMS.map((f, idx) => {
@@ -474,7 +448,7 @@ export function ContactPage() {
             {[
               { Icon: IcClock,   label: 'Réponse 24h' },
               { Icon: IcShield,  label: 'RGPD compliant' },
-              { Icon: IcSparkle, label: 'Sans démarchage' },
+              { Icon: IcSparkle, label: 'Sans engagement' },
             ].map(({ Icon, label }, i) => (
               <span key={i} className="inline-flex items-center gap-2 text-white/70 text-[12.5px] font-medium whitespace-nowrap">
                 <Icon className="w-3.5 h-3.5 text-orange-500" />

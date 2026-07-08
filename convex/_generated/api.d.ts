@@ -20,6 +20,7 @@ import type * as claims from "../claims.js";
 import type * as closures from "../closures.js";
 import type * as communications from "../communications.js";
 import type * as config from "../config.js";
+import type * as contact from "../contact.js";
 import type * as crons from "../crons.js";
 import type * as customers from "../customers.js";
 import type * as dependencyStatus from "../dependencyStatus.js";
@@ -71,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   closures: typeof closures;
   communications: typeof communications;
   config: typeof config;
+  contact: typeof contact;
   crons: typeof crons;
   customers: typeof customers;
   dependencyStatus: typeof dependencyStatus;

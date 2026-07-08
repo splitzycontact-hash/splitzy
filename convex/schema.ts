@@ -458,6 +458,21 @@ export default defineSchema({
   }).index("by_email", ["email"])
     .index("by_created", ["createdAt"]),
 
+  // Demandes entrantes du formulaire /contact (démo, support, presse, partenariat).
+  // Table distincte de `leads` : leads est spécifique au calculateur de rentabilité
+  // (champs chiffrés requis — restaurantType, foodCostPercent, computedGapEuros)
+  // et mélanger les deux formes affaiblirait la validation des deux flux.
+  demoRequests: defineTable({
+    firstName: v.string(),
+    lastName: v.string(),
+    email: v.string(),
+    restaurantName: v.optional(v.string()),
+    subject: v.string(),        // demo | support | press | partner | other
+    message: v.string(),
+    createdAt: v.number(),
+  }).index("by_email", ["email"])
+    .index("by_created", ["createdAt"]),
+
   // Rate limiting générique — une entrée par clé (ex. "campaign:restaurantId").
   // Fenêtre glissante : count incrémenté dans la même fenêtre, reset au-delà.
   rateLimits: defineTable({
