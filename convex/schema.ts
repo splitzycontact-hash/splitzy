@@ -443,6 +443,21 @@ export default defineSchema({
     .index("by_restaurant_thread", ["restaurantId", "threadId"])
     .index("by_restaurant_date", ["restaurantId", "createdAt"]),
 
+  // Leads marketing capturés par le calculateur de rentabilité (/rentabilite).
+  // computedGapEuros : écart estimé €/mois vs coût matière de référence, calculé
+  // CÔTÉ SERVEUR dans leads.submitLead (jamais la valeur envoyée par le client).
+  // Estimation sectorielle générique — pas une analyse des données du restaurant.
+  leads: defineTable({
+    email: v.string(),
+    restaurantType: v.string(),
+    monthlyRevenueRange: v.string(),
+    foodCostPercent: v.number(),
+    computedGapEuros: v.number(),
+    source: v.string(),          // ex. "calculateur_rentabilite"
+    createdAt: v.number(),
+  }).index("by_email", ["email"])
+    .index("by_created", ["createdAt"]),
+
   // Rate limiting générique — une entrée par clé (ex. "campaign:restaurantId").
   // Fenêtre glissante : count incrémenté dans la même fenêtre, reset au-delà.
   rateLimits: defineTable({

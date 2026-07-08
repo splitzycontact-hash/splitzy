@@ -44,9 +44,10 @@ function SmallCard({ Icon, title, desc, to }: {
   )
 }
 
-function DarkSmallCard({ Icon, title, desc, to }: {
+function DarkSmallCard({ Icon, title, desc, to, secondaryLink }: {
   Icon: React.ComponentType<{ size?: number; stroke?: number }>
   title: string; desc: string; to?: string
+  secondaryLink?: { label: string; to: string }
 }) {
   return (
     <m.div
@@ -62,6 +63,15 @@ function DarkSmallCard({ Icon, title, desc, to }: {
       {to && (
         <Link to={to} className="mt-3 text-[13px] font-medium text-orange-400 hover:text-orange-300 transition-colors">
           En savoir plus →
+        </Link>
+      )}
+      {secondaryLink && (
+        <Link
+          to={secondaryLink.to}
+          onClick={() => window.scrollTo(0, 0)}
+          className="mt-1.5 text-[13px] font-medium text-white/45 hover:text-orange-300 transition-colors"
+        >
+          {secondaryLink.label}
         </Link>
       )}
     </m.div>
@@ -254,6 +264,7 @@ export function Features() {
               title="IA embarquée"
               desc="Insights sur vos ventes, analyse automatique des feedbacks, suggestions d'action concrètes."
               to="/fonctionnalites#ia"
+              secondaryLink={{ label: 'Estimer ma rentabilité →', to: '/rentabilite' }}
             />
             <SmallCard
               Icon={IconUsers}

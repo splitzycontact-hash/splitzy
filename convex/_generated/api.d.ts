@@ -31,6 +31,7 @@ import type * as growth from "../growth.js";
 import type * as http from "../http.js";
 import type * as insights from "../insights.js";
 import type * as invitations from "../invitations.js";
+import type * as leads from "../leads.js";
 import type * as lib from "../lib.js";
 import type * as members from "../members.js";
 import type * as menuItems from "../menuItems.js";
@@ -81,6 +82,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   insights: typeof insights;
   invitations: typeof invitations;
+  leads: typeof leads;
   lib: typeof lib;
   members: typeof members;
   menuItems: typeof menuItems;

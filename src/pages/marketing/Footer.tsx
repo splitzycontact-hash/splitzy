@@ -9,6 +9,7 @@ const FOOTER_COLS = [
       { label: 'Fonctionnalités', to: '/fonctionnalites' },
       { label: 'Tarifs',          to: '/pricing' },
       { label: 'Démo',            to: '/demo' },
+      { label: 'Diagnostic de rentabilité', to: '/rentabilite' },
       { label: 'Changelog',       to: '/changelog' },
     ],
   },
